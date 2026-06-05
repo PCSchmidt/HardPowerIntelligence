@@ -172,9 +172,24 @@ verified brief per desk**.
 
 - **Data cost at MVP ≈ $0** (free public Tier-0 sources) + ~$19/mo for one market-data
   vendor (FMP).
-- **LLM is the dominant variable cost**, controlled by the waterfall + shared-output
-  caching + the budget guard.
-- **Infrastructure ~$80–230/mo** (Vercel, Supabase Pro, backend host, email, errors).
+- **LLM cost is low by design.** The waterfall routes through OpenRouter to
+  cost-optimized models; Claude Sonnet is only the last-resort fallback.
+
+| Role | Model | Est. tokens/brief | Est. cost/brief |
+|------|-------|-------------------|-----------------|
+| Extraction | DeepSeek V4 Flash ($0.28/M out) | 30K in / 5K out | ~$0.005 |
+| Disambiguation | DeepSeek V4 Flash | 10K in / 2K out | ~$0.002 |
+| Synthesis | DeepSeek V4 Pro ($3.48/M out) | 25K in / 4K out | ~$0.057 |
+| Eval gate | Qwen3.7 Max ($3.75/M out) | 15K in / 2K out | ~$0.026 |
+| **Total** | | | **~$0.09/brief** |
+
+  One brief serves all subscribers (shared output). At 365 briefs/year per desk:
+  ~$33/year for one desk, ~$100/year at full three-desk Cycle 2 scale. All LLM spend
+  is capped by a budget guard that pauses synthesis if the daily threshold is exceeded.
+
+- **Infrastructure ~$80–230/mo** (Vercel, Supabase Pro, Fly.io ×2 services, Resend,
+  Sentry).
 - Break-even at a small number of subscribers; every reader past that is margin.
 
 See [DATA_SOURCES.md](DATA_SOURCES.md) for the source-by-source breakdown.
+See [DECISIONS.md](../DECISIONS.md#d006) (D006) for model selection rationale and upgrade process.

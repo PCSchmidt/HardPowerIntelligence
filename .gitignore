@@ -4,3 +4,27 @@
 .meridian/session.json
 .meridian/hooks.log
 .meridian/drift/
+.meridian/gate-state.json
+
+# Environment
+.env
+.env.*
+!.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.venv/
+venv/
+dist/
+*.egg-info/
+
+# Node
+node_modules/
+.next/
+.vercel/
+
+# OS
+.DS_Store
+Thumbs.db

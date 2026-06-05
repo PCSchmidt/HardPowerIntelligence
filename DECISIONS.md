@@ -45,42 +45,126 @@ an additional reader is near zero. It also maintains the publication posture
 
 ---
 
-## D004 — APScheduler + Postgres job queue for MVP; Celery deferred
+## D004 — Postgres job queue with procrastinate; Celery deferred *(updated 2026-06-05)*
 
-**Decision:** Use APScheduler with a Postgres job queue (`FOR UPDATE SKIP LOCKED`) for
-the source scheduler. Do not introduce Redis or Celery until throughput demands it.
+**Decision:** Use **`procrastinate`** (a Python async task queue backed by Postgres) for
+the source scheduler. Supabase `pg_cron` enqueues due jobs into the `ingestion_jobs`
+table on each source's schedule; one or more `hpi-worker` processes claim and execute
+jobs via `SELECT ... FOR UPDATE SKIP LOCKED`. APScheduler is not used — procrastinate
+owns the job lifecycle. Do not introduce Redis or Celery until throughput demands it.
 
-**Why:** Redis + Celery adds operational complexity (another service, another failure
-mode, another cost line). A Postgres-backed queue is sufficient at MVP scale, already
-has the database for job state, and Supabase `pg_cron` can enqueue due jobs. Upgrade
-path to Celery is clear if queue depth or throughput becomes a bottleneck.
+**Why:** APScheduler running inside a process stores its schedule in memory. If the
+process restarts, in-flight jobs are lost and the schedule resets. For a paid
+subscription product that promises a daily brief, silent ingestion failures are
+unacceptable. A Postgres-backed queue is durable — jobs survive worker restarts because
+they exist in the database, not in RAM. `pg_cron` handles the schedule; the worker
+handles execution; the jobs table is the audit log. `procrastinate` provides this
+pattern out of the box with async support, retry logic, and job monitoring without
+adding a second infrastructure dependency.
+
+Upgrade trigger for Celery + Redis: queue depth consistently exceeding Postgres throughput
+limits, or need for distributed task routing across heterogeneous worker pools. Not
+anticipated before Cycle 3.
 
 ---
 
-## D005 — Supabase for database, auth, and vectors
+## D005 — Supabase for database, auth, and vectors *(updated 2026-06-05)*
 
-**Decision:** Use Supabase (managed Postgres + pgvector) for the graph, ingestion
+**Decision:** Use Supabase (managed Postgres + pgvector) for the entity graph, ingestion
 tables, briefs, user accounts, and vector search. Row-level security for all user data.
+Large raw payloads (EDGAR filings, bulk downloads) are stored in **Supabase Storage**
+(S3-compatible object storage) with a URL pointer in the `raw_records` table; small
+structured payloads (<50KB) may be stored inline.
 
-**Why:** Supabase bundles Postgres, auth, row-level security, pgvector, and a REST/
-realtime API in one managed service with a generous free tier. Running a separate auth
-service, a separate vector DB, and a separate Postgres instance at MVP would multiply
-complexity without adding capability. pgvector handles semantic search for entity
-disambiguation at the scale of this dataset; a dedicated graph DB (Apache AGE, Neo4j)
-is deferred until traversal scale demands it.
+**Why:** Supabase bundles Postgres, auth, row-level security, pgvector, and a
+REST/realtime API in one managed service with a generous free tier. Separate services
+for auth, vectors, and storage would multiply complexity without adding capability.
+
+**Raw payload routing:** EDGAR 10-K filings run 1–5MB each. Storing large payloads
+inline in Postgres would exhaust Supabase's free-tier storage limit within months and
+degrade query performance. Supabase Storage is the correct landing zone for large binary
+payloads; the `raw_records.payload_url` column holds the pointer.
+
+**Graph traversal ceiling:** Supabase's managed Postgres does not support Apache AGE
+(which requires a custom-compiled Postgres build). The relational graph (entities +
+typed edges + recursive CTEs) handles 1–4 hop traversals comfortably through Cycle 2.
+The migration trigger for evaluating a dedicated graph layer is: all three desks live
++ supply-chain synthesis active + measurable query latency on 3+ hop traversals at
+production load. At that point, the preferred option is a **hybrid**: Supabase retains
+accounts, ingestion, and briefs; a Neo4j Aura instance handles deep graph traversal only.
+The schema abstraction (entities + typed edges) is graph-portable — migration is a data
+copy and query rewrite, not a redesign.
 
 ---
 
-## D006 — LLM waterfall: cheap models for extraction, strong model for synthesis
+## D006 — LLM waterfall: OpenRouter + DeepSeek V4 + Qwen3.7, configuration-driven *(updated 2026-06-05)*
 
-**Decision:** Use cheap models (e.g., Claude Haiku) for entity extraction, clustering,
-and candidate selection. Use the strong model (e.g., Claude Sonnet/Opus) only for
-final brief synthesis.
+**Decision:** Use a model waterfall with five independently configurable roles, all
+accessed via **LiteLLM + OpenRouter** except the last-resort fallback which calls the
+Anthropic SDK directly. Model IDs are pinned in environment variables, never hardcoded.
 
-**Why:** LLM cost is the dominant variable in the run cost. The strong model is only
-needed at the final synthesis step where prose quality matters. Extraction and
-clustering are pattern-matching tasks that cheap models handle reliably. Waterfall
-reduces synthesis cost by 5–10x versus using the strong model throughout.
+**Waterfall configuration:**
+
+| Role | Model | OpenRouter ID | Input/1M | Output/1M |
+|------|-------|--------------|----------|-----------|
+| Extraction | DeepSeek V4 Flash | `openrouter/deepseek/deepseek-v4-flash` | $0.14 | $0.28 |
+| Disambiguation | DeepSeek V4 Flash | `openrouter/deepseek/deepseek-v4-flash` | $0.14 | $0.28 |
+| Synthesis | DeepSeek V4 Pro | `openrouter/deepseek/deepseek-v4-pro` | $1.74 | $3.48 |
+| Eval | Qwen3.7 Max | `openrouter/qwen/qwen3.7-max` | $1.25 | $3.75 |
+| Synthesis fallback | Qwen3.7 Max | `openrouter/qwen/qwen3.7-max` | $1.25 | $3.75 |
+| Last-resort fallback | Claude Sonnet 4.6 | direct Anthropic SDK | ~$3.00 | ~$15.00 |
+
+**Why — model assignments:**
+- *Extraction/disambiguation (V4 Flash):* Pattern-matching tasks cheap models handle
+  reliably. $0.28/M output is ~50x cheaper than Sonnet for steps that do not require
+  strong reasoning.
+- *Synthesis (V4 Pro):* DeepSeek V4 Pro (1.6T MoE, 49B active, 1M context, 384K max
+  output) handles constrained factual generation at high capability and low cost
+  ($3.48/M vs $15/M output). The 384K max output ceiling matters: a detailed multi-story
+  Defense brief with full citations must not hit truncation mid-generation.
+- *Eval (Qwen3.7 Max):* The citation entailment check is a structured reasoning task —
+  Qwen3.7 Max's design focus (agentic, reasoning, structured output, 1M context). 65K
+  max output is sufficient for structured JSON verdicts. Benchmarks show Qwen3.7 Max
+  competitive with or above Sonnet 4.6 on intelligence and reasoning at $3.75/M vs
+  $15/M output.
+- *Synthesis fallback (Qwen3.7 Max):* If DeepSeek V4 Pro is unavailable, Qwen3.7 Max
+  is the fallback synthesis model. Its 65K output limit is a constraint for very long
+  briefs; monitor and adjust if synthesis regularly approaches that ceiling.
+- *Last-resort fallback (Claude Sonnet, direct Anthropic SDK):* Present not because
+  Sonnet is preferred, but because it is on a different infrastructure path. If
+  OpenRouter goes down, all OpenRouter-routed models fail simultaneously. A direct
+  Anthropic SDK call bypasses that. It is insurance, not a preference.
+
+**Estimated per-brief cost:** ~$0.09 (vs ~$0.40 all-Sonnet).
+Three desks × 365 days ≈ $100/year vs $440/year at full Cycle 2 scale.
+
+**Why — LiteLLM + OpenRouter:** LiteLLM normalizes the API across providers; OpenRouter
+provides a single API key, load balancing, and provider-level redundancy for all
+non-Anthropic models. No pipeline stage imports provider SDKs directly except the
+Anthropic SDK last-resort path. Model swaps are environment variable changes, not code
+changes. LiteLLM's built-in token and cost tracking feeds the budget guard directly.
+
+**Why — model pinning:** The citation-faithfulness eval harness is the product's
+credibility guarantee. If the eval model changes mid-run, scores drift and you cannot
+distinguish quality regression from model change. Pin all roles to specific versioned
+model IDs. Upgrades are deliberate: run the eval harness against the last 30 published
+briefs with the candidate model; promote only if faithfulness score meets or exceeds
+baseline; record the change here with date and reason.
+
+**Availability fallback sequence (synthesis):**
+1. DeepSeek V4 Pro via OpenRouter — retry 3× with exponential backoff
+2. Qwen3.7 Max via OpenRouter
+3. Claude Sonnet 4.6 via direct Anthropic SDK
+4. If all three fail: trigger D013 (previous brief + staleness indicator + alert)
+
+**Availability fallback sequence (eval):**
+1. Qwen3.7 Max via OpenRouter — retry 3×
+2. Claude Sonnet 4.6 via direct Anthropic SDK
+3. If both fail: hold brief in `pending`; retry eval on next cycle
+
+**Data routing note:** All synthesis and eval prompts contain public-domain data
+(USAspending, EDGAR, DoD contracts). Routing through DeepSeek and Qwen infrastructure
+is acceptable; all source data is publicly available.
 
 ---
 
@@ -111,16 +195,31 @@ This is what makes the "no uncited claim" guarantee checkable by an automated ev
 
 ---
 
-## D009 — FastAPI as the API layer; Next.js frontend separate
+## D009 — FastAPI on Fly.io, deployed as two services *(updated 2026-06-05)*
 
 **Decision:** FastAPI (Python) for the API backend. Next.js (App Router) for the
-frontend. They are separate services, not a monolith or a Next.js API-routes backend.
+frontend. They are separate services. The FastAPI backend is deployed to **Fly.io** as
+**two distinct services**: `hpi-api` (the HTTP server handling brief requests, auth
+validation, and Stripe webhooks) and `hpi-worker` (the long-running scheduler and
+ingestion worker). Next.js is deployed to Vercel.
 
-**Why:** The intelligence engine is Python (adapters, entity resolution, brief
-generation, eval harness). Keeping the API in Python avoids a cross-language RPC
-boundary between the engine and the API layer. Next.js is the best choice for the
-web reader (SEO, streaming, Vercel deployment) but is not the right choice for a
-data-pipeline backend. Separation lets each scale independently.
+**Why — FastAPI:** The intelligence engine is Python. Keeping the API in Python avoids
+a cross-language boundary between the engine and the API layer. Next.js is the right
+choice for the web reader (SEO, streaming, Vercel) but not for a data-pipeline backend.
+
+**Why — Fly.io over Railway:** The `hpi-worker` process must be persistent and
+always-on — APScheduler/procrastinate runs continuously, and a sleeping worker stops
+ingestion silently. Railway's lower tiers sleep idle services; Fly.io is designed for
+persistent processes and does not sleep. Fly.io also provides better granularity on
+machine sizing (~$2–5/mo for a shared-cpu-1x instance at MVP).
+
+**Why — two services:** Separating `hpi-api` and `hpi-worker` means the reader-facing
+API stays up if the worker crashes, and the worker can be restarted independently
+without dropping in-flight HTTP requests. It also sets up the natural scaling path:
+multiple worker instances can run safely against the same Postgres job queue via
+`FOR UPDATE SKIP LOCKED`. Next.js API routes are used only for Stripe webhook
+callbacks and auth redirects where required by those SDKs; all data fetching routes
+through FastAPI.
 
 ---
 
@@ -137,3 +236,133 @@ but the pieces don't integrate — is the failure mode Meridian is designed to p
 Gate enforcement also tracks calibration (predicted vs. actual hours) and forces
 independent evaluation of each phase before proceeding, surfacing integration failures
 early rather than at deploy time.
+
+---
+
+## D011 — Frontend-to-API boundary: FastAPI-first
+
+**Decision:** Next.js never calls Supabase directly for application data. All data
+fetching — briefs, entity data, subscription status, follows — routes through FastAPI
+endpoints. Supabase is accessed server-side only (from FastAPI). The Supabase JS client
+is used in Next.js only for authentication (session management, token refresh). Row-level
+security remains enabled as defense-in-depth, but FastAPI is the primary authorization
+layer.
+
+**Why:** The Supabase-first alternative (Next.js using supabase-js for read operations
+directly) splits business logic: some access control lives in RLS policies, some in
+FastAPI middleware, and the split is invisible to the reader. When the Cycle 2 mobile
+app is added, it calls the same FastAPI endpoints the web calls — there is one API
+contract, not two. FastAPI is also where subscription tier is checked, budget guards
+run, and brief access is gated — all of these belong in one place. The performance
+cost of routing through FastAPI instead of querying Supabase directly is negligible for
+this read volume.
+
+---
+
+## D012 — Subscription gating: FastAPI gates data, Next.js gates UX
+
+**Decision:** Subscription status is the source of truth in Supabase's `subscriptions`
+table, updated exclusively by Stripe webhooks arriving at a FastAPI endpoint. FastAPI
+validates the Supabase JWT on every request, resolves subscription tier, and gates
+data access (returning 403 for Pro-only content to free-tier users). Next.js middleware
+checks the session and handles UX routing (redirecting unauthenticated users to login,
+unauthenticated users to the subscribe page) — but never trusts its own session as the
+final authorization check. Both layers run; they serve different purposes.
+
+**Why — Stripe webhooks via FastAPI:** Stripe sends events (subscription created,
+payment failed, subscription cancelled) as HTTP POST requests. Handling these in
+FastAPI keeps the subscription state update logic co-located with the rest of the
+business logic, testable with standard Python tooling, and independent of Supabase
+Edge Functions (which add a separate deployment target). FastAPI verifies the Stripe
+webhook signature, updates `subscriptions`, and the change is immediately reflected in
+subsequent API calls.
+
+**Why — dual-layer gating:** Next.js middleware gates the UI route (so a free user
+never sees the Pro page at all), while FastAPI gates the data (so even if someone
+bypasses the UI, the API returns nothing). Defense in depth. The session claim (from
+Supabase Auth JWT custom claims) can carry the subscription tier for fast UI routing
+without an extra API call, but the FastAPI check is authoritative.
+
+---
+
+## D013 — Brief fallback when the eval gate fails or generation fails
+
+**Decision:** When a brief fails the citation-faithfulness eval gate, or when brief
+generation fails (LLM unavailable, synthesis error), subscribers are shown the **most
+recently published passing brief** with a visible staleness indicator ("Last updated
+X hours ago — next brief pending"). The failed/in-progress brief is held in a
+`pending` state. A Sentry alert fires immediately. The `briefs` table tracks
+`published_at`, `status` (`published | pending | failed`), and `faithfulness_score`
+to support this.
+
+**Why:** A paid subscriber must always see something — a "brief unavailable" blank
+screen is a support ticket and a cancellation risk. The previous brief is still
+accurate (it passed its own eval gate); its information is simply not the most current.
+Showing it with a clear timestamp is honest and functional. Silently publishing a
+failed brief is not an option — that is the product's core guarantee. The staleness
+indicator preserves trust; blanking the page destroys it.
+
+**Implication for schema design:** The `briefs` table must support multiple rows per
+desk (one per day), with a `status` column and a query pattern for "latest published
+brief for this desk." This is a Gate 2 (DATABASE_SCHEMA.md) requirement.
+
+---
+
+## D014 — Brief generation window: 5:30am ET daily *(updated 2026-06-05)*
+
+**Decision:** The daily brief generation job runs at **5:30am ET**. The data-readiness
+window closes at **5:00am ET** — sources scheduled to run overnight must complete by
+then. Sources that have not completed by 5:00am are noted in the brief's metadata as
+`sources_missing: [...]`; the brief generates with whatever data is present. Missing
+sources are flagged in citations metadata (not surfaced to the user unless all sources
+are missing). The next scheduled run of those sources proceeds normally; no special
+retry logic blocks the brief.
+
+**Why — 5:30am ET:** The target subscriber is a serious defense/energy investor or
+analyst who reads intelligence before market prep — by 6am or 7am ET at the latest.
+Competitive intelligence products (Defense News Morning Brief, Axios Pro, Politico
+Playbook, Bloomberg morning letters) publish by 6am ET. A 6:30am generation window
+produces a brief at ~6:45am, missing the early-morning reading window entirely. A
+5:30am generation window produces a brief by ~5:45am — ready when subscribers start
+their day. EDGAR's overnight batch (8-Ks, bulk filings) is available by 4–5am ET;
+DoD contracts, USAspending, and SAM.gov cover prior-day activity and are available
+overnight. No meaningful data is lost vs. a later cutoff.
+
+**Why — macro releases are handled separately:** Scheduled macro releases (CPI, FOMC
+statements, jobs reports) land at 8:30am ET on known dates. These are tracked in the
+`calendar_events` table and trigger a targeted fetch + incremental brief update at
+their release time — they do not delay the morning generation window.
+
+**Why — generate-with-available-data:** Blocking generation until all sources respond
+allows a single flaky source to delay the brief indefinitely. Sources are independently
+circuit-broken (D004); the brief's value comes from synthesis across multiple
+corroborating sources, not any single one.
+
+**Cycle 2 — two-window model:** Once the engine is validated, move to two generation
+cycles per day: (1) **Morning brief at 5:30am ET** — overnight data, prior-day awards
+and filings; (2) **Intraday update at 3:00pm ET** — macro releases, intraday 8-Ks,
+congressional activity, earnings. This is how professional intelligence products
+operate at scale. Cycle 1 runs one window only.
+
+---
+
+## D015 — Admin interface: Supabase Studio + FastAPI endpoints at MVP
+
+**Decision:** The human review queue for entity resolution (low-confidence mentions
+flagged for manual review) is managed via **Supabase Studio** (the Supabase web
+dashboard, available at no cost) and a pair of FastAPI admin endpoints:
+`GET /admin/resolution-queue` and `POST /admin/resolution-queue/{id}/resolve`.
+These endpoints are protected by an `is_admin` claim in the JWT. No dedicated admin
+UI is built in Cycle 1. Operational metrics (source health, circuit breaker state,
+LLM spend, last successful brief) are surfaced via a `GET /admin/status` endpoint
+returning JSON. Sentry handles error alerting.
+
+**Why:** The resolution queue will start thin — most defense contractor mentions
+resolve deterministically via the crosswalk spine. Building a polished admin UI before
+the queue volume justifies it wastes gate budget. Supabase Studio provides full table
+access with filtering and inline editing, which is sufficient for a solo operator
+reviewing a queue of tens to low hundreds of items per day. The FastAPI endpoints
+provide programmatic access and form the scaffolding for a proper admin UI in Cycle 2
+if the queue grows.
+
+---
