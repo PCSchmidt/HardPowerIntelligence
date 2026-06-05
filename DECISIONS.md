@@ -469,3 +469,101 @@ PDF, and follows is sufficient to drive Pro conversion.
 whichever comes first.
 
 ---
+
+## D020 — Frontend tech stack *(added 2026-06-05)*
+
+**Decision:** Next.js App Router (already locked) with the following additions:
+
+| Layer | Choice | Rationale |
+|-------|--------|-----------|
+| Components | shadcn/ui | Radix primitives (accessible), copy-paste ownership, full customization, excellent App Router support |
+| Styling | Tailwind CSS | Utility-first, pairs perfectly with shadcn, dark mode via `dark:` prefix when needed |
+| Icons | lucide-react | Already in shadcn dependency tree; consistent, well-maintained set |
+| Mutations / cache | TanStack Query v5 | Better mutation + optimistic update handling than SWR; built-in devtools |
+| Auth client | @supabase/ssr | Current Supabase package for App Router; `@supabase/auth-helpers-nextjs` is deprecated and must not be used |
+| Fonts | next/font | Zero layout shift, no external requests; loads Playfair Display, Lora, Inter |
+| Analytics | PostHog | `'use client'` provider wrapper in root `layout.tsx`; auto-tracks page views |
+| Error tracking | Sentry | Both API and frontend; initialized in `instrumentation.ts` |
+
+**Why shadcn over MUI/Chakra:** Shadcn components live in the repo — no dependency on a library's release cycle, no override battles, no design system compromise. For a product where visual sophistication is a differentiator, full design ownership is worth the additional setup cost.
+
+---
+
+## D021 — Design aesthetic: clean/editorial, high-class *(added 2026-06-05)*
+
+**Decision:** Clean/editorial visual language as the default. Dark mode deferred to Cycle 2 as a Pro feature.
+
+**Design language:** "Premium intelligence publication" — The Economist's restraint, Stratfor's analytical weight, Bloomberg's data precision. Every element earns its place. Typography carries the design; color signals meaning, not decoration.
+
+**Typography:**
+- Display / brief headlines: **Playfair Display** (serif, editorial, expensive-feeling)
+- Brief body copy: **Lora** (readable serif at paragraph sizes, pairs with Playfair)
+- All UI chrome: **Inter** (clean, modern, versatile)
+- All loaded via `next/font` for zero CLS
+
+**Color palette (light mode):**
+- Background: `#FAFAF8` (warm white — editorial, not clinical)
+- Surface: `#FFFFFF` (cards against warm background)
+- Brand primary: `#1B3A6B` (deep navy — authoritative, defense-adjacent)
+- Brand secondary: `#C8A96E` (antique gold — premium signal, used sparingly)
+- Interactive: `#2563EB` (blue — links, CTAs)
+- Foreground: `#1A1A1A` (near-black for maximum readability)
+- Full palette and token definitions in `DESIGN_SYSTEM.md`
+
+**Why warm white over pure white:** Pure white (#FFFFFF) reads as clinical and cheap against dark text. Warm white (#FAFAF8) signals print editorial (Financial Times salmon, cream newspaper stock). Subtle but effective.
+
+**Dark mode:** Token architecture supports dark mode from day one (CSS custom properties). Implementation deferred to Cycle 2 — the editorial light experience is the product's visual identity at launch.
+
+---
+
+## D022 — Frontend data fetching pattern *(added 2026-06-05)*
+
+**Decision:** Server Components for all content; Client Components for all interactivity; TanStack Query for mutations and cache invalidation.
+
+**Rules:**
+- Server Components (default): fetch from FastAPI directly on the server. Use for all pages where content is the primary load (brief reader, entity 360, marketing home, archive). No loading spinners for initial paint; SEO-ready.
+- Client Components (`'use client'`): only when browser APIs, event handlers, or React state are required. Nav auth state, citations drawer, follow button, trial banner, theme toggle.
+- TanStack Query: mutations only (follow/unfollow, subscription status revalidation after Stripe redirect). Not used for initial page data — that's Server Components.
+- Next.js middleware (`middleware.ts`): calls Supabase `updateSession()` on every request to keep the auth cookie fresh. Runs at the edge.
+
+**Why not client-side fetch for briefs:** A brief page that shows a loading skeleton before content appears signals "this is a web app." A brief page that renders the full content on first paint signals "this is a publication." The product's positioning demands the latter.
+
+---
+
+## D023 — Brief reader layout and navigation *(added 2026-06-05)*
+
+**Decision:** Single column on mobile and tablet; optional right sidebar at `lg:` (1024px+). Slide-in citations drawer on all breakpoints (right panel on desktop, full-screen sheet on mobile).
+
+**Brief reader layout:**
+- Content column: `max-w-[72ch]` centered, generous vertical padding
+- Sidebar (lg+): catalyst calendar widget + followed entities list (Pro); `w-80` fixed width
+- No horizontal scroll; no fixed side nav (wastes screen real estate on a reading product)
+
+**Citations drawer:**
+- Triggered by clicking any citation chip `[1]` in brief body
+- Desktop: fixed right panel, `w-[420px]`, slides in from right, does not push content
+- Mobile: shadcn `Sheet` full-screen bottom or side, same content
+- Close: X button, click-outside, or Escape key
+- Drawer is scoped to the current brief item's citations by default; "Show all sources" toggle
+
+**Brief item type badges:** Color-coded by item type (Award = navy, Filing = blue, Policy = amber, Macro = teal, Signal = violet) using desk-aware Tailwind variants.
+
+---
+
+## D024 — Subscription UX: trial, upgrade prompts, gates *(added 2026-06-05)*
+
+**Decision:** Inline soft gates over hard redirects. Trial countdown in nav. No hard gate for free tier (current brief always accessible).
+
+**Trial banner:** Displayed only in the NavBar during an active trial. Subtle — "Trial: N days remaining · Manage." Upgrades to slightly more prominent on the last day. Disappears after conversion or cancellation. Not shown on every page as a banner.
+
+**Archive gate (free user, historical brief):** Inline `UpgradePrompt` component above the locked item — not a redirect. "Access the full 90-day archive with Pro. 14-day free trial, cancel anytime." + CTA button. Keeps the user on the product.
+
+**Entity 360 gate (free user):** Full-page `ArchiveLock` component — soft gate with trial CTA. The page route is accessible but the content is replaced with the gate. No hard 403 redirect for web navigation (FastAPI returns 403 on the data endpoint; the UI shows the gate page).
+
+**PDF gate:** Inline tooltip/popover on the PDF button: "PDF export is a Pro feature. Start your free trial." Does not navigate away.
+
+**Post-lapse:** Free tier after trial ends. No hard gate. Current day's brief accessible. Archive items show lock icon + "Pro" label. Product sells itself.
+
+**Stripe Checkout flow:** `/subscribe` → Stripe hosted checkout (redirect) → `/subscribe/success` (confirmation + onboarding + CTA) or `/subscribe/cancel` (no-friction return to `/subscribe`).
+
+---
