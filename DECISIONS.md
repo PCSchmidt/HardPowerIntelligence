@@ -48,10 +48,16 @@ an additional reader is near zero. It also maintains the publication posture
 ## D004 — Postgres job queue with procrastinate; Celery deferred *(updated 2026-06-05)*
 
 **Decision:** Use **`procrastinate`** (a Python async task queue backed by Postgres) for
-the source scheduler. Supabase `pg_cron` enqueues due jobs into the `ingestion_jobs`
-table on each source's schedule; one or more `hpi-worker` processes claim and execute
-jobs via `SELECT ... FOR UPDATE SKIP LOCKED`. APScheduler is not used — procrastinate
-owns the job lifecycle. Do not introduce Redis or Celery until throughput demands it.
+the source scheduler. Procrastinate's `@app.periodic` decorator registers each source's
+fetch schedule directly in Python code; the `hpi-worker` process owns the schedule
+lifecycle entirely. `pg_cron` is **not required** — procrastinate stores periodic task
+state in `procrastinate_periodic_defers` and fires jobs without any Postgres extension.
+APScheduler is not used. Do not introduce Redis or Celery until throughput demands it.
+
+*(Updated 2026-06-05: dropped pg_cron dependency. pg_cron requires Supabase Pro and is
+not available on the free tier. Procrastinate's native PeriodicTask achieves the same
+result with no infrastructure dependency. If Supabase Pro is adopted for other reasons,
+pg_cron can coexist as a secondary trigger but adds no functional value for Cycle 1.)*
 
 **Why:** APScheduler running inside a process stores its schedule in memory. If the
 process restarts, in-flight jobs are lost and the schedule resets. For a paid
@@ -355,22 +361,26 @@ operate at scale. Cycle 1 runs one window only.
 
 ## D015 — Admin interface: Supabase Studio + FastAPI endpoints at MVP
 
-**Decision:** The human review queue for entity resolution (low-confidence mentions
-flagged for manual review) is managed via **Supabase Studio** (the Supabase web
-dashboard, available at no cost) and a pair of FastAPI admin endpoints:
-`GET /admin/resolution-queue` and `POST /admin/resolution-queue/{id}/resolve`.
-These endpoints are protected by an `is_admin` claim in the JWT. No dedicated admin
-UI is built in Cycle 1. Operational metrics (source health, circuit breaker state,
-LLM spend, last successful brief) are surfaced via a `GET /admin/status` endpoint
-returning JSON. Sentry handles error alerting.
+**Decision:** The `resolution_queue` table is an **async audit log**, not a daily work
+queue. Low-confidence mentions are auto-dismissed by the resolver cascade (D027) and
+logged with `status = 'auto_dismissed'`; no human action is required to keep the
+pipeline running. The FastAPI admin endpoints (`GET /admin/resolution-queue`,
+`POST /admin/resolution-queue/{id}/resolve`) and Supabase Studio provide access for
+**periodic audit** (weekly, monthly, or when a brief output looks wrong) — not daily
+triage. Operational metrics (source health, circuit breaker state, LLM spend, last
+successful brief) are surfaced via `GET /admin/status`. Sentry handles real-time
+alerting. No dedicated admin UI in Cycle 1.
 
-**Why:** The resolution queue will start thin — most defense contractor mentions
-resolve deterministically via the crosswalk spine. Building a polished admin UI before
-the queue volume justifies it wastes gate budget. Supabase Studio provides full table
-access with filtering and inline editing, which is sufficient for a solo operator
-reviewing a queue of tens to low hundreds of items per day. The FastAPI endpoints
-provide programmatic access and form the scaffolding for a proper admin UI in Cycle 2
-if the queue grows.
+**Why:** A solo operator cannot babysit a daily resolution queue. The two-tier LLM
+cascade (D027) handles the vast majority of mentions automatically. Defense contractor
+data resolves deterministically via the crosswalk spine for all major primes and
+subcontractors; the LLM cascade handles edge cases. Only truly unresolvable mentions
+(confidence < 0.55) are auto-dismissed — these are typically obscure foreign entities
+or non-standard contractor references that add marginal value to the brief anyway.
+The audit log accumulates these for review at the operator's discretion.
+
+*(Updated 2026-06-05: resolution_queue reclassified from daily work queue to async
+audit log. Reflects D027 two-tier LLM cascade decision.)*
 
 ---
 
@@ -565,5 +575,340 @@ whichever comes first.
 **Post-lapse:** Free tier after trial ends. No hard gate. Current day's brief accessible. Archive items show lock icon + "Pro" label. Product sells itself.
 
 **Stripe Checkout flow:** `/subscribe` → Stripe hosted checkout (redirect) → `/subscribe/success` (confirmation + onboarding + CTA) or `/subscribe/cancel` (no-friction return to `/subscribe`).
+
+---
+
+## D025 — Python project structure: uv, Python 3.12, monorepo workspaces *(added 2026-06-05)*
+
+**Decision:**
+
+- **Package manager:** `uv` (fast, modern, standard for new Python projects in 2025–2026)
+- **Python version:** 3.12
+- **Repository layout:**
+
+```
+HardPowerIntelligence/
+  web/           # Next.js (Vercel)
+  api/           # FastAPI app — hpi-api Fly.io service
+  engine/        # Intelligence engine — shared Python package
+  worker/        # hpi-worker entry point (procrastinate runner)
+  tests/         # pytest suite (unit + integration)
+  supabase/      # Supabase CLI migrations
+  docker/        # Fly.io Dockerfiles (Dockerfile.api, Dockerfile.worker)
+  pyproject.toml # Root workspace — declares api, engine, worker as members
+```
+
+- **One root `pyproject.toml`** with `uv` workspaces. `engine/` is a workspace member
+  installable as an editable package by both `api/` and `worker/`. Each service declares
+  `engine` as a local dependency.
+- **pytest** lives at root; discovers `tests/` directory. All Python tooling (`ruff`,
+  `mypy`, `pytest`) configured in root `pyproject.toml`.
+
+**Why:** A monorepo with workspaces means `engine/` code is shared without publishing
+to PyPI or duplicating code. `uv` resolves dependencies faster than pip and provides
+a lockfile (`uv.lock`) for reproducible builds. Single `pyproject.toml` at root means
+one config file for all Python tooling.
+
+---
+
+## D026 — Embedding model: OpenAI text-embedding-3-small *(added 2026-06-05)*
+
+**Decision:** Use OpenAI `text-embedding-3-small` for all vector embeddings:
+`entity_aliases.embedding` and `normalized_records.embedding`. Confirms `VECTOR(1536)`
+in the database schema. Adds OpenAI as a dependency with `OPENAI_API_KEY` in env.
+
+**Cost:** $0.02 per 1M tokens. Embedding all defense contractor aliases and text chunks
+costs cents per month at MVP scale — negligible.
+
+**Usage in the pipeline:**
+- Entity resolution: embed `alias_normalized` text at alias creation time
+- RAG ingestion: embed `text_chunk` at normalization time (async, post-ingestion)
+- RAG query: embed concatenation of top-5 materiality candidate headlines + entity names
+  once per brief generation cycle; use as `pgvector` query vector
+
+**Why over alternatives:** `text-embedding-3-small` is the de facto standard for RAG
+pipelines — ubiquitous documentation, excellent pgvector compatibility, and the 1536
+dimension size is well-supported by `ivfflat` and `hnsw` indexes. Alternatives (Cohere,
+local models) add either cost or infrastructure overhead without meaningful quality gain
+for this use case.
+
+**Environment variables:**
+```
+OPENAI_API_KEY=sk-...
+EMBEDDING_MODEL=text-embedding-3-small
+EMBEDDING_DIMENSIONS=1536
+```
+
+---
+
+## D027 — Entity resolution: two-tier LLM cascade, async audit log *(added 2026-06-05)*
+
+**Decision:** Four-tier automated resolution cascade. No daily human action required.
+`resolution_queue` is an async audit log, not a work queue (see updated D015).
+
+```
+similarity ≥ 0.92             → auto-link (no LLM)
+0.70 ≤ similarity < 0.92      → DeepSeek V4 Flash disambiguation
+0.55 ≤ similarity < 0.70      → DeepSeek V4 Flash with expanded context
+similarity < 0.55             → auto-dismiss, log to resolution_queue
+```
+
+**Environment variables:**
+```
+ENTITY_RESOLUTION_HIGH_THRESHOLD=0.92
+ENTITY_RESOLUTION_MEDIUM_THRESHOLD=0.70
+ENTITY_RESOLUTION_LOW_THRESHOLD=0.55
+```
+
+**Why the two LLM tiers:** The first LLM call receives the normalized mention +
+the top candidates + a short context snippet. The second call (0.55–0.70 range) adds
+the full source passage — more context improves accuracy for edge cases without doubling
+cost on the common case. Below 0.55, even expanded context rarely resolves correctly;
+auto-dismiss is the correct call.
+
+**Why auto-dismiss over provisional entities:** Creating provisional entity nodes risks
+polluting the graph with duplicates or incorrect entries that silently corrupt future
+briefs. An auto-dismissed mention is a recoverable gap; a wrong entity link is an
+active error. The crosswalk spine (USAspending UEI → SAM entity hierarchy) handles all
+major defense primes and subcontractors deterministically. Auto-dismissed mentions in
+Cycle 1 will predominantly be obscure foreign entities or non-standard contractor
+references — marginal value to the brief.
+
+---
+
+## D028 — Synthesis prompt structure *(added 2026-06-05)*
+
+**Decision:** Dual-section prompt with `[CITE:N]` sequential citation index and
+structured JSON output format.
+
+**Prompt structure:**
+```
+## Verified facts (ground truth — do not contradict or modify)
+[JSON array: {record_id, entity, amount, date, program, source_id}]
+
+## Source passages (cite by index)
+[1] {source_id, date, url} — "{excerpt}"
+[2] ...
+
+## Output schema
+{
+  "headline": "...",
+  "bluf": "...",
+  "items": [
+    {
+      "item_type": "award|filing|policy|macro|signal",
+      "headline": "...",
+      "body": "... [CITE:1] ... [CITE:3] ...",
+      "entity_mentions": ["..."],
+      "citation_indices": [1, 3]
+    }
+  ]
+}
+
+## Instructions
+Write a Defense brief. Every factual claim must include [CITE:N].
+Only reference facts and passages provided above.
+Return valid JSON matching the output schema exactly.
+```
+
+**Citation binding:** The `[CITE:N]` indices map to `raw_record_id` at position N-1 in
+the sources list. The binding step resolves indices to UUIDs and creates `citations`
+rows. Any claim without a `[CITE:N]` marker is flagged as an uncited claim and counts
+against the faithfulness score.
+
+**Why structured JSON:** Prose output with post-processing parsing is fragile. Telling
+the model the exact output schema and validating the response with Pydantic is reliable
+with current-generation LLMs. The `DeepSeek V4 Pro` and `Qwen3.7 Max` models both
+handle JSON schema adherence well with explicit schema instructions.
+
+**Why dual-section:** Separating structured facts from text passages makes the
+"non-hallucinable spine" explicit to the model. Structured facts (amounts, dates,
+entity IDs) are labeled as ground truth; passages are labeled as supporting color.
+This reduces factual hallucination and makes the eval gate's entailment check
+more interpretable — the eval model can distinguish fact violations from passage
+interpretation errors.
+
+---
+
+## D029 — Eval gate architecture *(added 2026-06-05)*
+
+**Decision:** Per-item evaluation (one Qwen3.7 Max call per brief item). Item-level
+exclusion for failed items. Brief-level `faithfulness_score` computed over surviving
+items only.
+
+**Eval call structure per item:**
+```json
+{
+  "claims": [
+    {"id": "c1", "text": "Lockheed Martin was awarded $1.1B for LRASM production"},
+    {"id": "c2", "text": "The contract runs through FY2028"}
+  ],
+  "sources": [
+    {"index": 1, "excerpt": "Award amount: $1,100,000,000; LRASM production FY26-28"}
+  ],
+  "task": "For each claim, determine if it is supported by the provided sources."
+}
+```
+
+**Expected JSON response:**
+```json
+{
+  "verdicts": [
+    {"id": "c1", "verdict": "pass", "confidence": 0.98},
+    {"id": "c2", "verdict": "pass", "confidence": 0.91}
+  ]
+}
+```
+
+**Failure handling:**
+- All claims in an item fail → item excluded from published brief, logged
+- `faithfulness_score = total_passing_claims / total_claims` across remaining items
+- Score ≥ `BRIEF_FAITHFULNESS_THRESHOLD` (0.95) → brief publishes
+- Score < threshold → D013 fallback (previous brief + staleness indicator + Sentry alert)
+
+**Why item-level exclusion over brief-level failure:** One bad extraction (e.g., a
+garbled EDGAR filing parse) should not block an otherwise credible brief. Item-level
+exclusion is the right granularity — surgical removal of the problematic item, not
+throwing out the whole output.
+
+---
+
+## D030 — Materiality scoring formula *(added 2026-06-05)*
+
+**Decision:**
+
+```python
+materiality = (
+    SOURCE_WEIGHTS[source_id]       * 0.25 +   # authority
+    float(is_new_since_last_brief)  * 0.30 +   # novelty (binary)
+    normalize(amount_usd)           * 0.20 +   # magnitude (0.0 for non-numeric)
+    ENTITY_IMPORTANCE[entity_type]  * 0.15 +   # importance
+    min(corroboration_count, 3)/3   * 0.10     # corroboration (capped at 3)
+)
+```
+
+Candidates with `materiality < MATERIALITY_THRESHOLD` are dropped before synthesis.
+
+**Environment variables (all tunable without code changes):**
+```
+MATERIALITY_THRESHOLD=0.35
+
+SOURCE_WEIGHTS={"usaspending": 0.9, "dod_contracts": 0.85, "edgar": 0.85,
+                "sam_gov": 0.8, "congress_gov": 0.8, "fred": 0.7, "gdelt": 0.5}
+
+ENTITY_IMPORTANCE={"company": 1.0, "program": 0.85, "person": 0.7,
+                   "gov_agency": 0.75, "institution": 0.6, "sector": 0.5}
+```
+
+**`normalize(amount_usd)`:** min-max normalization against a rolling 90-day window of
+award amounts for the same source. Awards in the top decile score 1.0; median score
+~0.5; no amount scores 0.0.
+
+**Review cadence:** Weights are starting estimates. After 30 published briefs, review
+the materiality distribution — if the threshold is too loose (too many items per brief)
+or too tight (brief feels thin), adjust `MATERIALITY_THRESHOLD` first before touching
+component weights.
+
+---
+
+## D031 — RAG retrieval parameters *(added 2026-06-05)*
+
+**Decision:**
+
+- **Time window:** all `normalized_records` with `created_at >= last_published_brief.generation_started_at`. Ensures no data is missed on brief failure days (D013).
+- **Passage count:** `RAG_PASSAGE_TOP_K=20` (configurable; max 40 before prompts become unwieldy)
+- **Graph edge cap:** top 50 edges by `(transaction_time DESC, confidence DESC)` for all entities in the candidate pool; `RAG_GRAPH_EDGE_LIMIT=50`
+- **Query vector:** embed the concatenation of the top-5 materiality candidates' headlines + primary entity names. Single `text-embedding-3-small` call per brief generation cycle. Query: `ORDER BY embedding <=> $query_vector LIMIT RAG_PASSAGE_TOP_K`
+
+**Why top-5 candidates as query:** After change detection and materiality scoring, the
+top-5 candidates define "what today's brief is about." Embedding their headlines +
+entities as a single query string retrieves the most relevant supporting passages
+without additional LLM calls or per-candidate queries. This is the minimal-cost
+approach that captures the day's thematic focus.
+
+**Environment variables:**
+```
+RAG_PASSAGE_TOP_K=20
+RAG_GRAPH_EDGE_LIMIT=50
+```
+
+---
+
+## D032 — Database migrations: Supabase CLI *(added 2026-06-05)*
+
+**Decision:** All schema changes via Supabase CLI migration files. No manual SQL in
+production. No Alembic.
+
+```
+supabase/
+  migrations/
+    20260605000001_initial_schema.sql
+    20260605000002_procrastinate_schema.sql
+    ...
+  config.toml
+  seed.sql      # source_registry seed rows
+```
+
+**Workflow:**
+- Local development: `supabase start` (local Postgres + Auth + Storage emulator)
+- New migration: `supabase migration new <description>`
+- Apply locally: `supabase db reset` (drops + recreates from migrations)
+- Deploy to cloud: `supabase db push`
+- All migration files committed to git
+
+**Why Supabase CLI over Alembic:** Supabase CLI is purpose-built for Supabase projects,
+handles RLS policies and Auth schema correctly, and provides the `supabase start` local
+emulator that matches production exactly. Alembic is better suited to SQLAlchemy-centric
+projects where Python models drive the schema. This project drives schema from SQL DDL
+(DATABASE_SCHEMA.md), making Supabase CLI the natural fit.
+
+---
+
+## D033 — Test infrastructure: pytest, asyncio, golden fixtures *(added 2026-06-05)*
+
+**Decision:**
+
+```toml
+# pyproject.toml [tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+addopts = "--cov=engine --cov=api --cov-report=term-missing"
+```
+
+**Dependencies:** `pytest`, `pytest-asyncio`, `pytest-cov`, `respx` (async HTTP mocking for adapters)
+
+**Test structure:**
+```
+tests/
+  unit/                          # No network, no DB — golden fixtures only
+    adapters/
+      test_usaspending_adapter.py
+      test_edgar_adapter.py
+    entity/
+      test_resolver.py
+    brief/
+      test_generator.py
+      test_citation_eval.py
+  integration/                   # Requires local Supabase (supabase start)
+    test_ingestion_pipeline.py
+    test_entity_resolution_e2e.py
+  fixtures/
+    usaspending/
+      20260605_dod_awards_response.json   # recorded real API response
+    edgar/
+      20260605_8k_lmt.json
+    sam_gov/
+      20260605_entity_lmt.json
+  conftest.py                    # DB fixture, mock HTTP client, sample entities
+```
+
+**Gate 4 acceptance:** unit tests only (golden fixtures). Integration tests are
+good practice but not required to pass Gate 4. Gate 5 (brief verified) requires
+the eval harness to pass on at least one real brief — integration test territory.
+
+**Golden fixture convention:** Record a real API response once (during adapter
+development), save to `tests/fixtures/{source_id}/{date}_{description}.json`,
+never regenerate automatically. Fixtures are version-controlled truth for the parser.
+Update manually only when the upstream API changes its response format.
 
 ---

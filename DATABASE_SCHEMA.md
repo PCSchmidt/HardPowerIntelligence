@@ -112,7 +112,7 @@ CREATE TABLE entity_aliases (
     alias               TEXT NOT NULL,
     alias_normalized    TEXT NOT NULL,   -- uppercase, stripped (Inc/Corp/LLC removed)
     source              TEXT NOT NULL,   -- where this alias came from
-    embedding           VECTOR(1536),    -- for semantic fallback matching
+    embedding           VECTOR(1536),    -- text-embedding-3-small (D026); generated at alias creation
     created_at          TIMESTAMPTZ NOT NULL DEFAULT now(),
     UNIQUE (entity_id, alias_normalized)
 );
@@ -345,7 +345,7 @@ CREATE TABLE normalized_records (
     structured_data JSONB NOT NULL DEFAULT '{}',
                         -- record-type-specific fields (award amount, filing date, etc.)
     text_chunk      TEXT,       -- free text for pgvector indexing (RAG passages)
-    embedding       VECTOR(1536),
+    embedding       VECTOR(1536),   -- text-embedding-3-small (D026); generated post-ingestion async
     created_at      TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
@@ -374,35 +374,30 @@ tables manually — run `procrastinate schema --apply` during deployment.
 | `procrastinate_events` | Job lifecycle events (scheduled, started, succeeded, failed) |
 | `procrastinate_periodic_defers` | Tracks last defer time for periodic tasks |
 
-**pg_cron integration:**
+**Scheduling integration (procrastinate PeriodicTask — D026):**
 
-Supabase `pg_cron` is used to enqueue ingestion jobs on schedule. Each active source
-in `source_registry` gets a pg_cron entry that calls a PL/pgSQL helper to enqueue a
-procrastinate job:
+Job scheduling is owned by procrastinate's native `@app.periodic` decorator, not
+`pg_cron`. The `hpi-worker` process registers all periodic tasks in code; state is
+stored in `procrastinate_periodic_defers`. No `pg_cron` extension required — this
+works on Supabase Free tier.
 
-```sql
--- Enqueue due ingestion jobs every 5 minutes (pg_cron scans source_registry.fetch_cron)
-SELECT cron.schedule(
-    'enqueue-due-ingestion-jobs',
-    '*/5 * * * *',
-    $$SELECT enqueue_due_ingestion_jobs()$$
-);
+Task registration lives in `worker/tasks.py`:
+
+```python
+@app.periodic(cron="0 10 * * *")    # USAspending: 8am UTC daily
+async def fetch_usaspending(timestamp: int) -> None: ...
+
+@app.periodic(cron="30 8 * * *")    # SAM.gov: 8:30am UTC
+async def fetch_sam_gov(timestamp: int) -> None: ...
+
+@app.periodic(cron="30 10 * * *")   # Brief generation: 5:30am ET = 10:30 UTC (D014)
+async def generate_defense_brief(timestamp: int) -> None: ...
 ```
 
-The `enqueue_due_ingestion_jobs()` function (created at migration time) evaluates each
-active source's `fetch_cron` expression and enqueues a procrastinate job for sources
-whose next run time has passed and which have no currently running job.
-
-**Brief generation schedule:**
-
-```sql
--- 5:30am ET = 10:30 UTC (per D014)
-SELECT cron.schedule(
-    'generate-defense-brief',
-    '30 10 * * *',
-    $$SELECT enqueue_brief_generation('defense')$$
-);
-```
+Each task reads its source config from `source_registry` at runtime. The
+`source_registry.fetch_cron` column documents the intended cadence but is not
+consumed by pg_cron — it is the reference value used when registering the
+`@app.periodic` decorator and for display in the admin status endpoint.
 
 ---
 
