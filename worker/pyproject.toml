@@ -1,0 +1,20 @@
+[project]
+name = "hpi-worker"
+version = "0.1.0"
+requires-python = ">=3.12"
+dependencies = [
+    "hpi-engine",
+    "procrastinate[aiopg]>=2.6",
+    "asyncpg>=0.30",
+    "pydantic-settings>=2.3",
+    "sentry-sdk>=2.5",
+    "python-dotenv>=1.0",
+    "structlog>=24.1",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["tasks"]
