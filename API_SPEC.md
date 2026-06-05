@@ -98,16 +98,16 @@ All error responses use this envelope:
 
 | Feature | Free | Pro |
 |---------|------|-----|
-| Weekly brief (summary) | ✓ | ✓ |
-| Daily brief (full content) | — | ✓ |
-| Brief archive | — | ✓ |
+| Daily brief — current day, full content | ✓ | ✓ |
+| Brief archive — rolling 90 days | — | ✓ |
 | Entity 360 pages | — | ✓ |
 | PDF export | — | ✓ |
 | Follows / personalization | — | ✓ |
+| Additional desks (Cycle 2) | — | ✓ |
 
-Free users receive one brief per week (most recent Monday brief). Pro users receive
-the full daily brief. All gating is enforced at the FastAPI layer (D012) — never
-rely solely on Next.js middleware.
+Both tiers receive the full daily brief for the current day. Pro adds archive access,
+entity 360, PDF, and follows. New subscribers get a 14-day Pro trial (CC required, D019).
+All gating is enforced at the FastAPI layer (D012) — never rely solely on Next.js middleware.
 
 ---
 
@@ -139,7 +139,7 @@ No auth required. Used by Fly.io health checks.
 Returns a paginated list of published briefs for a desk, latest first.
 
 **Auth:** required  
-**Tier gating:** free users see only the most recent weekly brief in results; pro users see full archive
+**Tier gating:** free users see only the current day's brief; pro users see rolling 90-day archive
 
 **Query params:**
 
@@ -180,7 +180,7 @@ latest brief is `pending` or `failed`, returns the last `published` brief with a
 staleness indicator.
 
 **Auth:** required  
-**Tier gating:** free users receive summary only (no `items`, no `citations`); pro users receive full content
+**Tier gating:** both tiers receive full content for the current day's brief; Pro additionally unlocks archive access via `GET /briefs/{id}` and `GET /briefs`
 
 **Query params:**
 
@@ -188,7 +188,7 @@ staleness indicator.
 |-------|------|----------|-------------|
 | `desk` | `"defense"` | yes | Desk to query |
 
-**Response `200` (pro tier):**
+**Response `200`:**
 ```json
 {
   "id": "uuid",
@@ -233,26 +233,6 @@ staleness indicator.
 }
 ```
 
-**Response `200` (free tier) — summary only:**
-```json
-{
-  "id": "uuid",
-  "desk": "defense",
-  "date": "2026-06-05",
-  "status": "published",
-  "published_at": "2026-06-05T09:35:00Z",
-  "headline": "...",
-  "bluf": "...",
-  "faithfulness_score": null,
-  "staleness_indicator": null,
-  "items": null,
-  "citations": null,
-  "sources_missing": [],
-  "model_waterfall": null,
-  "tier_gate": "pro_required"
-}
-```
-
 **Staleness indicator (D013 fallback — when returned brief is not today's):**
 ```json
 {
@@ -271,7 +251,7 @@ staleness indicator.
 Returns a single brief by ID with full content.
 
 **Auth:** required  
-**Tier gating:** pro only for `items` and `citations`; 404 if `id` not found or `status != published`
+**Tier gating:** free users can access today's brief by ID with full content; any brief with `date < today` requires Pro and returns `403` for free-tier users
 
 **Path params:** `id: UUID`
 
@@ -291,8 +271,8 @@ Returns a PDF rendering of the brief.
 **Auth:** required  
 **Tier gating:** pro only
 
-Generates on demand via Puppeteer/WeasyPrint. Cached in Supabase Storage after first
-generation. Response is streamed.
+Generates on demand via WeasyPrint (pure Python, D017). Cached in Supabase Storage after
+first generation. Response is streamed.
 
 **Response `200`:** `Content-Type: application/pdf`
 
@@ -753,7 +733,7 @@ class BriefFull(BriefSummary):
     sources_missing: list[str]
     model_waterfall: ModelWaterfallMeta | None
     staleness_indicator: StalenessIndicator | None
-    tier_gate: str | None  # "pro_required" when free tier
+    tier_gate: str | None  # set when access is restricted (e.g. archived brief on free tier)
 
 class BriefItem(BaseModel):
     id: UUID

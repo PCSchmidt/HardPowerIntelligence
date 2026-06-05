@@ -221,6 +221,13 @@ multiple worker instances can run safely against the same Postgres job queue via
 callbacks and auth redirects where required by those SDKs; all data fetching routes
 through FastAPI.
 
+**Rate limiting:** Cloudflare WAF rules handle edge-level throttling (100 requests/minute
+per IP on `/v1/*`; already in the stack, zero additional cost). `slowapi` FastAPI
+middleware enforces per-user limits on expensive endpoints: entity search (30/min),
+entity 360 (20/min), PDF export (5/hour). No Redis required at MVP — `slowapi` uses
+in-memory counters. Upgrade to Redis-backed limiting only if multiple `hpi-api`
+instances run concurrently.
+
 ---
 
 ## D010 — Meridian gate governance from day one
@@ -364,5 +371,101 @@ access with filtering and inline editing, which is sufficient for a solo operato
 reviewing a queue of tens to low hundreds of items per day. The FastAPI endpoints
 provide programmatic access and form the scaffolding for a proper admin UI in Cycle 2
 if the queue grows.
+
+---
+
+## D016 — Citation faithfulness threshold: 0.95, configurable *(added 2026-06-05)*
+
+**Decision:** The minimum citation-faithfulness score for a brief to publish is **0.95**.
+Stored in environment variable `BRIEF_FAITHFULNESS_THRESHOLD` (default `0.95`); adjustable
+without a code change.
+
+**What 0.95 means concretely:**
+
+The eval gate checks every cited claim in the brief:
+- Prose claims: LLM entailment check ("does this source passage support this claim?") → pass/fail
+- Numeric claims: exact match against the cited source value → pass/fail
+
+`faithfulness_score = passing_checks / total_checks`
+
+A brief with 20 citations where 19 pass scores 0.95 → publishes. Where 18 pass → 0.90 →
+fails, D013 fallback activates, Sentry alert fires.
+
+**Why 0.95:** A credibility product that publishes uncited claims loses its core
+differentiator. 95% means at most 1 claim in 20 is unsupported — tight enough to be a
+meaningful guarantee, loose enough not to block every brief on a minor extraction edge
+case. The threshold is a variable so it can be tightened toward 1.0 as the pipeline
+matures. Starting below 0.95 is not recommended; the eval harness exists to enforce the
+guarantee, not to waive it.
+
+---
+
+## D017 — PDF generation: WeasyPrint *(added 2026-06-05)*
+
+**Decision:** Brief PDF export uses **WeasyPrint** (Python library, HTML/CSS → PDF).
+Generated on demand in `hpi-api`, cached in Supabase Storage after first generation.
+PDF is a Pro-tier feature.
+
+**Why WeasyPrint over Puppeteer:** Puppeteer (headless Chromium) requires 500MB–1GB RAM —
+incompatible with `shared-cpu-1x` Fly.io instances without a significant memory upgrade.
+WeasyPrint runs in-process (~80MB RAM), handles CSS3 sufficiently for structured documents,
+and produces clean output. A defense brief — headline, items, citations — is a structured
+document, not a complex web application. No additional service or container required.
+
+**Upgrade path:** If PDF fidelity requirements grow beyond WeasyPrint's CSS support, the
+replacement is a dedicated Gotenberg container (headless Chrome via Docker, separate
+Fly.io service). This is a deployment change, not a code change — PDF generation is
+behind a single function abstraction.
+
+---
+
+## D018 — OAuth providers: Google + GitHub in Cycle 1 *(added 2026-06-05)*
+
+**Decision:** Supabase Auth supports email/password plus the following OAuth providers.
+Scope by cycle:
+
+- **Cycle 1:** Google, GitHub
+- **Cycle 2:** LinkedIn (OIDC), Microsoft/Azure AD
+- **Required for App Store (Cycle 2):** Apple Sign-In (App Store mandate when any social
+  auth is offered)
+
+**Why Google + GitHub:** Google covers the broadest professional audience (Workspace,
+Gmail). GitHub signals technical and analytical users aligned with the product's positioning.
+Both require nothing more than adding credentials in the Supabase dashboard. LinkedIn is
+the most professionally relevant network for the HPI audience but is deferred to Cycle 2.
+Microsoft/Azure AD targets enterprise users at defense and energy companies — deferred
+until there is evidence of enterprise demand.
+
+---
+
+## D019 — Pricing and trial *(added 2026-06-05)*
+
+**Decision:**
+- **Free tier:** daily brief (current day only); no archive, no entity 360, no PDF, no follows
+- **Pro tier:** $19/month or $179/year (~21% savings, ~$14.92/month effective)
+- **Trial:** 14-day free Pro trial, credit card required on sign-up; Stripe `trialing`
+  status; auto-converts to paid at trial end unless cancelled
+
+**Why $19/month:** Below the psychological threshold for a professional trying a new tool.
+Above commodity newsletter pricing. Competitive with niche intelligence products
+($10–$50/month). Positions HPI as a credible product at an accessible launch price.
+Prices can be raised after value is proven; lowering later signals distress.
+
+**Why annual at $179:** ~21% discount drives annual commitment and improves cash flow.
+At $179/year the subscriber makes one decision and forgets about it — lower churn than
+monthly billing.
+
+**Why CC-required trial:** Free trials without CC convert at ~2–5%. CC-required trials
+convert at 40–60% because users who sign up have already committed psychologically. For
+a solo operator with no marketing budget, conversion efficiency matters more than
+top-of-funnel volume.
+
+**Why daily brief on free tier:** The incremental LLM cost of serving an additional free
+reader is zero (shared output, D003). Withholding the brief from free users reduces
+product value without reducing costs. Differentiation via archive access, entity 360,
+PDF, and follows is sufficient to drive Pro conversion.
+
+**Review trigger:** Revisit pricing after 50 paying subscribers or 6 months post-launch,
+whichever comes first.
 
 ---

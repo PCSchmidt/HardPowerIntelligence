@@ -113,9 +113,11 @@ Available to Pro subscribers.
 
 ## Web — Auth (Supabase)
 
-Email + password auth via Supabase Auth. Row-level security on all user data tables.
-Free tier: read the weekly brief.
-Pro tier: daily brief, PDF export, archive, entity 360 pages.
+Email + password auth via Supabase Auth. OAuth via Google and GitHub (Cycle 1).
+Row-level security on all user data tables.
+Free tier: daily brief (current day only).
+Pro tier: daily brief + archive (rolling 90 days), PDF export, entity 360 pages, follows.
+New subscribers: 14-day Pro trial, credit card required on sign-up.
 
 ## Web — Stripe Subscriptions
 
