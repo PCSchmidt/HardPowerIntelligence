@@ -1,0 +1,208 @@
+# Meridian Gate Definition — Hard Power Intelligence, Cycle 1
+# Defense desk, web-only. Hybrid: fullstack-web spine + intelligence pipeline gates.
+#
+# DAG:
+#   confirmed ─┬─► backend_approved ──► data_pipeline_live ──► brief_verified ─┐
+#              └─► frontend_approved ──────────────────────────────────────────┤
+#                                                                               ▼
+#                                                                    web_reader_live
+#                                                                               │
+#                                                           tests_passing ──► security_scan ──► deploy_ready
+
+version: "1.0"
+
+project:
+  name: "hard-power-intelligence"
+  recipe: "fullstack-web+intelligence-pipeline"
+  description: "Cycle 1 — Defense desk, web-only: data pipeline + brief engine + web reader"
+
+gates:
+  # ─── Gate 1: Scope confirmed ──────────────────────────────────────────────────
+  - id: confirmed
+    label: "Project Scope Confirmed"
+    type: human_approval
+    required: true
+    approval_token: "CONFIRMED"
+    requires: []
+    requires_artifacts:
+      - CONTRACT.md
+      - SPEC.md
+      - DECISIONS.md
+    hooks:
+      pre:
+        - validate-contract.sh
+        - validate-spec.sh
+      post:
+        - write-reflexion.sh
+        - emit-telemetry.sh
+    emits: CONFIRMED_GATE.json
+    on_fail: block_all_writes
+
+  # ─── Gate 2: Backend specification ────────────────────────────────────────────
+  # FastAPI endpoint shapes + Supabase schema. Unlocks data pipeline work.
+  - id: backend_approved
+    label: "Backend Specification Approved"
+    type: human_approval
+    required: true
+    approval_token: "BACKEND APPROVED"
+    requires:
+      - confirmed
+    requires_artifacts:
+      - API_SPEC.md
+      - DATABASE_SCHEMA.md
+    hooks:
+      pre:
+        - validate-api-spec.sh
+      post:
+        - write-reflexion.sh
+        - emit-telemetry.sh
+    emits: BACKEND_GATE.json
+    on_fail: block_all_writes
+
+  # ─── Gate 3: Frontend specification ───────────────────────────────────────────
+  # Runs in parallel with Gate 2. Defense desk reader layout, citation drawer,
+  # entity 360 page, subscribe flow. Unlocks web reader build.
+  - id: frontend_approved
+    label: "Frontend Specification Approved"
+    type: human_approval
+    required: true
+    approval_token: "FRONTEND APPROVED"
+    requires:
+      - confirmed
+    requires_artifacts:
+      - FRONTEND_SPEC.md
+      - DESIGN_SYSTEM.md
+      - COMPONENT_REGISTRY.md
+    hooks:
+      pre:
+        - validate-frontend-spec.sh
+      post:
+        - write-reflexion.sh
+        - emit-telemetry.sh
+    emits: FRONTEND_GATE.json
+    on_fail: block_all_writes
+
+  # ─── Gate 4: Data pipeline live ───────────────────────────────────────────────
+  # USAspending adapter fetches + parses DoD contract records; entity resolver maps
+  # them to canonical entities (contractor name → ticker + CIK + UEI). Proven by
+  # tests against golden fixtures — not a live demo.
+  - id: data_pipeline_live
+    label: "Data Pipeline Live (USAspending → Entity Graph)"
+    type: human_approval
+    required: true
+    approval_token: "PIPELINE LIVE"
+    requires:
+      - backend_approved
+    requires_artifacts:
+      - engine/adapters/usaspending.py
+      - engine/entity/resolver.py
+      - tests/test_usaspending_adapter.py
+      - tests/test_entity_resolver.py
+    hooks:
+      pre:
+        - run-tests.sh
+      post:
+        - write-reflexion.sh
+        - emit-telemetry.sh
+    emits: PIPELINE_GATE.json
+    on_fail: block_all_writes
+
+  # ─── Gate 5: Brief verified ────────────────────────────────────────────────────
+  # THE most critical gate — it is the product's credibility guarantee.
+  # Brief generator produces a Defense brief; the citation eval harness confirms
+  # every claim links to a source at or above the faithfulness threshold.
+  # A brief below the threshold does NOT pass this gate and does NOT ship.
+  - id: brief_verified
+    label: "Brief Generator + Citation Eval Passing"
+    type: human_approval
+    required: true
+    approval_token: "BRIEF VERIFIED"
+    requires:
+      - data_pipeline_live
+    requires_artifacts:
+      - engine/brief/generator.py
+      - engine/eval/citation_eval.py
+      - EVAL_BASELINE.md
+    hooks:
+      pre:
+        - run-tests.sh
+        - run-evaluator.sh
+      post:
+        - write-reflexion.sh
+        - emit-telemetry.sh
+    emits: BRIEF_GATE.json
+    on_fail: block_all_writes
+
+  # ─── Gate 6: Web reader live ───────────────────────────────────────────────────
+  # Defense desk renders the verified brief; Supabase auth and Stripe subscription
+  # flow work end-to-end (test mode). Requires both the brief engine (Gate 5) and
+  # the approved frontend spec (Gate 3).
+  - id: web_reader_live
+    label: "Web Reader Live (Brief + Auth + Stripe)"
+    type: human_approval
+    required: true
+    approval_token: "READER LIVE"
+    requires:
+      - brief_verified
+      - frontend_approved
+    requires_artifacts:
+      - web/app/page.tsx
+      - web/app/brief/[id]/page.tsx
+      - web/app/subscribe/page.tsx
+    hooks:
+      pre:
+        - run-tests.sh
+      post:
+        - write-reflexion.sh
+        - emit-telemetry.sh
+    emits: READER_GATE.json
+    on_fail: block_all_writes
+
+  # ─── Gate 7: Full test suite passing ─────────────────────────────────────────
+  - id: tests_passing
+    label: "Full Test Suite Passing"
+    type: automated
+    required: true
+    requires:
+      - web_reader_live
+    hooks:
+      pre:
+        - run-tests.sh
+    pass_condition: "exit_code == 0"
+    emits: TESTS_GATE.json
+    on_fail: block_write
+
+  # ─── Gate 8: Security scan ────────────────────────────────────────────────────
+  - id: security_scan
+    label: "Security Scan Complete"
+    type: automated
+    required: false
+    requires:
+      - tests_passing
+    hooks:
+      pre:
+        - run-security-audit.sh
+    pass_condition: "exit_code == 0"
+    on_fail: warn
+
+  # ─── Gate 9: Deploy ready — Cycle 1 ──────────────────────────────────────────
+  - id: deploy_ready
+    label: "Ready to Deploy — Cycle 1 (Defense desk, web)"
+    type: human_approval
+    required: true
+    approval_token: "GO"
+    requires:
+      - tests_passing
+      - security_scan
+    requires_artifacts:
+      - DEPLOYMENT_CONFIG.md
+      - CHANGELOG.md
+    hooks:
+      pre:
+        - validate-deployment.sh
+      post:
+        - tag-release.sh
+        - write-reflexion.sh
+        - emit-telemetry.sh
+    emits: DEPLOY_APPROVED
+    on_fail: block_all_writes
