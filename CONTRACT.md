@@ -6,7 +6,7 @@ requires re-passing Gate 1.
 
 ---
 
-## What we are building
+## Purpose — what we are building
 
 A web-based intelligence subscription product. An automated engine ingests public
 government, regulatory, and financial data, resolves every mention to a canonical
