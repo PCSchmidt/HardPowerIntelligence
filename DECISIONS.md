@@ -912,3 +912,153 @@ never regenerate automatically. Fixtures are version-controlled truth for the pa
 Update manually only when the upstream API changes its response format.
 
 ---
+
+## D034 — Embedding bootstrap: inline at brief generation time *(added 2026-06-06)*
+
+**Decision:** `embed_pending_records(pool, since: datetime)` runs as the first step
+of the brief generator. It batch-calls OpenAI `text-embedding-3-small` for any
+`normalized_records` in the time window where `embedding IS NULL`. Synchronous-inline
+at MVP. Formalized move to the async procrastinate worker is a Gate 6 task.
+
+**Why:** No prior step generates embeddings. The RAG cosine-search step requires
+`embedding IS NOT NULL` to return results. Making this the first generator step
+ensures the window's records are always embedded before retrieval, with negligible
+cost (~20 records × 200 tokens ≈ $0.0004 per brief).
+
+**Gate 6 follow-up:** Add `@app.periodic` embedding task that runs post-ingestion so
+embeddings exist before the brief window opens, eliminating brief-generation latency.
+
+---
+
+## D035 — Magnitude normalization fallback for thin history *(added 2026-06-06)*
+
+**Decision:** `normalize(amount_usd)` uses the rolling 90-day min-max per D030
+when the window has ≥ `MAGNITUDE_MIN_WINDOW` (default 10) records with a non-null
+amount. When the window is thin, fall back to a static bucket scale:
+`<$10M → 0.2`, `$10M–$100M → 0.4`, `$100M–$1B → 0.7`, `$1B+ → 1.0`.
+Records with no amount score 0.0 in either mode.
+
+**Why:** The first-ever brief run has no 90-day history. A divide-by-zero or null
+magnitude score would break materiality scoring for all records. The bucket scale
+is deterministic, explainable, and directionally correct.
+
+**Environment variable:** `MAGNITUDE_MIN_WINDOW=10`
+
+---
+
+## D036 — Corroboration fallback when entity_id is NULL *(added 2026-06-06)*
+
+**Decision:** `corroboration_count` for a record = number of other records in the
+time window that share at least one `entity_id` (preferred) OR, when `entity_id IS
+NULL`, share at least one exact-match `normalized_mention` string after applying
+`normalize_mention()`. This is documented as a degraded-mode behavior that improves
+automatically as entity resolution populates `entity_id` values.
+
+**Why:** Gate 5 runs before the entity graph is seeded with crosswalk data. Most
+`entity_mentions[*].entity_id` fields will be NULL. Without a fallback, all
+corroboration scores are 0, making the 10% corroboration component useless for
+the first brief.
+
+---
+
+## D037 — LLM client module: engine/llm/client.py *(added 2026-06-06)*
+
+**Decision:** All LLM text-generation calls (synthesis, eval, entity disambiguation)
+go through `engine/llm/client.py`. Interface:
+
+```python
+async def complete(
+    model: str,
+    messages: list[dict],
+    json_mode: bool = True,
+    fallbacks: list[str] | None = None,
+) -> str:  # returns the content string
+```
+
+Internals: LiteLLM `acompletion()` with `response_format={"type": "json_object"}`
+when `json_mode=True`. On JSON parse failure, one repair retry with an explicit
+"return only valid JSON" message appended. After retry failure, raises to trigger
+LiteLLM fallback. Token counts and estimated cost logged via structlog on every call.
+
+**Why:** Centralises retry logic, JSON enforcement, cost logging, and the LiteLLM
+dependency. If LiteLLM ever requires migration, only this file changes.
+
+---
+
+## D038 — Eval claim extraction: sentence-boundary split *(added 2026-06-06)*
+
+**Decision:** Claims are extracted from `brief_item.body` by splitting on sentence
+boundaries (`re.split(r'(?<=[.!?])\s+(?=[A-Z])', body)`). Each sentence is one
+claim. Sentences with no `[CITE:N]` marker auto-fail. All claims — including numeric
+— are evaluated by Qwen3.7 Max entailment check. No separate exact-match path for
+numeric claims (premature optimization; revisit at Gate 6 if eval costs grow).
+
+All claims for one brief_item are batched into a single Qwen call returning structured
+JSON: `{"claim_evaluations": [{"id": "c1", "supported": bool}]}`.
+
+**Why:** Sentence = claim maps cleanly to the synthesis prompt instruction ("one
+citation per sentence"). LiteLLM approach consistent. Numeric exact-match adds
+implementation complexity without demonstrated benefit at MVP scale.
+
+---
+
+## D039 — Brief item bounds *(added 2026-06-06)*
+
+**Decision:** `BRIEF_MAX_ITEMS=8`, `BRIEF_MIN_ITEMS=3`. The synthesis prompt targets
+5–7 items. If fewer than `BRIEF_MIN_ITEMS` survive both materiality scoring and the
+eval gate, `briefs.status` is set to `failed` and the D013 fallback (previous
+published brief + staleness indicator) is served.
+
+**Why:** A one- or two-item brief is not a viable intelligence product. Eight items
+is the practical upper bound for a focused BLUF brief that can be read in under five
+minutes.
+
+**Environment variables:** `BRIEF_MAX_ITEMS=8`, `BRIEF_MIN_ITEMS=3`
+
+---
+
+## D040 — RAG time window fallback for first brief *(added 2026-06-06)*
+
+**Decision:** When no previously published brief exists (`briefs` table is empty or
+has no `status = 'published'` rows), use `now() - BRIEF_WINDOW_HOURS_FALLBACK hours`
+as the window start. Default: 48 hours. Subsequent briefs use
+`last_published_brief.generation_started_at`.
+
+**Why:** On first run there is no baseline timestamp. A 48-hour window ensures the
+first brief has sufficient data without pulling weeks of history.
+
+**Environment variable:** `BRIEF_WINDOW_HOURS_FALLBACK=48`
+
+---
+
+## D041 — PassageContext: immutable citation index *(added 2026-06-06)*
+
+**Decision:** The RAG retrieval step constructs a `list[PassageContext]` (frozen
+dataclass: `index, raw_record_id, source_id, url, fetched_at, native_id, excerpt`)
+in a single operation and never mutates it. The list index position IS the citation
+index (`[CITE:1]` maps to `passages[0]`). This list is passed unchanged from RAG
+retrieval → synthesis prompt construction → citation row creation.
+
+**Why:** Mutable reordering or deduplication of passages between retrieval and
+citation creation breaks the citation index mapping. Immutability by construction
+prevents this class of bug entirely.
+
+---
+
+## D042 — Gate 5 integration run strategy *(added 2026-06-06)*
+
+**Decision:** Gate 5 closes via a one-time manual integration run, not a CI test.
+Process:
+1. Seed local Supabase DB from the golden USAspending fixture
+2. Run `python scripts/run_brief.py --desk defense` (requires `OPENROUTER_API_KEY`)
+3. Record results in `EVAL_BASELINE.md`
+
+The script is checked into `scripts/`; the run is not part of the automated test
+suite. Integration tests in `tests/integration/` are marked `@pytest.mark.integration`
+and skipped by default (`pytest -m "not integration"`).
+
+**Why:** EVAL_BASELINE.md requires real LLM outputs. Running real LLM calls in CI
+introduces cost, flakiness, and API key management complexity not justified at this
+stage.
+
+---

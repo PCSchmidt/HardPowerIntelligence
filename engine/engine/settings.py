@@ -39,8 +39,24 @@ class Settings(BaseSettings):
     # Eval gate (D016)
     brief_faithfulness_threshold: float = 0.95
 
-    # Materiality scoring (D030)
+    # Materiality scoring (D030, D035, D036)
     materiality_threshold: float = 0.35
+    magnitude_min_window: int = 10
+    source_weights: str = (
+        '{"usaspending":0.9,"dod_contracts":0.85,"edgar":0.85,'
+        '"sam_gov":0.8,"congress_gov":0.8,"fred":0.7,"gdelt":0.5}'
+    )
+    entity_importance: str = (
+        '{"company":1.0,"program":0.85,"person":0.7,'
+        '"gov_agency":0.75,"institution":0.6,"sector":0.5,'
+        '"security":0.95,"product":0.75,"facility":0.65,'
+        '"geography":0.55,"segment":0.7}'
+    )
+
+    # Brief generation (D039, D040)
+    brief_max_items: int = 8
+    brief_min_items: int = 3
+    brief_window_hours_fallback: int = 48
 
     # RAG retrieval (D031)
     rag_passage_top_k: int = 20

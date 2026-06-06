@@ -27,10 +27,9 @@ Gate 5 (`brief_verified`) passes when:
 faithfulness_score = passing_claim_checks / total_claim_checks
 ```
 
-- **Prose claims:** Qwen3.7 Max entailment check — "does this source passage support this claim?" → pass/fail per claim
-- **Numeric claims:** exact match against cited source value (tolerates formatting variants: "$1.1B" == "$1,100,000,000")
-- **Uncited claims:** any claim in brief body without a `[CITE:N]` marker → automatic fail
-- **Item-level exclusion:** if all claims in a brief item fail, the item is excluded from the published brief; remaining items' scores are used for the brief-level score
+- **All claims:** Qwen3.7 Max entailment check — "does this source passage support this claim?" → pass/fail per claim. Numeric and prose claims handled uniformly (D038).
+- **Uncited claims:** any sentence in brief body without a `[CITE:N]` marker → automatic fail
+- **Item-level exclusion:** if all claims in a brief item fail, the item is excluded from the published brief; remaining items' scores determine the brief-level score
 
 ---
 
