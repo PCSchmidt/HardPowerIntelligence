@@ -38,10 +38,10 @@ Required User-Agent header: `HardPowerIntelligence/1.0 contact@hardpowerintel.co
 ## Data Ingestion — Scheduler
 
 Source registry table (`source_registry`) drives per-source fetch cadence.
-APScheduler + Postgres job queue (`FOR UPDATE SKIP LOCKED`) executes due jobs.
+Procrastinate (Postgres-backed job queue, `FOR UPDATE SKIP LOCKED`) executes due jobs.
+Periodic tasks registered via `@app.periodic` in `worker/tasks.py` — no `pg_cron` required (D004/D025).
 Token-bucket rate limiting, exponential backoff, and a circuit breaker per source.
 Budget guard pauses paid sources if daily spend exceeds cap.
-Supabase `pg_cron` enqueues due jobs.
 
 ## Entity Resolution — Crosswalk Spine
 

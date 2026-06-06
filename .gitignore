@@ -19,6 +19,12 @@ __pycache__/
 venv/
 dist/
 *.egg-info/
+.coverage
+htmlcov/
+.pytest_cache/
+
+# Claude Code state (hook markers, session state)
+.claude/state/
 
 # Node
 node_modules/

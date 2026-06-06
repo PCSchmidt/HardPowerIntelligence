@@ -76,8 +76,8 @@ These are good and planned — just **not now**. Naming them protects the cycle:
 
 - **Web-first Stripe subscriptions** (reader-app model — sold/managed on web to avoid
   app-store commissions).
-- Tiers: **Free** (weekly brief, limited history) → **Pro** (daily brief, PDF export,
-  archive) → **à-la-carte premium deep-dive PDFs**.
+- Tiers: **Free** (daily brief, current day only) → **Pro** ($19/mo or $179/yr —
+  90-day archive, entity 360, PDF export, follows) → deep-dive reports in later cycles (D019).
 - Deferred: Creator/RIA/Team tiers.
 
 ---

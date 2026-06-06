@@ -63,8 +63,8 @@ pg_cron can coexist as a secondary trigger but adds no functional value for Cycl
 process restarts, in-flight jobs are lost and the schedule resets. For a paid
 subscription product that promises a daily brief, silent ingestion failures are
 unacceptable. A Postgres-backed queue is durable — jobs survive worker restarts because
-they exist in the database, not in RAM. `pg_cron` handles the schedule; the worker
-handles execution; the jobs table is the audit log. `procrastinate` provides this
+they exist in the database, not in RAM. Procrastinate's `@app.periodic` handles the
+schedule from the worker process; the jobs table is the audit log. `procrastinate` provides this
 pattern out of the box with async support, retry logic, and job monitoring without
 adding a second infrastructure dependency.
 

@@ -764,8 +764,8 @@ Foreign key constraints require this creation order:
 11. `brief_items` (references `briefs`)
 12. `citations` (references `briefs`, `brief_items`, `raw_records`)
 13. `calendar_events`
-14. Procrastinate schema: `procrastinate schema --apply`
-15. pg_cron schedules
+14. Procrastinate schema: run `procrastinate schema --apply` against the database
+15. Register `@app.periodic` tasks in `worker/tasks.py` (Python code, no SQL required)
 
 ---
 

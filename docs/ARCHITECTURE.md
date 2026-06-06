@@ -38,7 +38,7 @@ freshest graph state on its own cadence and diffs against the last brief.
 | Mobile *(later)* | React Native + Expo | Log-in-only "reader" app |
 | API | FastAPI | Brief API, auth, Stripe webhooks |
 | Data / auth / cache | Supabase (Postgres + pgvector) | Graph, records, briefs, users, vectors |
-| LLM | Anthropic API | Extraction (cheap) + synthesis (strong) waterfall |
+| LLM | OpenRouter (DeepSeek V4 Flash/Pro, Qwen3.7 Max) + Anthropic SDK last-resort (D006) | Cost-controlled waterfall |
 | Payments | Stripe | Web-first subscriptions (reader model) |
 | Infra | Cloudflare, Sentry, PostHog, Resend | DNS/WAF, errors, analytics, email |
 
@@ -99,9 +99,9 @@ Cadence ranges from continuous (news 15–30 min, 8-K sweep) through daily (EDGA
 USAspending awards, EIA, FRED) to quarterly (13F). The same calendar that schedules
 fetches also powers the user-facing **catalyst calendar**.
 
-**Implementation (solo-dev pragmatic):** a background worker running APScheduler over
-a Postgres job queue (`FOR UPDATE SKIP LOCKED`); upgrade to Redis/Celery only if
-throughput demands. Supabase `pg_cron` can enqueue due jobs.
+**Implementation (solo-dev pragmatic):** `hpi-worker` runs procrastinate with
+`@app.periodic` decorators for scheduling — no `pg_cron` required (D004/D025).
+Upgrade to Redis/Celery only if throughput demands it.
 
 ---
 
