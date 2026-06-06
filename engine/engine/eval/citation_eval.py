@@ -1,0 +1,143 @@
+import re
+from dataclasses import dataclass
+
+import structlog
+
+from engine.brief.rag import PassageContext
+from engine.llm.client import llm_client, parse_json
+from engine.settings import settings
+
+log = structlog.get_logger()
+
+_CITE_RE = re.compile(r"\[CITE:(\d+)\]")
+_SENTENCE_RE = re.compile(r"(?<=[.!?])\s+(?=[A-Z])")
+
+
+@dataclass
+class Claim:
+    id: str
+    text: str
+    citation_indices: list[int]
+
+    @property
+    def is_cited(self) -> bool:
+        return bool(self.citation_indices)
+
+
+@dataclass
+class EvalResult:
+    item_id: str
+    excluded: bool
+    claims_total: int
+    claims_passing: int
+    faithfulness_score: float
+
+
+def extract_citation_indices(text: str) -> list[int]:
+    return list(dict.fromkeys(int(m) for m in _CITE_RE.findall(text)))
+
+
+def extract_claims(body: str) -> list[Claim]:
+    if not body:
+        return []
+    sentences = _SENTENCE_RE.split(body.strip())
+    claims = []
+    for i, sentence in enumerate(sentences):
+        sentence = sentence.strip()
+        if not sentence:
+            continue
+        claims.append(Claim(
+            id=f"c{i}",
+            text=sentence,
+            citation_indices=extract_citation_indices(sentence),
+        ))
+    return claims
+
+
+class CitationEvaluator:
+    def __init__(self, eval_model: str | None = None):
+        self.eval_model = eval_model or settings.llm_model_eval
+
+    async def eval_item(
+        self,
+        item_id: str,
+        body: str,
+        passages: list[PassageContext],
+    ) -> EvalResult:
+        claims = extract_claims(body)
+        if not claims:
+            return EvalResult(
+                item_id=item_id, excluded=True,
+                claims_total=0, claims_passing=0, faithfulness_score=0.0,
+            )
+
+        # Uncited claims auto-fail — separate them before the LLM call
+        uncited = [c for c in claims if not c.is_cited]
+        cited = [c for c in claims if c.is_cited]
+
+        # Build passage lookup for this item's cited indices
+        cited_indices = {idx for c in cited for idx in c.citation_indices}
+        relevant_passages = [p for p in passages if p.index in cited_indices]
+
+        passing = 0
+
+        if cited:
+            eval_payload = {
+                "claims": [{"id": c.id, "text": c.text} for c in cited],
+                "sources": [
+                    {"index": p.index, "excerpt": p.excerpt}
+                    for p in relevant_passages
+                ],
+                "instruction": (
+                    "For each claim, determine if it is supported by the provided source passages. "
+                    "Return JSON: {\"claim_evaluations\": [{\"id\": \"...\", \"supported\": true|false}]}"
+                ),
+            }
+            messages = [
+                {"role": "system", "content": "You are a strict citation-faithfulness evaluator. Return only valid JSON."},
+                {"role": "user", "content": str(eval_payload)},
+            ]
+            content = await llm_client.complete(
+                model=self.eval_model,
+                messages=messages,
+                json_mode=True,
+            )
+            parsed = parse_json(content) or {}
+            evaluations = {
+                e["id"]: e.get("supported", False)
+                for e in parsed.get("claim_evaluations", [])
+            }
+            passing = sum(1 for c in cited if evaluations.get(c.id, False))
+
+        total = len(claims)
+        excluded = (passing + 0) == 0 and total > 0  # all claims failed
+
+        if total == 0:
+            score = 0.0
+        else:
+            score = passing / total  # uncited claims count as failing in denominator
+
+        log.info(
+            "item_eval",
+            item_id=item_id,
+            total=total,
+            passing=passing,
+            uncited=len(uncited),
+            excluded=excluded,
+        )
+
+        return EvalResult(
+            item_id=item_id,
+            excluded=excluded,
+            claims_total=total,
+            claims_passing=passing,
+            faithfulness_score=score,
+        )
+
+    def brief_faithfulness_score(self, results: list[EvalResult]) -> float:
+        surviving = [r for r in results if not r.excluded]
+        if not surviving:
+            return 0.0
+        total = sum(r.claims_total for r in surviving)
+        passing = sum(r.claims_passing for r in surviving)
+        return passing / total if total else 0.0
