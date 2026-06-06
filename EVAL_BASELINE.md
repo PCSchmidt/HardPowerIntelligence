@@ -39,7 +39,7 @@ faithfulness_score = passing_claim_checks / total_claim_checks
 
 | Brief date | Desk | Items generated | Items excluded | Claims checked | Claims passing | Score | Published? | Notes |
 |------------|------|----------------|----------------|----------------|----------------|-------|------------|-------|
-| —          | —    | —              | —              | —              | —              | —     | —          | First run pending |
+| 2026-06-06 | defense | 3 | 1 | 2 | 2 | 1.000 | Yes | First integration run; 3 fixture records, 2 passages retrieved, 1 item excluded (Qwen judged LRASM claim unsupported by available passage), 2 surviving items both scored 1.00 |
 
 ---
 

@@ -47,10 +47,13 @@ def build_synthesis_prompt(
 {schema}
 
 ## Instructions
-Generate a {desk.upper()} desk BLUF brief with {max_items} items maximum (target 5–7).
+Generate a {desk.upper()} desk BLUF brief with {max_items} items maximum (target 2–3 given the passage count).
 Prioritize high-dollar contract awards, significant filings, and policy developments.
-Every sentence in every item body MUST include at least one [CITE:N] citation.
-Any sentence without a citation will be flagged as a faithfulness failure."""
+
+CRITICAL CITATION RULE: Every single sentence in every item body MUST end with [CITE:N].
+If a sentence does not have [CITE:N] at the end, it will be automatically failed by the evaluation system.
+Only write sentences you can directly support with a provided passage. Do not add context, background,
+or analysis that is not in the passages. One sentence per item is better than two sentences where one is uncited."""
 
     return [
         {"role": "system", "content": system},

@@ -53,7 +53,7 @@ async def embed_pending_records(pool: asyncpg.Pool, since: datetime) -> int:
 
     async with pool.acquire() as conn:
         await conn.executemany(
-            "UPDATE normalized_records SET embedding = $2 WHERE id = $1",
+            "UPDATE normalized_records SET embedding = $2::vector WHERE id = $1",
             [(str(uid), f"[{','.join(str(x) for x in emb)}]") for uid, emb in updates],
         )
 
@@ -75,7 +75,7 @@ async def build_query_vector(
             WHERE created_at >= $1
               AND embedding IS NOT NULL
               AND text_chunk IS NOT NULL
-            ORDER BY created_at DESC, payload_size_bytes DESC NULLS LAST
+            ORDER BY created_at DESC
             LIMIT $2
             """,
             since,

@@ -1,10 +1,20 @@
 import json
+import os
 import re
 
 import litellm
 import structlog
 
+from engine.settings import settings
+
 log = structlog.get_logger()
+
+# LiteLLM reads credentials from os.environ, not from our Settings object.
+# Ensure they're present before any API call is made.
+if settings.openrouter_api_key:
+    os.environ.setdefault("OPENROUTER_API_KEY", settings.openrouter_api_key)
+if settings.anthropic_api_key:
+    os.environ.setdefault("ANTHROPIC_API_KEY", settings.anthropic_api_key)
 
 _FENCE_RE = re.compile(r"```(?:json)?\s*([\s\S]*?)\s*```")
 

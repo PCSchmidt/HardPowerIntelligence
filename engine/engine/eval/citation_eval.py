@@ -82,20 +82,27 @@ class CitationEvaluator:
         passing = 0
 
         if cited:
-            eval_payload = {
-                "claims": [{"id": c.id, "text": c.text} for c in cited],
-                "sources": [
-                    {"index": p.index, "excerpt": p.excerpt}
-                    for p in relevant_passages
-                ],
-                "instruction": (
-                    "For each claim, determine if it is supported by the provided source passages. "
-                    "Return JSON: {\"claim_evaluations\": [{\"id\": \"...\", \"supported\": true|false}]}"
-                ),
-            }
+            sources_block = "\n".join(
+                f"[{p.index}] {p.excerpt}" for p in relevant_passages
+            ) or "No sources provided."
+
+            claims_block = "\n".join(
+                f"id={c.id}: {c.text}" for c in cited
+            )
+
+            user_content = (
+                f"SOURCE PASSAGES:\n{sources_block}\n\n"
+                f"CLAIMS TO EVALUATE:\n{claims_block}\n\n"
+                "For each claim, check whether the cited [CITE:N] source passage directly supports "
+                "the factual assertion in the claim. Return only this JSON:\n"
+                '{"claim_evaluations": [{"id": "c0", "supported": true}, ...]}'
+            )
             messages = [
-                {"role": "system", "content": "You are a strict citation-faithfulness evaluator. Return only valid JSON."},
-                {"role": "user", "content": str(eval_payload)},
+                {
+                    "role": "system",
+                    "content": "You are a citation-faithfulness evaluator. A claim is supported if the cited source passage directly contains the stated fact. Return only valid JSON.",
+                },
+                {"role": "user", "content": user_content},
             ]
             content = await llm_client.complete(
                 model=self.eval_model,

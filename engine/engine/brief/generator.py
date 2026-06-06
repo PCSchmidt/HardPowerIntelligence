@@ -1,7 +1,7 @@
 import json
 import uuid
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 
 import asyncpg
 import structlog
@@ -79,10 +79,30 @@ async def _score_candidates(
 
     scorer.window_amounts = [r["amount"] for r in amount_rows if r["amount"]]
 
+    # Pre-parse all JSONB fields (asyncpg may return them as raw strings)
+    def _parse_json_field(val):
+        if isinstance(val, str):
+            return json.loads(val)
+        return val or {}
+
+    def _parse_json_list(val):
+        if isinstance(val, str):
+            return json.loads(val)
+        return val or []
+
+    parsed_rows = [
+        {
+            **dict(row),
+            "_sd": _parse_json_field(row["structured_data"]),
+            "_em": _parse_json_list(row["entity_mentions"]),
+        }
+        for row in rows
+    ]
+
     scored = []
-    for row in rows:
-        sd = row["structured_data"] or {}
-        mentions = row["entity_mentions"] or []
+    for row in parsed_rows:
+        sd = row["_sd"]
+        mentions = row["_em"]
         primary_mention = mentions[0] if mentions else {}
         entity_type = primary_mention.get("entity_type", "company")
         amount_usd = sd.get("amount_usd")
@@ -90,12 +110,12 @@ async def _score_candidates(
         # Corroboration: count records sharing normalized_mention (D036)
         primary_name = primary_mention.get("normalized", "")
         corroboration = sum(
-            1 for r2 in rows
+            1 for r2 in parsed_rows
             if r2["id"] != row["id"]
+            and primary_name
             and any(
                 m.get("normalized") == primary_name
-                for m in (r2["entity_mentions"] or [])
-                if primary_name
+                for m in r2["_em"]
             )
         )
 
@@ -146,7 +166,7 @@ async def generate_brief(desk: str, pool: asyncpg.Pool) -> GeneratedBrief:
         {
             "record_id": str(c["rr_id"]),
             "source_id": c["source_id"],
-            "data": c["structured_data"],
+            "data": json.loads(c["structured_data"]) if isinstance(c["structured_data"], str) else (c["structured_data"] or {}),
         }
         for c, _ in candidates[: settings.brief_max_items * 2]
     ]
@@ -191,13 +211,15 @@ async def generate_brief(desk: str, pool: asyncpg.Pool) -> GeneratedBrief:
 async def persist_brief(
     brief: GeneratedBrief,
     desk: str,
-    brief_date: str,
+    brief_date: str | date,
     faithfulness_score: float,
     eval_passed: bool,
     excluded_item_ids: set[str],
     pool: asyncpg.Pool,
 ) -> str:
     brief_id = str(uuid.uuid4())
+    if isinstance(brief_date, str):
+        brief_date = date.fromisoformat(brief_date)
     status = "published" if eval_passed else "failed"
     published_at = datetime.now(timezone.utc) if eval_passed else None
 
@@ -236,7 +258,7 @@ async def persist_brief(
                     item.get("item_type", "signal"),
                     item.get("headline", ""),
                     item.get("body", ""),
-                    "{}",
+                    [],   # entity_ids resolved in Gate 6 after entity graph is seeded
                     i,
                 )
 
