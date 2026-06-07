@@ -71,13 +71,13 @@ See [docs/PHILOSOPHY.md](docs/PHILOSOPHY.md) for the full thesis.
 
 | Layer | Technology |
 |-------|------------|
-| Web | Next.js (Vercel) — marketing site, reader, Stripe checkout |
+| Web | Next.js (Vercel) — marketing site, reader, Lemon Squeezy checkout |
 | Mobile *(later)* | React Native + Expo, as a log-in-only "reader" app |
 | Backend | FastAPI |
 | Data / auth | Supabase (Postgres + pgvector) |
 | Intelligence engine | source adapters → scheduler → entity-resolution graph → RAG synthesis → eval gate |
 | LLM | OpenRouter (DeepSeek V4 Flash/Pro, Qwen3.7 Max) + Anthropic SDK (last-resort fallback) — ~$0.09/brief |
-| Payments | Stripe (web-first reader model) |
+| Payments | Lemon Squeezy — Merchant of Record (web-first reader model) |
 
 **Pipeline shape:** a per-source scheduler fetches each source at its own cadence →
 adapters emit immutable, hashed, cited records → entity resolution writes provenanced
@@ -91,8 +91,8 @@ Full design in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
 ## Monetization
 
-Web-first subscriptions billed through Stripe (reader-app model — subscriptions are
-sold and managed on the web to avoid app-store commissions). Tiered: a free daily
+Web-first subscriptions billed through Lemon Squeezy as Merchant of Record (reader-app
+model — subscriptions are sold and managed on the web to avoid app-store commissions). Tiered: a free daily
 brief (current day), a Pro tier ($19/mo or $179/yr) with archive, entity 360, PDF
 export, and follows, and premium deep-dive reports in later cycles. Designed to run cheaply (~$80–230/mo infrastructure) and reach
 break-even at a small number of subscribers.

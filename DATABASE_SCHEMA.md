@@ -575,8 +575,14 @@ CREATE TRIGGER on_auth_user_created
 
 ### `subscriptions`
 
-Source of truth for subscription state. Updated exclusively by Stripe webhook handlers
-in `hpi-api` (D012). Never written by Next.js or by Supabase client-side calls.
+Source of truth for subscription state. Updated exclusively by Lemon Squeezy webhook
+handlers in `hpi-api` (D050; supersedes the Stripe mechanism in D012). Never written by
+Next.js or by Supabase client-side calls.
+
+> **Note:** the `stripe_customer_id` / `stripe_subscription_id` column names below are
+> legacy from the original Stripe design. After the Lemon Squeezy pivot (D050) they hold
+> Lemon Squeezy customer/subscription IDs; a processor-agnostic rename migration is
+> planned before the webhook persists rows (Gate 7/8).
 
 ```sql
 CREATE TABLE subscriptions (

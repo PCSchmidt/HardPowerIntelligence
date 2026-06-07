@@ -833,7 +833,7 @@ interface SubscriptionStatusProps {
   status: 'active' | 'trialing' | 'past_due' | 'cancelled'
   currentPeriodEnd: string | null
   trialEndsAt: string | null
-  stripePortalUrl: string | null   // generated server-side via Stripe API
+  portalUrl: string | null   // Lemon Squeezy customer portal URL (D050)
 }
 ```
 

@@ -23,13 +23,13 @@ runs on every brief before publish; briefs below the threshold do not ship.
 
 | Layer | Technology | Notes |
 |-------|-----------|-------|
-| Web frontend | Next.js (App Router) on Vercel | Marketing, reader, Stripe checkout |
-| API backend | FastAPI (Python) | Brief API, auth, Stripe webhooks, scheduler endpoint |
+| Web frontend | Next.js (App Router) on Vercel | Marketing, reader, Lemon Squeezy checkout |
+| API backend | FastAPI (Python) | Brief API, auth, Lemon Squeezy webhooks, scheduler endpoint |
 | Database / auth | Supabase (Postgres + pgvector) | Graph, records, briefs, users, vectors, RLS |
 | Intelligence engine | Python (adapter → resolver → brief gen → eval) | Runs as background worker |
 | Scheduler | APScheduler + Postgres job queue | `FOR UPDATE SKIP LOCKED`; upgrade to Celery only if scale demands |
 | LLM | Anthropic API | Cheap models for extraction/clustering; strong model for synthesis |
-| Payments | Stripe | Web-first reader model; subscriptions managed on web |
+| Payments | Lemon Squeezy (Merchant of Record) | Web-first reader model; MoR handles global tax (D050) |
 | Email | Resend | Transactional and digest emails |
 | Errors | Sentry | Both frontend and backend |
 | Analytics | PostHog | Product analytics (not trading signals) |
@@ -62,7 +62,7 @@ No paid enterprise feeds in Cycle 1. FMP is the one cheap upgrade (~$19/mo).
 1. A cited daily Defense brief renders on web; every claim links to its source.
 2. The citation-faithfulness eval harness reports at or above the target threshold
    before any brief is published.
-3. A user can register, subscribe via Stripe (test → live), and read gated content.
+3. A user can register, subscribe via Lemon Squeezy (test → live), and read gated content.
 4. The intelligence engine runs within the monthly LLM budget cap.
 5. Infrastructure runs within the ~$80–230/mo envelope.
 

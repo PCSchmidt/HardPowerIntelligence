@@ -272,7 +272,7 @@ this read volume.
 
 ---
 
-## D012 — Subscription gating: FastAPI gates data, Next.js gates UX
+## D012 — Subscription gating: FastAPI gates data, Next.js gates UX *(payment processor superseded by D050 — Lemon Squeezy; the dual-layer gating principle still holds)*
 
 **Decision:** Subscription status is the source of truth in Supabase's `subscriptions`
 table, updated exclusively by Stripe webhooks arriving at a FastAPI endpoint. FastAPI
@@ -448,7 +448,7 @@ until there is evidence of enterprise demand.
 
 ---
 
-## D019 — Pricing and trial *(added 2026-06-05)*
+## D019 — Pricing and trial *(added 2026-06-05; payment processor superseded by D050 — Lemon Squeezy. Pricing/trial terms unchanged)*
 
 **Decision:**
 - **Free tier:** daily brief (current day only); no archive, no entity 360, no PDF, no follows

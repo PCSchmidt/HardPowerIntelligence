@@ -34,13 +34,13 @@ Cross-cutting layers: **Macro** (rates, inflation, policy) and **Smart Money** (
 | Engine | Entity-resolution graph + scheduler + 5–8 Tier-0 free adapters |
 | Quality | Citation-faithfulness eval harness meeting a defined target |
 | UI | Defense desk, citation drawer, catalyst calendar, entity 360 page |
-| Accounts | Auth + free→Pro subscription via Stripe (reader model) |
+| Accounts | Auth + free→Pro subscription via Lemon Squeezy (reader model) |
 | Data | Free public Tier-0 sources + one market-data vendor (FMP ~$19/mo) |
 
 **Cycle 1 acceptance criteria:**
 1. A cited daily Defense brief renders on web, every claim linked to a source.
 2. The eval harness reports citation-faithfulness at or above target before publish.
-3. A user can subscribe (Stripe test → live) and read gated content.
+3. A user can subscribe (Lemon Squeezy test → live) and read gated content.
 4. Infrastructure runs within the ~$80–230/mo envelope.
 
 ---
@@ -74,8 +74,8 @@ These are good and planned — just **not now**. Naming them protects the cycle:
 
 ## Monetization scope
 
-- **Web-first Stripe subscriptions** (reader-app model — sold/managed on web to avoid
-  app-store commissions).
+- **Web-first Lemon Squeezy subscriptions** (Merchant of Record; reader-app model —
+  sold/managed on web to avoid app-store commissions).
 - Tiers: **Free** (daily brief, current day only) → **Pro** ($19/mo or $179/yr —
   90-day archive, entity 360, PDF export, follows) → deep-dive reports in later cycles (D019).
 - Deferred: Creator/RIA/Team tiers.

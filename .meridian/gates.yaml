@@ -134,11 +134,11 @@ gates:
     on_fail: block_all_writes
 
   # ─── Gate 6: Web reader live ───────────────────────────────────────────────────
-  # Defense desk renders the verified brief; Supabase auth and Stripe subscription
-  # flow work end-to-end (test mode). Requires both the brief engine (Gate 5) and
-  # the approved frontend spec (Gate 3).
+  # Defense desk renders the verified brief; Supabase auth and Lemon Squeezy
+  # subscription flow work end-to-end (test mode). Requires both the brief engine
+  # (Gate 5) and the approved frontend spec (Gate 3).
   - id: web_reader_live
-    label: "Web Reader Live (Brief + Auth + Stripe)"
+    label: "Web Reader Live (Brief + Auth + Payments)"
     type: human_approval
     required: true
     approval_token: "READER LIVE"
