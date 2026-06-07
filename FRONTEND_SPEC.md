@@ -18,7 +18,7 @@ Gate 3 artifact. Pass `FRONTEND APPROVED` to close Gate 3 and unlock Gate 6.
 | Mutations | TanStack Query v5 | D022 |
 | Analytics | PostHog | `'use client'` provider in root layout |
 | Errors | Sentry | `instrumentation.ts` |
-| Payments | Stripe.js | Checkout redirect only; no Elements in Cycle 1 |
+| Payments | Lemon Squeezy (MoR) | Hosted checkout redirect/overlay; D050. Merchant of Record handles global tax |
 
 ---
 
@@ -45,7 +45,7 @@ Gate 3 artifact. Pass `FRONTEND APPROVED` to close Gate 3 and unlock Gate 6.
 
 **TanStack Query** (mutations + invalidation only):
 - `POST /users/follows` and `DELETE /users/follows/{id}`
-- Subscription status revalidation after Stripe `success_url` redirect
+- Subscription status revalidation after Lemon Squeezy checkout `success` redirect
 - Wrap in `QueryClientProvider` in root layout (client component wrapper)
 
 ### Directory structure
@@ -291,7 +291,7 @@ Appears on all pages. Client Component.
 4. **Annual option** — Toggle or secondary row: "$179/year — save 21%"
 5. **FAQ accordion** — "What happens after my trial?", "Can I cancel?", "What's included in Free?", "Is this investment advice?" (answer: no)
 
-**CTA action:** Calls a Next.js API route (`/api/stripe/create-checkout`) which creates a Stripe Checkout Session and redirects to Stripe. Success URL: `/subscribe/success`. Cancel URL: `/subscribe`.
+**CTA action:** Calls a Next.js API route (`/api/checkout`) which generates a Lemon Squeezy hosted-checkout URL for the selected variant (monthly/annual) with `custom_data.user_id` embedded, then redirects to it (or opens the Lemon.js overlay). Success URL (redirect/`receipt_link`): `/subscribe/success`. Cancel returns to `/subscribe`. Per D045, the route surfaces a "payments not yet configured" state when `LEMONSQUEEZY_API_KEY` is absent.
 
 **SEO:** `robots: index, follow`. `title`: "Subscribe — Hard Power Intelligence". `description`: "14-day free trial. Daily cited defense intelligence briefs. Cancel anytime."
 
@@ -311,7 +311,7 @@ Appears on all pages. Client Component.
 3. **3 feature highlights**: Archive access, Entity 360, PDF export — icon + one-line description each
 4. **Primary CTA**: "Go to the Defense Desk →" → `/desk/defense`
 
-**Note:** Subscription may not have updated instantly if the Stripe webhook hasn't fired yet. If `auth/me` still returns `free`, show a spinner and poll `GET /auth/me` every 2 seconds for up to 10 seconds (TanStack Query with `refetchInterval`). If still free after 10s, show a reassurance message: "Your subscription is being activated. Refresh in a moment."
+**Note:** Subscription may not have updated instantly if the Lemon Squeezy webhook hasn't fired yet. If `auth/me` still returns `free`, show a spinner and poll `GET /auth/me` every 2 seconds for up to 10 seconds (TanStack Query with `refetchInterval`). If still free after 10s, show a reassurance message: "Your subscription is being activated. Refresh in a moment."
 
 **SEO:** `robots: noindex`
 
@@ -408,8 +408,8 @@ Appears on all pages. Client Component.
    - Trial: "Trial ends [date]" + days remaining
    - Pro: "Pro · Renews [date] · $19/month"
    - Free (lapsed): "Free plan · [Upgrade to Pro] →"
-   - "Manage subscription" → Stripe Customer Portal link (generated via `GET /api/stripe/portal`)
-   - "Cancel subscription" → also via Stripe Portal
+   - "Manage subscription" → Lemon Squeezy Customer Portal link (`urls.customer_portal` from the subscription, surfaced via `GET /api/portal`)
+   - "Cancel subscription" → also via the Lemon Squeezy Customer Portal
 
 3. **Follows** (Pro only — `ArchiveLock` gate if free):
    - Heading: "Followed entities"
@@ -446,7 +446,7 @@ No custom components. No data fetching. Stub only in Cycle 1.
       └─ /signup
           ├─ Email/password → confirm email → /subscribe
           └─ OAuth → /subscribe
-              └─ "Start free trial" → Stripe Checkout
+              └─ "Start free trial" → Lemon Squeezy Checkout
                   ├─ Success → /subscribe/success → /desk/defense
                   └─ Cancel → /subscribe
 ```
@@ -458,7 +458,7 @@ No custom components. No data fetching. Stub only in Cycle 1.
   └─ Clicks archive brief link or visits /brief/[id] with date < today
       └─ ArchiveLock gate shown
           └─ "Start 14-day free trial" CTA
-              └─ /subscribe → Stripe Checkout → /subscribe/success
+              └─ /subscribe → Lemon Squeezy Checkout → /subscribe/success
 ```
 
 ### Flow 3: Reading a brief + citations

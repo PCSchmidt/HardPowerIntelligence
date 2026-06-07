@@ -34,12 +34,12 @@ freshest graph state on its own cadence and diffs against the last brief.
 
 | Layer | Technology | Role |
 |-------|------------|------|
-| Web | Next.js (Vercel) | Marketing, reader UI, Stripe checkout, SEO |
+| Web | Next.js (Vercel) | Marketing, reader UI, Lemon Squeezy checkout, SEO |
 | Mobile *(later)* | React Native + Expo | Log-in-only "reader" app |
-| API | FastAPI | Brief API, auth, Stripe webhooks |
+| API | FastAPI | Brief API, auth, Lemon Squeezy webhooks |
 | Data / auth / cache | Supabase (Postgres + pgvector) | Graph, records, briefs, users, vectors |
 | LLM | OpenRouter (DeepSeek V4 Flash/Pro, Qwen3.7 Max) + Anthropic SDK last-resort (D006) | Cost-controlled waterfall |
-| Payments | Stripe | Web-first subscriptions (reader model) |
+| Payments | Lemon Squeezy (MoR) | Web-first subscriptions (reader model); global tax handled (D050) |
 | Infra | Cloudflare, Sentry, PostHog, Resend | DNS/WAF, errors, analytics, email |
 
 ---

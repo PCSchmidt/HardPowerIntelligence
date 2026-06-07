@@ -119,10 +119,11 @@ Free tier: daily brief (current day only).
 Pro tier: daily brief + archive (rolling 90 days), PDF export, entity 360 pages, follows.
 New subscribers: 14-day Pro trial, credit card required on sign-up.
 
-## Web — Stripe Subscriptions
+## Web — Lemon Squeezy Subscriptions
 
 Web-first reader model: subscriptions sold and managed on web (avoids app-store
-commissions). Stripe Checkout for Pro subscription. Stripe webhooks update
+commissions). Lemon Squeezy hosted checkout for Pro subscription; as Merchant of
+Record it handles global VAT/GST (D050). Lemon Squeezy webhooks update the
 `subscriptions` table in Supabase. Test-mode validation before going live.
 
 ## Web — Marketing and SEO

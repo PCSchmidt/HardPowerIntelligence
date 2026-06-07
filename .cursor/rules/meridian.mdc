@@ -35,7 +35,7 @@ platform. Treat the rules below as the contract the commit boundary enforces.
    - depends on: data_pipeline_live
    - required artifacts: engine/brief/generator.py, engine/eval/citation_eval.py, EVAL_BASELINE.md
    - verified by: run-tests.sh, run-evaluator.sh
-5. **web_reader_live** — Web Reader Live (Brief + Auth + Stripe)
+5. **web_reader_live** — Web Reader Live (Brief + Auth + Payments)
    - depends on: brief_verified, frontend_approved
    - required artifacts: web/app/page.tsx, web/app/brief/[id]/page.tsx, web/app/subscribe/page.tsx
    - verified by: run-tests.sh
