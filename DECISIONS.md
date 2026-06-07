@@ -1062,3 +1062,114 @@ introduces cost, flakiness, and API key management complexity not justified at t
 stage.
 
 ---
+
+## D043 — Shared asyncpg pool factory *(added 2026-06-07)*
+
+**Decision:** Connection pooling lives in `engine/engine/db.py` as an async
+`create_pool()` factory that strips the `+asyncpg` prefix from `DATABASE_URL`. Both
+FastAPI (lifespan-managed) and worker/script code import from there. No ad-hoc pool
+creation scattered across scripts.
+
+**Why:** DRY connection management; one place to tune pool size, timeouts, and codecs.
+
+---
+
+## D044 — Gate 6 closure criteria *(added 2026-06-07)*
+
+**Decision:** Gate 6 (`web_reader_live`) closes when (a) `pytest -m "not integration"`
+passes, (b) `tsc --noEmit` passes in `web/`, and (c) the required pages exist and
+TypeScript-compile cleanly. Visual verification is manual against local Supabase data.
+Playwright end-to-end tests are deferred to Gate 7 (`tests_passing`).
+
+**Why:** Gate 8 is `deploy_ready`; Gate 6 means "functionally complete and verified
+locally," not deployed. TypeScript compilation is the cheap, high-value gate for a
+frontend; browser automation is heavier infrastructure better suited to Gate 7.
+
+---
+
+## D045 — Checkout graceful degradation *(added 2026-06-07)*
+
+**Decision:** The subscribe page UI ships complete in Gate 6. The checkout action only
+fires when payment credentials are present in the environment; absent credentials, the
+CTA surfaces an explicit "payments not yet configured" state rather than crashing.
+
+**Why:** Unblocks the gate without requiring live payment-processor configuration, which
+is a Gate 8 launch concern.
+
+---
+
+## D046 — Tailwind / shadcn version policy *(added 2026-06-07)*
+
+**Decision:** Use whatever `shadcn@latest init` installs (Tailwind v4 + CSS-first config
+expected as of 2026). The DESIGN_SYSTEM.md token values are CSS custom properties and
+translate directly into the installed version's config format — same values, adapted
+syntax. Pin the installed versions in `package.json`.
+
+**Why:** Forcing the Tailwind v3 config format the spec was written against would fight
+the tooling for no benefit. Tokens are syntax-portable; the values are what matter.
+
+---
+
+## D047 — Gate 6 component depth *(added 2026-06-07)*
+
+**Decision:** Functional in Gate 6: `NavBar`, `Footer`, `BriefHeader`, `BriefItem`,
+`CitationsDrawer`, `PricingTable`, `LoginForm`, `SignupForm`, Supabase `middleware.ts`.
+Functional stubs (render, no live data wiring): everything entity-related
+(`EntitySearch`, `FollowButton`, `EntityChip`, Entity 360) and PDF export.
+
+**Why:** Entity features depend on the entity graph (Gate 4 incomplete) and PDF depends
+on WeasyPrint (unbuilt). Stubbing them keeps the gate honest while preserving layout.
+
+---
+
+## D048 — Local Supabase for Gate 6 development *(added 2026-06-07)*
+
+**Decision:** All Gate 6 development runs against the local Supabase stack
+(`supabase start`, ports 54321/54322), never the cloud project. FastAPI verifies JWTs
+with the local `SUPABASE_JWT_SECRET` from `supabase status`; Next.js auth points at
+`http://127.0.0.1:54321`. Cloud values are swapped in only at deploy (Gate 8).
+
+**Why:** Local and production stay fully isolated — no risk of corrupting cloud data
+during development. Confirmed by user 2026-06-07.
+
+---
+
+## D049 — Build `/desk/defense` in Gate 6 *(added 2026-06-07)*
+
+**Decision:** Build `web/app/desk/defense/page.tsx` (the primary daily reader) as part
+of Gate 6 even though it is not in the original gate artifact list. It shares all
+components with `/brief/[id]`; the only delta is the API call
+(`GET /briefs/latest` vs `GET /briefs/{id}`).
+
+**Why:** Near-zero marginal cost once `/brief/[id]` exists, and it makes the gate
+represent the application actually working rather than three isolated pages.
+
+---
+
+## D050 — Payment processor: Lemon Squeezy (Merchant of Record) *(added 2026-06-07)*
+
+**Decision:** Use Lemon Squeezy as Merchant of Record instead of Stripe. This
+**supersedes the Stripe-specific mechanism in D012 and D019** — the pricing ($19/mo,
+$179/yr, 14-day CC-required trial) and the dual-layer gating principle (FastAPI gates
+data, Next.js gates UX) are **unchanged**; only the processor, webhook source, and
+checkout mechanism change.
+
+- Webhook endpoint: `POST /webhooks/lemon-squeezy` (HMAC-SHA256 `X-Signature` verification)
+- Checkout: Lemon Squeezy hosted checkout URL/overlay with `custom_data.user_id` embedded
+- `subscriptions` table stores Lemon Squeezy subscription IDs
+
+**Why:** HPI is a solo-operated information product with a global audience. The EU/UK
+$0 VAT threshold makes Stripe-as-MoR a tax-compliance burden from the first
+international subscriber; an MoR absorbs all global VAT/GST/sales-tax liability. The
+payment code was not yet written, making this the clean decision window. Lemon Squeezy
+is Stripe-owned (Stripe processing infrastructure under an MoR legal shield), and its
+webhook handler shape is nearly identical to the Stripe one originally planned. Tradeoff
+accepted: higher headline fee (~5% + $0.50 vs ~2.9% + $0.30) in exchange for eliminated
+tax-filing labor — the effective gap narrows sharply on international volume.
+
+**Compliance note:** HPI must remain positioned as a general publication, not investment
+advice (the disclaimer is already in `FRONTEND_SPEC.md` and the Footer). Avoid
+"make money from this data" framing in all marketing copy to pass MoR live-activation
+review.
+
+---

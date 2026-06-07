@@ -30,7 +30,7 @@ Middleware runs in this order on every request (except explicitly exempted route
 
 ### 1. Auth middleware
 
-Applies to: all routes except `GET /health`, `POST /stripe/webhook`.
+Applies to: all routes except `GET /health`, `POST /webhooks/lemon-squeezy`.
 
 FastAPI reads the `Authorization: Bearer <jwt>` header and verifies the Supabase JWT
 locally using `SUPABASE_JWT_SECRET` (no round-trip to Supabase). On success, attaches
@@ -451,30 +451,36 @@ session hydration to get authoritative tier from FastAPI (D012).
 
 ---
 
-### Stripe Webhooks
+### Lemon Squeezy Webhooks
 
-#### `POST /stripe/webhook`
+#### `POST /webhooks/lemon-squeezy`
 
-Receives Stripe events. No Bearer auth — Stripe signature verification instead.
+Receives Lemon Squeezy (Merchant of Record, D050) events. No Bearer auth — HMAC
+signature verification instead.
 
 **Headers:**
 ```
 Content-Type: application/json
-Stripe-Signature: t=...,v1=...
+X-Signature: <hex hmac-sha256 of raw body>
+X-Event-Name: subscription_created
 ```
 
-FastAPI verifies the signature with `STRIPE_WEBHOOK_SECRET` before processing.
+FastAPI computes `hmac.new(LEMONSQUEEZY_WEBHOOK_SECRET, raw_body, sha256).hexdigest()`
+and compares against `X-Signature` with `hmac.compare_digest` before processing.
 Invalid signature → `400` (logged to Sentry; not `401` to avoid leaking timing info).
 
-**Handled event types:**
+The internal user is resolved from `meta.custom_data.user_id`, which is embedded when
+the checkout URL is generated.
 
-| Stripe event | Action |
-|-------------|--------|
-| `checkout.session.completed` | Create `subscriptions` row, set `tier = "pro"`, set `status = "active"` |
-| `customer.subscription.updated` | Update `tier`, `status`, `current_period_start`, `current_period_end` |
-| `customer.subscription.deleted` | Set `status = "cancelled"`, set `tier = "free"` |
-| `invoice.payment_failed` | Set `status = "past_due"` |
-| `invoice.payment_succeeded` | Ensure `status = "active"` (handles recovery from past_due) |
+**Handled event types** (from `meta.event_name`):
+
+| Lemon Squeezy event | Action |
+|--------------------|--------|
+| `subscription_created` | Create `subscriptions` row, set `tier = "pro"`, set `status` from payload (`active` or `on_trial`); store `lemon_squeezy_id` |
+| `subscription_updated` | Update `status`, `current_period_end` (renews_at), `tier` |
+| `subscription_cancelled` / `subscription_expired` | Set `status = "cancelled"`, set `tier = "free"` |
+| `subscription_payment_failed` | Set `status = "past_due"` |
+| `subscription_payment_success` | Ensure `status = "active"` (handles recovery from past_due) |
 
 Unhandled event types → `200` (acknowledged but ignored; logged at DEBUG level).
 
@@ -485,7 +491,7 @@ Unhandled event types → `200` (acknowledged but ignored; logged at DEBUG level
 
 **Response `400` (bad signature):**
 ```json
-{"error": {"code": "invalid_signature", "message": "Stripe signature verification failed"}}
+{"error": {"code": "invalid_signature", "message": "Lemon Squeezy signature verification failed"}}
 ```
 
 ---
@@ -772,8 +778,9 @@ All secrets in environment variables; never hardcoded.
 | `SUPABASE_URL` | Supabase project URL |
 | `SUPABASE_SERVICE_ROLE_KEY` | Service role key (never exposed to client) |
 | `SUPABASE_JWT_SECRET` | JWT secret for local token verification |
-| `STRIPE_SECRET_KEY` | Stripe API key |
-| `STRIPE_WEBHOOK_SECRET` | Stripe webhook signing secret |
+| `LEMONSQUEEZY_API_KEY` | Lemon Squeezy API key (checkout + portal URL generation) |
+| `LEMONSQUEEZY_STORE_ID` | Lemon Squeezy store ID |
+| `LEMONSQUEEZY_WEBHOOK_SECRET` | Lemon Squeezy webhook HMAC signing secret |
 | `OPENROUTER_API_KEY` | OpenRouter API key (all non-Anthropic models) |
 | `ANTHROPIC_API_KEY` | Direct Anthropic SDK key (last-resort fallback) |
 | `SENTRY_DSN` | Sentry error reporting |
@@ -790,7 +797,7 @@ All secrets in environment variables; never hardcoded.
 
 ## Service boundary notes
 
-- `hpi-api` handles all HTTP: briefs, entities, calendar, auth relay, Stripe webhooks, admin.
+- `hpi-api` handles all HTTP: briefs, entities, calendar, auth relay, Lemon Squeezy webhooks, admin.
 - `hpi-worker` handles background processing: scheduler, ingestion adapters, brief generation. It does not expose HTTP endpoints (internal Fly.io network only for health).
 - Next.js calls `hpi-api` for all data. It calls Supabase Auth JS client only for session management (token refresh, sign-in, sign-out).
 - Both services read/write Supabase Postgres. `hpi-api` uses `SUPABASE_SERVICE_ROLE_KEY` for all DB operations (RLS bypass in trusted backend). Row-level security remains on as defense-in-depth.

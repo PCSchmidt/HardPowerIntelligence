@@ -9,9 +9,10 @@ dependencies = [
     "asyncpg>=0.30",
     "pydantic>=2.7",
     "pydantic-settings>=2.3",
-    "supabase>=2.5",
-    "stripe>=10.0",
-    "slowapi>=0.1.9",
+    "pyjwt>=2.8",            # local Supabase JWT verification (HS256)
+    "httpx>=0.27",          # Lemon Squeezy API calls (checkout + portal URLs)
+    "structlog>=24.1",
+    "slowapi>=0.1.9",       # rate limiting (wired later)
     "sentry-sdk[fastapi]>=2.5",
     "python-dotenv>=1.0",
 ]
