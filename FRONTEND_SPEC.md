@@ -155,7 +155,7 @@ Appears on all pages. Client Component.
 
 **Sections (top to bottom):**
 
-1. **Hero** — Full-width. Headline in Playfair Display (`text-display-xl`): "Intelligence that cites its sources." Subheadline in Inter: one sentence on the product. Two CTAs: "Start 14-day free trial" (primary, navy fill) + "See a sample brief" (secondary, outlined). Background: `#FAFAF8`.
+1. **Hero** — Full-width. Headline in Playfair Display (`text-display-xl`): "Intelligence that cites its sources." Subheadline in Inter: one sentence on the product. Two CTAs: "Start 14-day free trial" (primary, navy fill) + "See a sample brief" (secondary, outlined). Background: parchment-equations backdrop (`web/public/textures/parchment-equations.png`) dimmed behind a `#FAFAF8`/navy scrim so type meets contrast targets — see DESIGN_SYSTEM.md §11 / D051.
 
 2. **Sample Brief Preview** — Truncated, ungated excerpt of a real Defense brief item (static, hardcoded for launch). Shows: item type badge, headline, first sentence of body, one citation chip `[1]`, citation source label. Fade-out at the bottom with "Sign up to read the full brief →". Signals the product's format.
 
@@ -168,7 +168,7 @@ Appears on all pages. Client Component.
 
 5. **Pricing Table** — `PricingTable` component. Free vs Pro columns. 14-day trial CTA. See subscription section.
 
-6. **Footer** — `Footer` component. Logo, tagline, links (Terms, Privacy, Contact), disclaimer ("HPI is a general publication, not investment advice.").
+6. **Footer** — `Footer` component. Logo, tagline, links (Terms, Privacy, Contact), disclaimer ("HPI is a general publication, not investment advice."). Carries a low-opacity parchment-equations hint as a chrome accent (DESIGN_SYSTEM.md §11 / D051), persisting the motif onto authenticated pages where reading surfaces stay clean white.
 
 **SEO:**
 - `title`: "Hard Power Intelligence — Defense, Energy & AI Infrastructure Briefings"

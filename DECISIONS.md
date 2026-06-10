@@ -1173,3 +1173,39 @@ advice (the disclaimer is already in `FRONTEND_SPEC.md` and the Footer). Avoid
 review.
 
 ---
+
+## D051 — Parchment-equations atmospheric backdrop *(added 2026-06-10)*
+
+**Decision:** A parchment texture overlaid with accurately-rendered mathematical
+equations grouped by the app's four coverage domains (Defense Technology, Space
+Exploration, Artificial Intelligence, Energy Technology) becomes a brand motif.
+
+Placement rules:
+- **Marketing / hero / auth pages:** full parchment-equations image as the hero
+  backdrop (dimmed/overlaid so foreground type stays legible). Overrides the prior
+  plain `#FAFAF8` hero background noted in FRONTEND_SPEC.md `GET /` Hero section.
+- **App chrome (header / footer / sidebar):** a *hint* of the parchment carried
+  through as an accent in the chrome only — e.g. a faint parchment fill or a thin
+  equation-edge strip — so the motif persists across authenticated pages.
+- **Reading surfaces (brief reader, dashboard, content cards):** stay clean white
+  (`--surface` / `--background`). No backdrop behind long-form reading content.
+
+**Why:** The locked design system (Principle 1, "Editorial over app. Decoration is
+noise.") forbids busy decoration behind reading content; legibility and the
+"premium intelligence publication" restraint win there. But the equation motif is
+genuinely on-theme — the four equation groups map 1:1 to the app's coverage areas —
+so it earns a place as atmosphere in marketing and as a light accent in chrome,
+without touching the reading experience. User-requested 2026-06-10.
+
+**Asset:** Source at repo root `parchment-space-energy-ai.png` (1672×941, RGB).
+Staged for the frontend gate at `web/public/textures/parchment-equations.png`.
+TODO at frontend build: optimize (WebP/AVIF, the PNG is ~3.2 MB), generate a dimmed
+overlay variant for the hero, and a low-opacity chrome-accent crop. Equations should
+be verified for accuracy before launch (they are decorative but the brand promise is
+"cites its sources" — visibly wrong math undercuts that).
+
+**Status:** Recorded after Gate 6. The frontend (`web/`) was scaffolded in Gate 6
+(web reader live), so this is implementable now: wire a `ParchmentBackdrop` into the
+hero/auth pages and the chrome accent (footer). Not yet implemented in code.
+
+---

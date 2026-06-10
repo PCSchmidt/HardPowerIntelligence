@@ -463,3 +463,28 @@ Override the default prose styles to use the HPI fonts and color tokens:
   line-height:           1.75;
 }
 ```
+
+---
+
+## 11. Atmospheric backdrop — parchment-equations motif
+
+A parchment texture overlaid with accurately-rendered equations grouped by the four
+coverage domains (Defense, Space, AI, Energy) is the brand's atmospheric motif.
+Source asset: `web/public/textures/parchment-equations.png`. See D051.
+
+This is an exception to Principle 1, scoped tightly so it never competes with reading
+content:
+
+| Surface                              | Treatment                                            |
+|--------------------------------------|------------------------------------------------------|
+| Marketing hero, auth (`/`, login)    | Full image as backdrop, dimmed behind a `#FAFAF8`/navy overlay (≈80–90% opacity scrim) so foreground type meets contrast targets. |
+| App chrome (header, footer, sidebar) | A *hint* only — faint parchment fill or a thin equation-edge strip. Low opacity (≈8–15%). Motif persists across authenticated pages. |
+| Reading surfaces (brief reader, dashboard, cards) | None. Clean `--surface` / `--background`. The backdrop stops at the chrome. |
+
+Implementation notes for the frontend gate:
+- Apply via a dedicated wrapper/util, not on `body`, so reading routes opt out cleanly.
+- Ship an optimized derivative (WebP/AVIF) plus a pre-dimmed hero variant and a
+  low-opacity chrome crop — do not scrim a 3.2 MB PNG at runtime.
+- Respect `prefers-reduced-motion`/contrast: the scrim must keep body text ≥ WCAG AA.
+- Verify the equations are correct before launch — visibly wrong math undercuts the
+  "every claim cites its source" brand promise.

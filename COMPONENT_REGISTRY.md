@@ -70,11 +70,36 @@ interface NavBarProps {
 |-|-|
 | Path | `components/layout/footer.tsx` |
 | Type | Server |
-| Description | Site footer. Logo, tagline, nav links, legal disclaimer. |
+| Description | Site footer. Logo, tagline, nav links, legal disclaimer. Wraps its content in `ParchmentBackdrop variant="accent"` to carry the brand motif onto authenticated pages (DESIGN_SYSTEM.md §11 / D051). |
 
 No props (all static content).
 
 **Content:** HPI wordmark · tagline · Links: Terms, Privacy Policy, Contact · Disclaimer: "Hard Power Intelligence is a general publication. Nothing published here constitutes investment advice."
+
+---
+
+### `ParchmentBackdrop`
+
+| | |
+|-|-|
+| Path | `components/layout/parchment-backdrop.tsx` |
+| Type | Server |
+| Description | Renders the parchment-equations brand motif (DESIGN_SYSTEM.md §11 / D051). Absolutely-positioned, behind a content slot, with a scrim overlay so foreground type stays legible. Two intensities via `variant`. Reading surfaces never wrap with this — it is opt-in per page, not applied on `body`. |
+
+```typescript
+interface ParchmentBackdropProps {
+  children: React.ReactNode
+  variant?: 'hero' | 'accent'   // 'hero' = full image + heavy scrim (marketing/auth)
+                                //  'accent' = low-opacity hint (chrome only)
+  className?: string
+}
+```
+
+**Variants:**
+- `hero` — full `web/public/textures/parchment-equations.png` (pre-dimmed derivative) behind a `#FAFAF8`/navy scrim ≈80–90% opacity. Used by marketing home hero and auth pages.
+- `accent` — low-opacity crop (≈8–15%) as a chrome hint. Consumed by `Footer` (and optionally `NavBar`/`Sidebar`) to carry the motif onto authenticated pages.
+
+**Notes:** Ship optimized WebP/AVIF derivatives (the source PNG is ~3.2 MB); do not scrim the raw PNG at runtime. Scrim must keep body text ≥ WCAG AA contrast.
 
 ---
 
