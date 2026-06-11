@@ -82,7 +82,13 @@ main() {
     # 3. pytest
     if [ -f "$TARGET_DIR/pyproject.toml" ] || [ -f "$TARGET_DIR/pytest.ini" ] || \
        [ -f "$TARGET_DIR/setup.py" ] || ls "$TARGET_DIR"/tests/*.py >/dev/null 2>&1; then
-        if command -v pytest >/dev/null 2>&1; then
+        # uv workspaces install packages into a project .venv; bare `pytest` on PATH
+        # uses the global interpreter and cannot import workspace packages. When this
+        # is a uv project, run through `uv run` and exclude the integration suite
+        # (live services / API keys) to match the gate definition (run-tests.sh / D052).
+        if command -v uv >/dev/null 2>&1 && grep -q "\[tool.uv" "$TARGET_DIR/pyproject.toml" 2>/dev/null; then
+            run_or_block "pytest" uv run --project "$TARGET_DIR" pytest -m "not integration" -q
+        elif command -v pytest >/dev/null 2>&1; then
             run_or_block "pytest" pytest -q
         else
             warn "Python project detected but pytest not installed - skipping"
