@@ -1209,3 +1209,31 @@ be verified for accuracy before launch (they are decorative but the brand promis
 hero/auth pages and the chrome accent (footer). Not yet implemented in code.
 
 ---
+
+## D052 — Frontend gate is `next build`, not bare `tsc --noEmit` *(added 2026-06-10)*
+
+**Decision:** The Gate 7 frontend type check in `run-tests.sh` runs `next build`
+(which performs TypeScript checking) instead of `npx tsc --noEmit`. This **supersedes
+the `tsc --noEmit` frontend command specified in D044**; the rest of D044 (Playwright
+deferred, backend `pytest -m "not integration"`) is unchanged.
+
+**Why:** The project installed **Next.js 16** (D046 — "use whatever the toolchain
+installs"), whose typed-routes feature generates `.next/types/validator.ts`. That file
+only type-checks correctly inside `next build`'s Next-plugin-aware TypeScript program.
+The `next` entry in `tsconfig.json` `plugins` is a *language-service* plugin — it
+augments route-type resolution in editors and during `next build`, but a bare
+command-line `tsc --noEmit` does not load it, so the generated validator cannot resolve
+the route registry (`AppRoutes` collapses to `never`) and fails with spurious errors
+like `Type '"/"' is not assignable to type 'never'` — even though the routes are
+registered correctly and `next build` passes its own TypeScript phase. `next build` is
+also the authoritative compile (it is what Vercel runs at deploy), so the gate now
+matches production truth.
+
+**Also:** `run-tests.sh` backend command changed from `python -m pytest` to
+`uv run pytest` so the gate is reproducible from a clean checkout after `uv sync`,
+without manual venv activation. Relatedly, the workspace root was missing
+`[tool.uv.sources]` (api/worker depend on `hpi-engine`); without it a clean `uv sync`
+failed outright. Both were latent because CI runs only `meridian-verify.sh` and never
+provisions or runs the Python suite.
+
+---

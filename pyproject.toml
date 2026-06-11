@@ -6,6 +6,14 @@ requires-python = ">=3.12"
 [tool.uv.workspace]
 members = ["api", "engine", "worker"]
 
+# Workspace members depend on each other (api/worker → hpi-engine); uv needs these
+# sources to resolve them from the workspace rather than PyPI. Without this, a clean
+# `uv sync` fails to parse the dependency graph.
+[tool.uv.sources]
+hpi-engine = { workspace = true }
+hpi-api = { workspace = true }
+hpi-worker = { workspace = true }
+
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]
