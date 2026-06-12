@@ -73,7 +73,7 @@ items to confirm at Gate 9. No autonomous fixes were required (none Critical/Hig
 ## Action items
 | Sev | Item | When |
 |-----|------|------|
-| MEDIUM | ✅ FIXED — `20260611000001_lock_briefs_rls.sql` revokes client read on briefs/citations/entities; applies at `supabase db push` | Done (apply at deploy) |
+| MEDIUM | ✅ FIXED + VERIFIED on cloud (2026-06-12) — `20260611000001_lock_briefs_rls.sql` applied; `authenticated`/`anon` confirmed to have no SELECT on briefs/citations/entities | Done |
 | LOW | Pin expected JWT alg(s) per environment | Cycle 2 / hardening |
 | LOW | Re-evaluate adversarial ingested-content handling when user queries ship | Cycle 2 |
-| CONFIG | `ENVIRONMENT=production`, real CORS origins, JWT secret ≥32, disable `/docs`, Lemon Squeezy secret | Gate 9 deploy |
+| CONFIG | ✅ `ENVIRONMENT=production` + real `CORS_ALLOW_ORIGINS` set on Fly (2026-06-12). ⬜ Still: Lemon Squeezy webhook secret, optional `/docs` disable | Partial |

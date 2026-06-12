@@ -5,6 +5,14 @@ desk: Supabase (cloud) → Fly.io (`hpi-api`) → Vercel (`web`), plus an interi
 cadence via GitHub Actions. Architecture per [DEPLOYMENT_CONFIG.md](DEPLOYMENT_CONFIG.md)
 (D009, D011, D050).
 
+> **✅ First deploy completed 2026-06-12** — live at `hard-power-intelligence.vercel.app`
+> + `hpi-api.fly.dev`. Real-world gotchas hit along the way (keep for next time):
+> (1) `supabase db push` needs the **URL-decoded** DB password in `SUPABASE_DB_PASSWORD`
+> (the connection string stores it percent-encoded); (2) intermittent local DNS failures
+> resolving the Supabase pooler host — retry; (3) two prod-only bugs fixed —
+> ivfflat→HNSW index (D053) and `pyjwt[crypto]` for ES256 tokens (D054); (4) Fly now
+> requires a payment method before deploy. Remaining work in DEPLOYMENT_CONFIG.md §6.
+
 > **Scope of this deploy.** Web + API + a brief generated from data already in the DB.
 > This validates the whole serving + auth + payments path end-to-end. It does **not**
 > include live scheduled ingestion of fresh government data — there is no production

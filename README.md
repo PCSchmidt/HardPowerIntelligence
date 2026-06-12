@@ -105,6 +105,12 @@ break-even at a small number of subscribers.
 AI-Infrastructure desks, the mobile reader app, and second-order supply-chain
 synthesis follow in a later cycle. This is an active, early-stage build.
 
+**Deployed to production 2026-06-12** — the full stack is live and working end-to-end:
+web reader (Vercel) → API (Fly.io) → Supabase, with auth and a cited brief rendering at
+`/desk/defense` (faithfulness 1.0). Gates 1–8 closed. Remaining before public launch:
+Lemon Squeezy checkout, a production ingestion runner (briefs currently run from seeded
+fixtures), and a few config fixes — tracked in `DEPLOYMENT_CONFIG.md` §6 and `CHANGELOG.md`.
+
 Scope boundaries in [docs/SCOPE.md](docs/SCOPE.md).
 
 ---

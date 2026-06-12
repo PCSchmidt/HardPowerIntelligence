@@ -40,6 +40,7 @@ faithfulness_score = passing_claim_checks / total_claim_checks
 | Brief date | Desk | Items generated | Items excluded | Claims checked | Claims passing | Score | Published? | Notes |
 |------------|------|----------------|----------------|----------------|----------------|-------|------------|-------|
 | 2026-06-06 | defense | 3 | 1 | 2 | 2 | 1.000 | Yes | First integration run; 3 fixture records, 2 passages retrieved, 1 item excluded (Qwen judged LRASM claim unsupported by available passage), 2 surviving items both scored 1.00 |
+| 2026-06-12 | defense | 3 | 0 | 3 | 3 | 1.000 | Yes | First **production** run (cloud Supabase). After HNSW index fix (D053) retrieval returned all 3 passages; all 3 items survived at 1.00. Published live to `/desk/defense`. |
 
 ---
 

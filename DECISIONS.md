@@ -1237,3 +1237,34 @@ failed outright. Both were latent because CI runs only `meridian-verify.sh` and 
 provisions or runs the Python suite.
 
 ---
+
+## D053 — HNSW embedding index (not ivfflat) *(added 2026-06-12)*
+
+**Decision:** The pgvector index on `normalized_records.embedding` is **HNSW**
+(`vector_cosine_ops`), not ivfflat. Migration `20260612000001_embedding_hnsw_index.sql`.
+
+**Why:** The first production brief retrieved 0 passages and could not publish. ivfflat
+with the default `probes = 1` returns zero rows for an ANN `ORDER BY embedding <=> $vec`
+when the table holds very little data (the single probed list is empty). The RAG
+retrieval JOINs `raw_records`, which pushed the planner onto the ivfflat index → no
+passages → citation eval excluded every item (faithfulness 0.000). HNSW has high recall
+out of the box (no `probes` tuning), is correct on small datasets, and scales. After the
+swap: 3 passages retrieved, eval 1.000, brief published.
+
+---
+
+## D054 — `pyjwt[crypto]` for asymmetric (ES256) Supabase tokens *(added 2026-06-12)*
+
+**Decision:** The API depends on `pyjwt[crypto]` (pulls in `cryptography`), not plain
+`pyjwt`.
+
+**Why:** Cloud Supabase signs user JWTs with **ES256** (asymmetric signing keys); PyJWT
+needs `cryptography` to verify ES256/RS256. The dependency was plain `pyjwt`, written and
+tested against local Supabase's HS256 (which only needs hmac). In production every
+authenticated request failed with 401 `invalid_token` (`MissingCryptographyError`), so
+the web reader showed "today's brief is being prepared" despite a published brief. This
+is a local-vs-cloud gap that only surfaced against the real cloud auth. `api/app/deps.py`
+already supports both paths (JWKS for ES/RS, HS256 fallback); it just lacked the crypto
+backend.
+
+---

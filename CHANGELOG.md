@@ -25,6 +25,11 @@ Supabase auth, and Lemon Squeezy subscriptions. Built gate-by-gate (Gates 1–8 
 - **Brand**: parchment-equations backdrop motif recorded for the web reader (D051).
 - **Deployment config**: `DEPLOYMENT_CONFIG.md` — Vercel + Fly.io + Supabase topology
   and env/secrets matrix.
+- **Production deployment (2026-06-12)**: live end-to-end — web (Vercel,
+  `hard-power-intelligence.vercel.app`), API (Fly.io, `hpi-api.fly.dev`), Supabase cloud.
+  First cited brief published to `/desk/defense` at faithfulness 1.0. Includes Fly
+  Dockerfiles + `fly.toml`, `.dockerignore`, `DEPLOY_RUNBOOK.md`, and the interim
+  `daily-brief.yml` GitHub Actions workflow.
 
 ### Changed
 - **Payments**: switched from Stripe to **Lemon Squeezy** (Merchant of Record) to absorb
@@ -40,20 +45,31 @@ Supabase auth, and Lemon Squeezy subscriptions. Built gate-by-gate (Gates 1–8 
   graph); committed `uv.lock` (D052).
 - **Security (briefs paywall)**: migration `20260611000001_lock_briefs_rls.sql` removes
   client read access to briefs/citations/entities so the Pro/archive paywall can't be
-  bypassed via direct Supabase PostgREST (SECURITY_AUDIT.md A01).
+  bypassed via direct Supabase PostgREST (SECURITY_AUDIT.md A01). Applied + verified on
+  cloud 2026-06-12.
+- **RAG retrieval (HNSW)**: replaced the ivfflat embedding index with HNSW — ivfflat with
+  `probes=1` returned 0 passages on sparse data, so no brief could publish (D053).
+- **API auth (ES256)**: `pyjwt[crypto]` so the API verifies cloud Supabase's ES256 tokens;
+  without `cryptography`, every authenticated request 401'd in production (D054).
 
 ### Security
 - No secrets in source or git history; constant-time webhook signature comparison;
   parameterized SQL throughout; RLS own-row isolation on all user tables.
 
-### Known gaps before v1.0.0 deploy
-- Dockerfiles (`docker/Dockerfile.api`, `Dockerfile.worker`) and Fly.io `fly.toml` configs
-  not yet authored (DEPLOYMENT_CONFIG.md §6).
-- Lemon Squeezy live credentials + webhook secret not yet provisioned (payments degrade
-  gracefully until then — D045).
-- Cloud migration apply (`supabase db push`) pending.
+### Known gaps before public launch
+- **Lemon Squeezy not set up** — checkout shows "not configured" (D045 graceful
+  degradation). Checkout creds go in Vercel; webhook secret on Fly.
+- **No production ingestion runner** — briefs run from seeded golden fixtures, not live
+  government data. Fresh daily cadence needs the ingestion runner (unbuilt `hpi-worker`,
+  D004); GH Actions `daily-brief.yml` is the interim bridge.
+- **Config:** Supabase Site URL points at another project (email-confirmation links
+  misroute); the `.env` `SUPABASE_SERVICE_ROLE_KEY` is wrong (unused by deployed services
+  but should be corrected).
+- **`persist_brief`** not idempotent for same-day reruns (UniqueViolation on (desk, date)).
+- Minor: verify the OpenRouter model IDs (non-fatal litellm "Provider List" log noise).
 
 ---
 
-_No tagged releases yet. The first tag (v1.0.0) is emitted when Gate 9 (`deploy_ready`)
-closes with the `GO` approval._
+_Deployed to production 2026-06-12 but not yet tagged. The first tag (v1.0.0) is emitted
+when Gate 9 (`deploy_ready`) is formally closed with the `GO` approval — pending Lemon
+Squeezy + public-launch readiness._
