@@ -1,0 +1,50 @@
+# hpi-worker — persistent ingestion/scheduler process (D004, D009). Deployed to Fly.io.
+#
+# ⚠️ TEMPLATE — NOT YET DEPLOYABLE. `worker/tasks/` is empty: there is no procrastinate
+#    App or periodic task defined anywhere yet. This image builds, but the CMD has
+#    nothing real to run. Implement the procrastinate App (e.g. worker/tasks/app.py with
+#    the @app.periodic ingestion schedule) before deploying, then set the CMD below.
+#
+# Build from the REPO ROOT:
+#   docker build -f docker/Dockerfile.worker -t hpi-worker .
+#   fly deploy --config fly.worker.toml
+
+# ---- builder ---------------------------------------------------------------------
+FROM ghcr.io/astral-sh/uv:python3.12-bookworm-slim AS builder
+
+ENV UV_COMPILE_BYTECODE=1 \
+    UV_LINK_MODE=copy \
+    UV_PYTHON_DOWNLOADS=never
+
+WORKDIR /app
+
+COPY pyproject.toml uv.lock ./
+COPY engine/pyproject.toml engine/pyproject.toml
+COPY api/pyproject.toml api/pyproject.toml
+COPY worker/pyproject.toml worker/pyproject.toml
+
+RUN --mount=type=cache,target=/root/.cache/uv \
+    uv sync --frozen --no-dev --no-install-workspace --package hpi-worker
+
+COPY engine/ engine/
+COPY worker/ worker/
+RUN --mount=type=cache,target=/root/.cache/uv \
+    uv sync --frozen --no-dev --package hpi-worker
+
+# ---- runtime ---------------------------------------------------------------------
+FROM ghcr.io/astral-sh/uv:python3.12-bookworm-slim
+
+ENV PATH="/app/.venv/bin:$PATH" \
+    PYTHONUNBUFFERED=1
+
+WORKDIR /app
+COPY --from=builder /app /app
+
+RUN useradd -r -u 10001 appuser && chown -R appuser:appuser /app
+USER appuser
+
+# TODO(worker): once worker/tasks defines a procrastinate App (e.g. `tasks.app:app`),
+# replace the placeholder below with the real worker command, e.g.:
+#   CMD ["procrastinate", "--app=tasks.app.app", "worker"]
+# The placeholder fails fast so a premature deploy is obvious rather than silently idle.
+CMD ["sh", "-c", "echo 'hpi-worker not implemented: worker/tasks is empty (see Dockerfile.worker header)'; exit 1"]

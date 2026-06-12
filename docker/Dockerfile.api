@@ -1,0 +1,52 @@
+# hpi-api — FastAPI data boundary (D009, D011). Deployed to Fly.io.
+# uv workspace build: install only the `hpi-api` package (+ its hpi-engine dep).
+#
+# Build from the REPO ROOT (the uv workspace root), not from docker/:
+#   docker build -f docker/Dockerfile.api -t hpi-api .
+#   fly deploy --config fly.api.toml      # fly uses [build].dockerfile = this file
+
+# ---- builder: resolve + install into /app/.venv ----------------------------------
+FROM ghcr.io/astral-sh/uv:python3.12-bookworm-slim AS builder
+
+ENV UV_COMPILE_BYTECODE=1 \
+    UV_LINK_MODE=copy \
+    UV_PYTHON_DOWNLOADS=never
+
+WORKDIR /app
+
+# 1) Manifests + lock first so dependency layers cache across source changes.
+#    All workspace members must exist on disk for uv to resolve the workspace.
+COPY pyproject.toml uv.lock ./
+COPY engine/pyproject.toml engine/pyproject.toml
+COPY api/pyproject.toml api/pyproject.toml
+COPY worker/pyproject.toml worker/pyproject.toml
+
+# 2) Install dependencies only (not the local packages yet) — cached layer.
+RUN --mount=type=cache,target=/root/.cache/uv \
+    uv sync --frozen --no-dev --no-install-workspace --package hpi-api
+
+# 3) Copy the source the api actually needs, then install the local packages.
+COPY engine/ engine/
+COPY api/ api/
+RUN --mount=type=cache,target=/root/.cache/uv \
+    uv sync --frozen --no-dev --package hpi-api
+
+# ---- runtime ---------------------------------------------------------------------
+# Same uv base so the interpreter the .venv references is present.
+FROM ghcr.io/astral-sh/uv:python3.12-bookworm-slim
+
+ENV PATH="/app/.venv/bin:$PATH" \
+    PYTHONUNBUFFERED=1 \
+    PORT=8080
+
+WORKDIR /app
+COPY --from=builder /app /app
+
+# Run as non-root.
+RUN useradd -r -u 10001 appuser && chown -R appuser:appuser /app
+USER appuser
+
+EXPOSE 8080
+
+# api/pyproject packages = ["app"]; FastAPI instance is app.main:app.
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8080"]

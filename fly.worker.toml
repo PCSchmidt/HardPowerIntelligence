@@ -1,0 +1,27 @@
+# Fly.io config — hpi-worker (persistent ingestion/scheduler, D004/D009).
+# Deploy:  fly deploy --config fly.worker.toml
+#
+# ⚠️ NOT YET DEPLOYABLE — worker/tasks is empty (no procrastinate App). See
+#    docker/Dockerfile.worker header. This config is ready for when the worker lands.
+#
+# Secrets (via `fly secrets set`): DATABASE_URL, OPENROUTER_API_KEY, SENTRY_DSN.
+
+app = "hpi-worker"
+primary_region = "iad"
+
+[build]
+  dockerfile = "docker/Dockerfile.worker"
+
+[env]
+  ENVIRONMENT = "production"
+
+# Background worker: NO [http_service]. The schedule lives in the process (procrastinate
+# @app.periodic, D004), so it must stay running — do not enable auto-stop. A single
+# always-on machine owns the ingestion schedule; running >1 would double-fire periodic
+# jobs unless procrastinate locking is configured.
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "512mb"
+
+# Keep exactly one machine running (persistent — D009: Fly does not sleep it).
+# Set after first deploy:  fly scale count 1 --config fly.worker.toml

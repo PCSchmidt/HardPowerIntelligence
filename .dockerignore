@@ -1,0 +1,28 @@
+# Build context exclusions for the Fly.io api/worker images (docker/Dockerfile.*).
+# Keep the context small: only the uv workspace (root manifest + lock + members) is needed.
+
+.git
+.github
+.claude
+.meridian
+.venv
+**/__pycache__
+**/*.pyc
+.pytest_cache
+.ruff_cache
+.mypy_cache
+
+# Frontend is deployed to Vercel, not in these images
+web
+
+# Docs / local-only
+*.md
+docs
+image
+*.png
+supabase/.branches
+supabase/.temp
+.env
+.env.*
+tests
+scripts

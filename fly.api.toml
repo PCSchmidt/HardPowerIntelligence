@@ -1,0 +1,41 @@
+# Fly.io config — hpi-api (FastAPI data boundary, D009/D011).
+# Deploy:  fly deploy --config fly.api.toml
+# Secrets (NOT set here — use `fly secrets set`): DATABASE_URL, SUPABASE_URL,
+#   SUPABASE_JWT_SECRET, CORS_ALLOW_ORIGINS, OPENROUTER_API_KEY,
+#   LEMONSQUEEZY_API_KEY, LEMONSQUEEZY_STORE_ID, LEMONSQUEEZY_WEBHOOK_SECRET,
+#   SENTRY_DSN. See DEPLOYMENT_CONFIG.md §3.
+
+app = "hpi-api"
+primary_region = "iad"   # set to your chosen region
+
+[build]
+  dockerfile = "docker/Dockerfile.api"
+
+[env]
+  ENVIRONMENT = "production"
+
+# Public HTTPS — Vercel (server-side) and the Lemon Squeezy webhook both reach it here.
+# It is auth-gated (JWT) + server-to-server (no browser CORS), per D011.
+[http_service]
+  internal_port = 8080
+  force_https = true
+  auto_stop_machines = "stop"
+  auto_start_machines = true
+  min_machines_running = 0   # bump to 1 to remove cold-start latency on first request/webhook
+
+  [http_service.concurrency]
+    type = "requests"
+    soft_limit = 200
+    hard_limit = 250
+
+# Fly health probe hits the unauthenticated /health route.
+[[http_service.checks]]
+  method = "get"
+  path = "/health"
+  interval = "30s"
+  timeout = "5s"
+  grace_period = "10s"
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "512mb"
