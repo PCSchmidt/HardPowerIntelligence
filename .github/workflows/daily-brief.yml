@@ -1,0 +1,52 @@
+# Interim daily-brief cadence (DEPLOY_RUNBOOK.md §6).
+#
+# Generates a Defense brief from the data currently in the cloud DB (normalized_records)
+# and publishes it if it passes the citation eval gate. This is the BRIDGE until the
+# durable ingestion worker (hpi-worker, D004) exists — it does NOT fetch fresh government
+# data, so until a production ingestion runner is added, this regenerates from existing
+# data. Run it manually (workflow_dispatch); enable the cron only once real ingestion feeds
+# fresh records (otherwise you pay LLM cost to regenerate the same brief, D006).
+#
+# Required repo secrets (gh secret set ...): DATABASE_URL, OPENROUTER_API_KEY,
+# OPENAI_API_KEY, and optionally ANTHROPIC_API_KEY.
+
+name: Daily Brief
+
+on:
+  workflow_dispatch:
+    inputs:
+      desk:
+        description: "Desk to generate"
+        default: "defense"
+        type: choice
+        options: [defense]
+  # Enable once a production ingestion runner populates fresh normalized_records:
+  # schedule:
+  #   - cron: "0 11 * * *"   # 11:00 UTC daily (≈ 6-7am ET); adjust to your cadence
+
+concurrency:
+  group: daily-brief
+  cancel-in-progress: false   # never run two brief generations at once
+
+jobs:
+  brief:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          version: "0.8.0"
+
+      - name: Sync workspace
+        run: uv sync --all-packages --all-extras
+
+      - name: Generate + eval + publish brief
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: uv run python scripts/run_brief.py --desk "${{ inputs.desk || 'defense' }}"
