@@ -50,8 +50,11 @@ vercel login
 - [ ] JWT secret (Settings → API → JWT Settings) — only needed if your project still uses
       the legacy HS256 secret; new projects use asymmetric keys verified via JWKS (the API
       handles both — `api/app/deps.py`)
-- [ ] `DATABASE_URL` (Settings → Database → Connection string → **URI**, the **pooler**,
-      e.g. `postgresql://postgres.<ref>:<password>@aws-0-<region>.pooler.supabase.com:6543/postgres`)
+- [ ] `DATABASE_URL` — **use the Session-mode pooler (port 5432), NOT Transaction (6543).**
+      asyncpg uses prepared statements (`engine/db.py`), which break on the Transaction
+      pooler (PgBouncer). Settings → Database → Connection pooling → **Session mode** → URI:
+      `postgresql://postgres.<ref>:<password>@aws-0-<region>.pooler.supabase.com:5432/postgres`
+      (the Session pooler is also IPv4, which GitHub Actions needs in §6).
 
 ---
 
@@ -111,10 +114,11 @@ fly secrets set --stage --app hpi-api \
   OPENROUTER_API_KEY='<openrouter>' \
   OPENAI_API_KEY='<openai>' \
   ANTHROPIC_API_KEY='<anthropic-or-empty>' \
-  LEMONSQUEEZY_API_KEY='<ls-api-key>' \
-  LEMONSQUEEZY_STORE_ID='<ls-store-id>' \
   LEMONSQUEEZY_WEBHOOK_SECRET='<ls-webhook-secret>'
-# CORS_ALLOW_ORIGINS is set in step 4.2 once the Vercel URL exists.
+# Note: the Lemon Squeezy CHECKOUT creds (API key, store id, variant ids) go in VERCEL,
+# not here — the checkout route runs on Vercel (web/app/api/checkout/route.ts). The API
+# only needs the WEBHOOK secret (it verifies inbound webhooks). CORS_ALLOW_ORIGINS is set
+# in step 4.2 once the Vercel URL exists.
 ```
 **Verify:** `fly secrets list --app hpi-api` shows the names (values are hidden).
 
