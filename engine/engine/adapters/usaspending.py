@@ -47,6 +47,8 @@ def _build_text_chunk(row: dict) -> str:
 
 class USASpendingAdapter:
     source_id: str = _SOURCE_ID
+    base_url: str = _BASE_URL
+    http_method: str = "POST"   # USAspending search is a POST with a JSON body
 
     # ── parse ──────────────────────────────────────────────────────────────────
 

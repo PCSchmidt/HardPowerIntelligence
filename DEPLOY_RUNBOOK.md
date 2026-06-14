@@ -14,10 +14,10 @@ cadence via GitHub Actions. Architecture per [DEPLOYMENT_CONFIG.md](DEPLOYMENT_C
 > requires a payment method before deploy. Remaining work in DEPLOYMENT_CONFIG.md §6.
 
 > **Scope of this deploy.** Web + API + a brief generated from data already in the DB.
-> This validates the whole serving + auth + payments path end-to-end. It does **not**
-> include live scheduled ingestion of fresh government data — there is no production
-> ingestion runner yet (the `hpi-worker` is unbuilt, D004). See [§6](#6-the-cadence-honestly)
-> for exactly what the scheduled job does and does not do.
+> This validates the whole serving + auth + payments path end-to-end. A production ingestion
+> runner now exists (`scripts/run_ingest.py`, D057) and pulls fresh USAspending data; the
+> durable always-on `hpi-worker` (D004) is still unbuilt — the GitHub Actions job is the
+> interim cadence. See [§6](#6-the-cadence-honestly) for what the scheduled job does.
 
 > **Cost note.** `run_brief.py` calls paid LLMs (OpenRouter + OpenAI embeddings, D006).
 > A daily run is a few cents; don't enable the schedule until you have data worth briefing.
@@ -209,15 +209,17 @@ uv run python scripts/run_brief.py --desk defense
 
 ## 6. The cadence, honestly
 
-`scripts/run_brief.py` **synthesizes a brief from whatever is already in `normalized_records`**.
-It does **not** fetch fresh government data — there is no production ingestion runner yet
-(that is the unbuilt `hpi-worker`, D004). So:
+`scripts/run_ingest.py` now **fetches fresh government data** into `normalized_records`
+(D057), and `scripts/run_brief.py` **synthesizes a brief from it**. The two run in sequence
+(ingest → brief). So:
 
-- **Today:** scheduling `run_brief.py` re-runs synthesis on the *current* data. Useful for a
-  fixed sample/demo brief, not for genuinely fresh daily intelligence.
-- **For real fresh cadence:** build an ingestion runner (USAspending adapter → entity
-  resolver → `normalized_records`) and run it *before* `run_brief.py`. That is the next
-  engineering task after this deploy (the durable Fly worker, or a second scheduled step).
+- **Today:** `run_ingest.py` pulls fresh USAspending awards (dedup + embed + cursor +
+  retention), then `run_brief.py` synthesizes from that fresh data. `daily-brief.yml` runs
+  both (ingest step first; pass `skip_ingest=true` to regenerate from existing data only).
+- **Still pending:** registering more adapters (SEC EDGAR next, D055 §10) and the durable
+  always-on `hpi-worker` (D004) — only needed once the manual/Actions cadence actually hurts.
+- **One-time:** trigger the first production ingest to replace the seeded fixtures:
+  `DATABASE_URL='<cloud>' OPENAI_API_KEY='<...>' uv run python scripts/run_ingest.py`.
 
 ### Interim scheduled job — GitHub Actions
 A scheduled workflow is provided at [.github/workflows/daily-brief.yml](.github/workflows/daily-brief.yml).

@@ -25,6 +25,13 @@ Supabase auth, and Lemon Squeezy subscriptions. Built gate-by-gate (Gates 1–8 
 - **Brand**: parchment-equations backdrop motif recorded for the web reader (D051).
 - **Deployment config**: `DEPLOYMENT_CONFIG.md` — Vercel + Fly.io + Supabase topology
   and env/secrets matrix.
+- **Production ingestion runner (2026-06-14)**: `engine/ingest/` + `scripts/run_ingest.py`
+  — the live-data replacement for `seed_fixtures.py` (D004, D055, D057). Pulls fresh source
+  data through a retry/backoff HTTP fetcher, dedups into `raw_records` via the DB unique
+  constraint, normalizes + embeds only new records, advances per-source cursors, records
+  `ingestion_runs` provenance with a circuit breaker, and prunes the hot window (retention
+  preserves cited records). USAspending wired live; `daily-brief.yml` now ingests before
+  briefing. 19 new tests (fetcher/runner/retention); live smoke test parsed 100 real awards.
 - **Production deployment (2026-06-12)**: live end-to-end — web (Vercel,
   `hard-power-intelligence.vercel.app`), API (Fly.io, `hpi-api.fly.dev`), Supabase cloud.
   First cited brief published to `/desk/defense` at faithfulness 1.0. Includes Fly

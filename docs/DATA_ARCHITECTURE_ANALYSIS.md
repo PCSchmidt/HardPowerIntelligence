@@ -403,9 +403,13 @@ bytes — which is exactly why the hot window is capped.
 1. Ratify the candidate decisions into `DECISIONS.md`: **structured-first / news-secondary**,
    **license-class enforcement**, plus the Q1–Q8 settlements in §12 (daily, global, minimal
    cost, 3 desks + convergence, signals layer, keyless GDELT, autonomous publish, retention).
-2. Build the **ingestion runner** (scheduler + `source_runs` + dedup) against the existing
-   adapter contract; prove it with live USAspending data replacing the seeded fixtures.
-   Apply the **14–30 day hot-window retention** (§12a) from day one.
+2. ✅ **DONE (2026-06-14)** — Built the **ingestion runner** (`engine/ingest/` +
+   `scripts/run_ingest.py`, D057): retry/backoff fetcher, DB-unique-constraint dedup,
+   embed-new-only, per-source cursor + `ingestion_runs` accounting + circuit breaker, and
+   **14–30 day hot-window retention** that preserves cited records. USAspending wired live
+   (smoke-tested against the real API); `daily-brief.yml` ingests before briefing. *Remaining
+   to fully retire fixtures: trigger a production ingest run (writes cloud DB + embedding
+   cost).*
 3. Add **`license_class` + `source_reliability`** to the record schema and enforce
    license-aware citations.
 4. Introduce the **`signals`/`events` layer** (Q5) + deliberate **`entity_edges`** population —

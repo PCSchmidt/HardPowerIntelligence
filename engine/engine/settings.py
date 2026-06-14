@@ -75,5 +75,9 @@ class Settings(BaseSettings):
     # Worker
     worker_concurrency: int = 5
 
+    # Ingestion runner (D004, D055)
+    ingest_max_pages: int = 10          # safety cap on pagination per run
+    ingest_hot_window_days: int = 21    # retention window for normalized + raw records
+
 
 settings = Settings()

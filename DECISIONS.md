@@ -1323,3 +1323,45 @@ confidence. Government data being both free *and* freely redistributable is prec
 free-first stack (D055) is also the legally safe stack.
 
 ---
+
+## D057 — Production ingestion runner design *(added 2026-06-14)*
+
+**Decision:** The production ingestion runner (`engine/ingest/`, driven by
+`scripts/run_ingest.py`) is the live-data replacement for `scripts/seed_fixtures.py`
+(D004, D055). Concrete design choices:
+
+- **Adapter HTTP contract.** Adapters declare `base_url` + `http_method`; the runner does the
+  HTTP via a shared `HttpFetcher` (httpx + tenacity). Retries target *transient* failures
+  only — transport errors, 429, 5xx with exponential backoff — and raise immediately on a
+  non-retryable 4xx so a broken adapter fails fast. Adapters are looked up by `source_id` in
+  `engine/adapters/registry.py` (one line per new source).
+- **Deterministic dedup via the DB.** Insert into `raw_records` with
+  `ON CONFLICT (source_id, native_id, content_hash) DO NOTHING RETURNING id`; a returned id
+  means new, so only **new** raw records get a `normalized_record` and an embedding. Re-runs
+  are idempotent and cheap.
+- **Accounting first, fail-soft per source.** An `ingestion_runs` row is opened `running`
+  before any network call and always closed (`success`/`failed`/`skipped`). An ingestion
+  failure is recorded (run + circuit breaker) and returned as `status='failed'` — it does
+  **not** raise, so one bad source can't abort a multi-source schedule. Programmer errors
+  (unknown source/adapter) still raise.
+- **Circuit breaker.** Consecutive failures increment `source_registry.circuit_breaker_*`;
+  at the threshold the breaker opens and skips runs for a 30-min cooldown, then allows one
+  half-open trial. Success resets it.
+- **Embedding in the runner.** New chunks are embedded at ingest time (gated on
+  `OPENAI_API_KEY` + an `embed` flag), spreading cost off the brief's critical path; the
+  generator's lazy embed becomes a no-op. Reuses `embed_pending_records` (D034).
+- **Hot-window retention (D055 §12a).** `prune_hot_window` deletes `normalized_records`
+  older than `INGEST_HOT_WINDOW_DAYS` (default 21) outright, and `raw_records` only if
+  unreferenced by citations / normalized records / entity edges / resolution queue — so a
+  raw record cited by a kept brief is never deleted and citations never dangle.
+
+**Why:** The schema (`source_registry`, `ingestion_runs`, the `raw_records` unique
+constraint, `last_cursor`, circuit-breaker columns) was already designed for this in the
+initial migration; the runner just operationalizes it. Pushing dedup into the DB's unique
+constraint (rather than app-side bookkeeping) makes idempotency a property of the schema, and
+fail-soft-per-source is what lets the eventual multi-source daily schedule survive a single
+flaky API. Validated: 123 unit tests pass (19 new — fetcher retry/backoff via respx, runner
+control-flow + dedup via a fake DB driving the real adapter, retention window math) and a
+live no-DB smoke test fetched + parsed 100 real USAspending records through the fetcher.
+
+---
