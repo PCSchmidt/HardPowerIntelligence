@@ -12,21 +12,19 @@ Requirements:
 """
 import argparse
 import asyncio
-import json
 import sys
-from datetime import date, datetime, timezone
-
-import asyncpg
+from datetime import date
 
 sys.path.insert(0, "engine")
 
 from engine.brief.generator import generate_brief, persist_brief
+from engine.db import create_pool
 from engine.eval.citation_eval import CitationEvaluator
 from engine.settings import settings
 
 
 async def main(desk: str, brief_date: str) -> None:
-    pool = await asyncpg.create_pool(settings.database_url.replace("+asyncpg", ""))
+    pool = await create_pool()   # hardened: retries transient DNS/connection failures (D057)
 
     print(f"Generating {desk.upper()} brief for {brief_date}...")
 

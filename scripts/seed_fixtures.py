@@ -14,19 +14,16 @@ import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 
-import asyncpg
-
 sys.path.insert(0, "engine")
 
 from engine.adapters.usaspending import USASpendingAdapter
-from engine.settings import settings
+from engine.db import create_pool
 
 FIXTURE_PATH = Path("tests/fixtures/usaspending/20260605_awards_response.json")
 
 
 async def main() -> None:
-    db_url = settings.database_url.replace("+asyncpg", "")
-    pool = await asyncpg.create_pool(db_url)
+    pool = await create_pool()   # hardened: retries transient DNS/connection failures (D057)
 
     fixture = json.loads(FIXTURE_PATH.read_text())
     adapter = USASpendingAdapter()
