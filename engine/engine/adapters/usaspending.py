@@ -7,7 +7,35 @@ from .base import NormalizedRecord
 _SOURCE_ID = "usaspending"
 _BASE_URL = "https://api.usaspending.gov/api/v2/search/spending_by_award/"
 _AWARD_TYPE_CODES = ["A", "B", "C", "D"]  # procurement contracts only
-_DEFAULT_LOOKBACK_DAYS = 3
+_DEFAULT_LOOKBACK_DAYS = 7  # thematic filter narrows results, so widen the window
+
+# Defense-Tech thematic filter (D059). The Defense desk is defined by *technology*,
+# not agency — space, directed energy, drones, surveillance, autonomy, robotics,
+# missiles, EW — wherever funded (DoD, DHS, DOE/NNSA, NASA, intel). USAspending's
+# keyword search indexes PSC/NAICS code *descriptions*, so these PSC-informed terms
+# act as a cross-agency category filter (e.g. "guided missile" → PSC 1410, "radar" →
+# PSC 5840s) plus emerging/cross-cutting terms PSC codes lag ("directed energy",
+# "autonomous", "hypersonic"). Keywords are OR-combined by the API. This is the
+# deterministic pre-filter from DATA_ARCHITECTURE_ANALYSIS §4 — relevance before the LLM.
+_DEFENSE_TECH_KEYWORDS = [
+    # Space / satellite
+    "satellite", "spacecraft", "launch vehicle", "space launch", "geospatial",
+    # Directed energy
+    "directed energy", "high energy laser", "laser weapon", "microwave weapon",
+    # Unmanned / counter-unmanned
+    "unmanned aircraft", "unmanned aerial", "drone", "counter-uas", "loitering munition",
+    # Autonomy / robotics
+    "autonomous", "autonomy", "robotic", "robotics",
+    # Missiles / munitions / strike
+    "guided missile", "hypersonic", "precision strike", "munition", "warhead",
+    # Sensing / surveillance / ISR
+    "radar", "surveillance", "reconnaissance", "electro-optical", "infrared sensor",
+    "night vision", "signals intelligence", "persistent surveillance",
+    # Electronic warfare
+    "electronic warfare", "electronic attack", "electromagnetic spectrum",
+    # C2 / AI for defense
+    "command and control", "artificial intelligence", "machine learning",
+]
 _FIELDS = [
     "Award ID", "Recipient Name", "Recipient UEI", "Start Date", "End Date",
     "Award Amount", "Awarding Agency", "Awarding Sub Agency",
@@ -115,6 +143,7 @@ class USASpendingAdapter:
             "filters": {
                 "time_period": [{"start_date": start_date, "end_date": end_date}],
                 "award_type_codes": _AWARD_TYPE_CODES,
+                "keywords": _DEFENSE_TECH_KEYWORDS,  # cross-agency defense-tech filter (D059)
             },
             "fields": _FIELDS,
             "page": page,

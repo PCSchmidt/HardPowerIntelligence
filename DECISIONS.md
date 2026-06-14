@@ -1392,3 +1392,31 @@ unsupported sentence (consistent with fully-autonomous publishing, D055 Q7: publ
 is provable). And the run crashed on persist because a failed brief already held the
 `(desk, date)` slot — idempotency was a known D055 gap, now closed. Validated by 9 new unit
 tests (sentence-stripping, temperature plumbing, delete-before-insert) and a live re-run.
+
+---
+
+## D059 — Desks are scoped by technology theme, not agency *(added 2026-06-14)*
+
+**Decision:** The **Defense desk = "Defense Tech," defined thematically and cross-agency** —
+space/satellites, directed energy/lasers, drones/counter-UAS, surveillance/ISR, autonomy,
+robotics, missiles/hypersonics, electronic warfare, radar — *wherever* funded (DoD, DHS,
+DOE/NNSA, NASA, intel), explicitly **not** DoD-only. Generic federal overhead (IT services,
+admin, emergency management) is out. The same thematic-scoping pattern will define the AI and
+Energy desks. Implemented as a **deterministic thematic pre-filter** on the USAspending
+adapter: a PSC-informed keyword list (`_DEFENSE_TECH_KEYWORDS`) passed to the API's `keywords`
+filter, plus a 7-day lookback (the filter narrows results, so widen the window).
+
+**Why:** The first live brief surfaced DHS ICE IT support, FEMA emergency management, and GSA
+IT services under "Defense" — faithfully cited but off-topic, because the adapter pulled the
+top awards by dollar amount across *all* agencies with no thematic filter. The fix is not an
+agency filter (a DHS border-surveillance drone *is* defense tech; a generic DoD IT contract is
+not) but a **technology-relevance** filter. USAspending's keyword search indexes PSC/NAICS code
+*descriptions*, so PSC-informed keywords ("guided missile" → PSC 1410, "radar" → PSC 5840s)
+act as a cross-agency category filter in one query, while emerging terms PSC codes lag
+("directed energy", "autonomous", "hypersonic", "machine learning") are caught directly. This
+is the deterministic pre-filter from `DATA_ARCHITECTURE_ANALYSIS.md` §4 — relevance enforced
+before anything reaches the LLM (cheaper + sharper). The API AND-combines `psc_codes` and
+`keywords`, so true "PSC OR keyword" would need two merged queries; a literal `psc_codes`
+second query is a documented future upgrade if keyword precision proves insufficient.
+Validated live: the filter replaced the generic-IT results with NASA space programs, Boeing/
+Lockheed space systems, Harris radar, and BlueStaq space-situational-awareness awards.

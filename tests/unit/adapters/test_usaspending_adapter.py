@@ -4,10 +4,7 @@ All tests run against golden fixtures — no network calls.
 Gate 4 acceptance: these tests must pass.
 """
 
-import hashlib
 import json
-
-import pytest
 
 from engine.adapters.usaspending import USASpendingAdapter
 
@@ -149,3 +146,26 @@ class TestCursor:
         response["page_metadata"]["has_next_page"] = True
         cursor = adapter.next_cursor(response, current_page=1)
         assert cursor["page"] == 2
+
+
+class TestDefenseTechFilter:
+    """The Defense desk is scoped by technology, not agency (D059)."""
+
+    def test_payload_includes_defense_tech_keywords(self):
+        adapter = USASpendingAdapter()
+        payload = adapter.build_request_payload(cursor=None, page=1)
+        keywords = payload["filters"]["keywords"]
+        assert keywords, "expected a non-empty defense-tech keyword filter"
+        # Spot-check coverage of the operator's named themes.
+        joined = " ".join(keywords).lower()
+        for theme in ("satellite", "directed energy", "drone", "autonomous",
+                      "radar", "guided missile", "electronic warfare"):
+            assert theme in joined, f"missing defense-tech theme: {theme}"
+
+    def test_keywords_exclude_generic_overhead_terms(self):
+        # The whole point is to drop generic federal IT/admin — make sure we didn't
+        # add over-broad terms that would re-admit it.
+        adapter = USASpendingAdapter()
+        keywords = [k.lower() for k in adapter.build_request_payload(None, 1)["filters"]["keywords"]]
+        for noise in ("it services", "software", "information technology", "support services"):
+            assert noise not in keywords
