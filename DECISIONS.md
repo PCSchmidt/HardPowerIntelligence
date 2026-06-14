@@ -1268,3 +1268,58 @@ already supports both paths (JWKS for ES/RS, HS256 fallback); it just lacked the
 backend.
 
 ---
+
+## D055 — Data-collection architecture: structured-first, news-secondary *(added 2026-06-14)*
+
+**Decision:** The Cycle-2 data pipeline is built on **free, public-domain structured
+primary-source data as the spine** (USAspending, SEC EDGAR, EIA, FRED, SAM/TED/SIPRI,
+etc.). **News/GDELT is a secondary discovery + corroboration layer and is never the sole
+citation for a brief claim.** Settles the open questions in
+[`docs/DATA_ARCHITECTURE_ANALYSIS.md`](docs/DATA_ARCHITECTURE_ANALYSIS.md):
+
+- **Cadence:** daily brief (not real-time) → ingestion cadence matched to daily publish.
+- **Scope:** global (consistent with the SITREP app); LLM cost held flat via deterministic
+  pre-filter (entity allowlist + theme codes + English-tag), not by limiting geography.
+- **Spend:** free-first only; paid sources (FMP ~$19/mo, Quiver) stay **revenue-gated**.
+- **Product shape:** three desk briefs (Defense / AI / Energy) **plus a cross-domain
+  convergence brief** — the moat made visible.
+- **Pipeline:** introduce a **`signals`/`events` layer** (dedup-clustered, scored) between
+  `normalized_records` and briefs; home for cross-domain `entity_edges`, novelty, confidence.
+- **GDELT:** start with the **keyless DOC 2.0 JSON API** (no GCP/billing); BigQuery deferred
+  until deeper co-occurrence analytics are wanted.
+- **Publishing:** fully autonomous (citation-faithfulness eval, Gate 5, is the quality bar);
+  revisit a human-in-the-loop gate only at significant scale.
+- **Retention:** 14–30 day **hot window** for `normalized_records` + embeddings; prune/archive
+  raw; keep `briefs` + `signals` indefinitely.
+
+**Why:** The cheapest, most defensible, and highest-provenance pipeline are the *same*
+pipeline. Structured government/regulatory data is already parsed (low LLM triage cost),
+freely redistributable (no licensing risk), and citable as primary fact — whereas a
+news-first product pays LLMs to separate signal from a noisy, copyright-encumbered firehose
+and is trivially replicable. The moat is the **entity graph + cross-domain edges over free
+structured data**, not access to any feed. The bottleneck is the ingestion *harness* (one
+adapter, no runner today), so the leverage is building the runner once and making each new
+adapter cheap. Cost analysis (global ≈ $0 infra delta; BigQuery ≈ $0 at our scale; Supabase
+storage trivial vs. the HNSW vector-index limit) is recorded in §12a of the analysis doc.
+
+---
+
+## D056 — `license_class` + `source_reliability` enforced on every adapter *(added 2026-06-14)*
+
+**Decision:** Every adapter declares a **`license_class`** (`public_domain` / `licensed` /
+`scrape_gray`, per `DATA_SOURCES.md`) and a **`source_reliability`** tier (1 primary record /
+2 authoritative secondary / 3 discovery-sentiment). Both become fields on `NormalizedRecord`
+and the `raw_records`/`normalized_records` tables. Synthesis is **license-aware**: only
+`public_domain` text may be republished verbatim; `licensed` and `scrape_gray` sources are
+**link-and-cite only** (synthesize from, never quote raw). The citation-faithfulness eval
+enforces that a claim cited to a non-public-domain source resolves to a link, not a quoted
+block.
+
+**Why:** For a *paid* subscription product, "free to access" ≠ "redistributable." This is the
+most under-weighted risk in the raw source survey. Encoding license posture in the data model
+(not as tribal knowledge) makes it impossible for restricted text to leak into a published
+brief body, and `source_reliability` lets synthesis prefer primary sources and report honest
+confidence. Government data being both free *and* freely redistributable is precisely why the
+free-first stack (D055) is also the legally safe stack.
+
+---
