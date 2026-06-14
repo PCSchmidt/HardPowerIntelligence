@@ -1420,3 +1420,35 @@ before anything reaches the LLM (cheaper + sharper). The API AND-combines `psc_c
 second query is a documented future upgrade if keyword precision proves insufficient.
 Validated live: the filter replaced the generic-IT results with NASA space programs, Boeing/
 Lockheed space systems, Harris radar, and BlueStaq space-situational-awareness awards.
+
+---
+
+## D060 — Product north-star: the Defense-Tech ∩ AI ∩ Energy convergence *(added 2026-06-14)*
+
+**Decision:** The product is organized around the **tri-sector convergence** of Defense Tech,
+AI, and Next-Gen Energy — the thesis that these three sectors are a single tri-directional
+feedback loop (AI needs power; energy needs intelligence; defense funds and consumes both).
+The three desks (Defense / AI / Energy) are *feeders*; the **cross-domain convergence brief
+is the flagship** (reaffirms D055 Q4). The bilateral and trilateral intersections are
+first-class: Defense∩AI (autonomy, counter-UAS, ATR, cognitive EW), Defense∩Energy (directed
+energy, tactical microgrids, FOB nuclear), AI∩Energy (SMRs, HALEU, interconnection queues,
+grid optimization), and the trilateral core (edge-compute power paradox, grid defense, AI
+materials discovery). The named **chokepoints** — semiconductors, HALEU/uranium, rare earths,
+SMRs, interconnection queues, edge/neuromorphic silicon, DEW/counter-UAS — are the tracked
+spine.
+
+**Why:** The convergence is where cutting-edge capital and capability actually concentrate,
+and — critically — it is **sourceable with the free-first public-domain stack** (USAspending/
+SAM for DEW/counter-UAS/autonomy, already in D059 keywords; EIA/NRC for nuclear/uranium/SMR;
+LBNL/ISO for interconnection queues; SEC EDGAR for hyperscaler capex + SMR developers +
+defense primes + Form 4/13F; BIS Entity List for export-control chokepoints). **The moat is
+not the thesis** — a generic LLM generates the convergence narrative in seconds — **it is the
+cited, primary-source evidence layer and entity graph underneath it.** Confident hype figures
+("$500B Stargate", "$90B DoD AI") are treated as claims to *source and cite or reject* via the
+faithfulness eval, not facts to assert. Operational consequences (priority order): (1)
+convergence requires ≥2 desks of live data, so **breadth now beats Defense depth** — SEC EDGAR
+is the next adapter precisely because one source spans all three desks + smart-money; (2) add
+a **cross-sector materiality boost** (items touching 2+ desks score higher — the convergence
+signal is the valuable signal); (3) the convergence brief is the headline product, desks feed
+it. Builds on D055 §5 (moat = entity graph + cross-domain edges) and the finance-forward
+source priority (D055 §10). Origin: operator's tri-sector ontology, 2026-06-14.
