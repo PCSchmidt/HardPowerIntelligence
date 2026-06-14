@@ -10,6 +10,8 @@ Usage:
     python scripts/run_ingest.py --source usaspending  # one source
     python scripts/run_ingest.py --no-embed            # skip embeddings (no OpenAI cost)
     python scripts/run_ingest.py --no-prune            # skip retention pruning
+    python scripts/run_ingest.py --reset-cursor        # re-pull the full lookback window
+                                                       # (e.g. after changing a source's filter)
 
 Requires: DATABASE_URL in .env; OPENAI_API_KEY for embeddings.
 """
@@ -28,10 +30,20 @@ from engine.ingest.retention import prune_hot_window
 from engine.ingest.runner import run_source
 
 
-async def main(source: str | None, embed: bool, prune: bool) -> None:
+async def main(source: str | None, embed: bool, prune: bool, reset_cursor: bool) -> None:
     pool = await create_pool()
     sources = [source] if source else registered_source_ids()
     print(f"Ingesting: {', '.join(sources)}")
+
+    if reset_cursor:
+        # Clear the watermark so the next pull re-fetches the full lookback window.
+        # Non-destructive: dedup (content_hash) still skips already-stored records.
+        async with pool.acquire() as conn:
+            await conn.execute(
+                "UPDATE source_registry SET last_cursor = NULL WHERE id = ANY($1::text[])",
+                sources,
+            )
+        print(f"Reset cursor for: {', '.join(sources)}")
 
     exit_code = 0
     try:
@@ -66,5 +78,7 @@ if __name__ == "__main__":
     parser.add_argument("--source", default=None, help="single source_id (default: all active)")
     parser.add_argument("--no-embed", dest="embed", action="store_false")
     parser.add_argument("--no-prune", dest="prune", action="store_false")
+    parser.add_argument("--reset-cursor", dest="reset_cursor", action="store_true",
+                        help="clear the cursor first to re-pull the full lookback window")
     args = parser.parse_args()
-    asyncio.run(main(args.source, args.embed, args.prune))
+    asyncio.run(main(args.source, args.embed, args.prune, args.reset_cursor))
