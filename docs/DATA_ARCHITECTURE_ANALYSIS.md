@@ -38,19 +38,23 @@ Everything below expands these and ends with the open questions I need you to an
 
 ---
 
-## 1. Where we actually are today (honest baseline)
+## 1. Where we actually are today
+
+*Baseline was written before the build (one adapter, no runner, fixtures). Updated
+2026-06-14 to current reality:*
 
 | Layer | Built? | Notes |
 |-------|--------|-------|
-| Adapter pattern (`NormalizedRecord`, `parse()` / `build_request_payload()` / `next_cursor()`) | ✅ | Clean, source-agnostic. Good foundation. |
-| Adapters implemented | 🟡 **1 of N** | `usaspending` only. Defense desk only. |
+| Adapter pattern (`NormalizedRecord`, `parse()` / `build_request_payload()` / `next_cursor()`) | ✅ | Clean, source-agnostic; HTTP via shared fetcher + `headers`. |
+| Adapters implemented | 🟡 **2 live** | `usaspending` (defense-tech, D059) + `edgar` (cross-desk, D061). EIA/NRC/global next. |
 | Entity resolver | ✅ | `engine/entity/resolver.py` — name → ticker/CIK/UEI. |
-| Raw → normalized → embed → brief pipeline | ✅ | `brief/generator.py`, pgvector RAG, materiality scoring, citation-faithfulness eval. |
-| **Production ingestion runner** | ❌ | No scheduler. No `source_runs` loop. `hpi-worker` empty (D004). |
-| Fresh data | ❌ | Briefs synthesize from **seeded golden fixtures**, not live feeds. |
-| Sources beyond US federal contracts | ❌ | No SEC, no EIA, no news, nothing global. |
+| Raw → normalized → embed → brief pipeline | ✅ | desk-scoped (D062), convergence-boosted (D060), reproducible (D058). |
+| **Production ingestion runner** | ✅ | `engine/ingest/` (D057): cursors, dedup, `ingestion_runs`, circuit breaker, retention. Run manually; cron gated. |
+| Fresh data | ✅ | Live USAspending + EDGAR; **fixtures retired** (Defense published from live data). |
+| Sources beyond US federal contracts | 🟡 | SEC EDGAR live; EIA/NRC, global procurement, GDELT still pending. |
 
-**Implication:** we are one adapter and zero runners into a 40-source plan. The plan is not
+**Original implication (now addressed):** we were one adapter and zero runners into a
+40-source plan. The plan is not
 the constraint. The *machine that runs adapters on a schedule and keeps the lights on* is.
 
 ---
@@ -289,13 +293,12 @@ the natural home for cross-domain edges, novelty, and confidence — and the nat
 Given the moat (entity graph) and the cost lever (structured-first), the order that buys the
 most product per dollar/effort:
 
-1. **Build the runner** (§3) — unblocks everything; pick USAspending (already built) as the
-   first live source to prove the loop end-to-end with fresh data.
-2. **SEC EDGAR** (full-text search + company-facts + **Form 4 / 13F / 13D-G**) — 🟢 free,
-   keyless. *Cross-cuts all three silos* (hyperscaler capex = AI demand engine,
-   defense-contractor fundamentals, energy capex) **and** is the richest free **smart-money /
-   investment-signal** vein (Q4/audience note). Highest leverage of any single add; also
-   strengthens the entity graph (CIK ↔ ticker already in the resolver).
+1. ✅ **DONE** — **Built the runner** (§3, D057), proven on live USAspending data; fixtures
+   retired. Includes dedup, cursors, accounting, circuit breaker, hot-window retention.
+2. ✅ **DONE (v1)** — **SEC EDGAR** full-text search adapter (D061), the first cross-desk
+   source: one adapter feeds Defense + AI + Energy via convergence-themed probes. *Deferred:
+   company-facts/XBRL capex + Form 4/13F ownership (the smart-money layer) as follow-on EDGAR
+   adapters.* Strengthens the entity graph (CIK ↔ ticker).
 3. **EIA Open Data + interconnection-queue data (ISO/LBNL)** — 🟢 free. Lights up the Energy
    desk *and* the AI-power-demand convergence story (the single best cross-silo narrative,
    which the Q4 convergence brief now showcases).
@@ -410,14 +413,18 @@ bytes — which is exactly why the hot window is capped.
    (smoke-tested against the real API); `daily-brief.yml` ingests before briefing. *Remaining
    to fully retire fixtures: trigger a production ingest run (writes cloud DB + embedding
    cost).*
-3. Add **`license_class` + `source_reliability`** to the record schema and enforce
-   license-aware citations.
-4. Introduce the **`signals`/`events` layer** (Q5) + deliberate **`entity_edges`** population —
-   the substrate the convergence brief (Q4) reads from.
-5. Onboard **SEC EDGAR** (incl. Form 4 / 13F — finance-forward) as the second adapter
-   (max cross-domain + smart-money leverage).
-6. Add **EIA + interconnection queues**, then **global procurement (TED/UK/SIPRI/SAM)**.
-7. Add **GDELT (keyless DOC API)** + RSS as the discovery/corroboration radar last.
+3. ✅ **DONE** — **SEC EDGAR** v1 adapter (D061), the first cross-desk source; **desk-scoped
+   multi-desk briefs** (D062) + **cross-sector materiality boost** (D060) shipped. Convergence
+   is now mechanically expressed: multi-desk records rank highest in every desk they touch.
+4. **Build the flagship convergence brief** (Q4/D060) — synthesize across the three desks
+   (or over multi-desk records); the desk briefs + cross-sector boost are its substrate.
+5. **Add `license_class` + `source_reliability`** to the record schema and enforce
+   license-aware citations; introduce the **`signals`/`events` layer** (Q5) + deliberate
+   **`entity_edges`** population.
+6. **AI / Energy desk depth** — **EIA + NRC + interconnection queues** (Energy), more AI-infra
+   sources; then **EDGAR follow-ons** (company-facts/XBRL capex, Form 4/13F smart-money).
+7. Add **global procurement (TED/UK/SIPRI/SAM)**, then **GDELT (keyless DOC API)** + RSS as
+   the discovery/corroboration radar last.
 
 The thread through all of it: *the cheapest pipeline, the most defensible pipeline, and the
 highest-provenance pipeline are the same pipeline* — structured public-domain data as the

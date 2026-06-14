@@ -101,15 +101,29 @@ break-even at a small number of subscribers.
 
 ## Status & scope
 
-**Cycle 1 ships one vertical deep: the Defense desk, web-only.** Energy and
-AI-Infrastructure desks, the mobile reader app, and second-order supply-chain
-synthesis follow in a later cycle. This is an active, early-stage build.
+**Deployed to production 2026-06-12** — the full stack is live end-to-end: web reader
+(Vercel) → API (Fly.io) → Supabase, with auth and a cited Defense brief at `/desk/defense`.
+Gates 1–8 closed. This is an active, early-stage build.
 
-**Deployed to production 2026-06-12** — the full stack is live and working end-to-end:
-web reader (Vercel) → API (Fly.io) → Supabase, with auth and a cited brief rendering at
-`/desk/defense` (faithfulness 1.0). Gates 1–8 closed. Remaining before public launch:
-Lemon Squeezy checkout, a production ingestion runner (briefs currently run from seeded
-fixtures), and a few config fixes — tracked in `DEPLOYMENT_CONFIG.md` §6 and `CHANGELOG.md`.
+**Since launch (2026-06-14):** the product is organized around the **Defense Tech ∩ AI ∩
+Energy convergence** thesis — its north-star (`DECISIONS.md` D060). The engine moved off
+fixtures onto live data and became genuinely multi-desk:
+
+- **Production ingestion runner** (`scripts/run_ingest.py`, D057) — pulls fresh data through
+  a retry/backoff fetcher with DB-level dedup, per-source cursors + accounting, a circuit
+  breaker, and hot-window retention. Proven on live data; manually run today (the scheduled
+  cron stays gated until enough sources justify it).
+- **Two live adapters** — **USAspending** (defense-tech awards, thematically scoped cross-agency
+  not DoD-only, D059) and **SEC EDGAR** (full-text search, the first cross-desk source — one
+  adapter feeds all three desks, D061).
+- **Convergence-aware, multi-desk briefs** — generation is desk-scoped across Defense / AI /
+  Energy (D062); a record touching ≥2 desks is boosted as the convergence signal (D060). The
+  Defense desk publishes from live data; AI and Energy are wired and awaiting their first
+  published run + dedicated sources for depth.
+
+Remaining before public launch: Lemon Squeezy checkout, dedicated AI/Energy sources (EIA/NRC,
+interconnection queues, more AI-infra), the flagship cross-domain **convergence brief**, and a
+few config fixes — tracked in `DEPLOYMENT_CONFIG.md` §6 and `CHANGELOG.md`.
 
 Scope boundaries in [docs/SCOPE.md](docs/SCOPE.md).
 

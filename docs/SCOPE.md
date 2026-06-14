@@ -26,6 +26,13 @@ Cross-cutting layers: **Macro** (rates, inflation, policy) and **Smart Money** (
 
 **One vertical deep: the Defense desk, web-only.**
 
+> **Evolution note (2026-06-14, D060/D062):** post-launch, the product adopted the **Defense
+> Tech ∩ AI ∩ Energy convergence** as its north-star. The engine is now multi-desk (all three
+> desks wired; cross-sector materiality boost), but execution still leads with **Defense
+> depth** — Defense is the only desk published from live data; AI/Energy are scaffolded and
+> await dedicated sources. "One vertical deep" still describes the *delivery* posture; the
+> convergence brief is the eventual flagship. See `DECISIONS.md` D060/D061/D062.
+
 | Area | Cycle 1 includes |
 |------|------------------|
 | Desk | **Defense only** |

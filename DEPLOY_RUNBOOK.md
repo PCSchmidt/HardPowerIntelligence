@@ -213,13 +213,17 @@ uv run python scripts/run_brief.py --desk defense
 (D057), and `scripts/run_brief.py` **synthesizes a brief from it**. The two run in sequence
 (ingest → brief). So:
 
-- **Today:** `run_ingest.py` pulls fresh USAspending awards (dedup + embed + cursor +
-  retention), then `run_brief.py` synthesizes from that fresh data. `daily-brief.yml` runs
-  both (ingest step first; pass `skip_ingest=true` to regenerate from existing data only).
-- **Still pending:** registering more adapters (SEC EDGAR next, D055 §10) and the durable
-  always-on `hpi-worker` (D004) — only needed once the manual/Actions cadence actually hurts.
-- **One-time:** trigger the first production ingest to replace the seeded fixtures:
-  `DATABASE_URL='<cloud>' OPENAI_API_KEY='<...>' uv run python scripts/run_ingest.py`.
+- **Today:** `run_ingest.py` pulls fresh data from **USAspending** (defense-tech awards, D059)
+  and **SEC EDGAR** (cross-desk filings, D061) — dedup + embed + cursor + retention — then
+  `run_brief.py --desk <defense|ai|energy>` synthesizes from it (D062). `daily-brief.yml` runs
+  both (ingest first; `skip_ingest=true` regenerates from existing data; desk is selectable).
+  Use `run_ingest.py --reset-cursor` to re-pull the full window after changing a source filter.
+- **Still pending:** dedicated AI/Energy sources for depth (EIA/NRC + interconnection queues),
+  EDGAR follow-ons (capex, Form 4/13F), and the durable always-on `hpi-worker` (D004) — only
+  needed once the manual/Actions cadence actually hurts.
+- **Fixtures retired:** the Defense desk now publishes from live-ingested data. To re-pull and
+  re-publish: `uv run python scripts/run_ingest.py` then `run_brief.py --desk defense`
+  (DATABASE_URL + OPENAI_API_KEY from `.env`).
 
 ### Interim scheduled job — GitHub Actions
 A scheduled workflow is provided at [.github/workflows/daily-brief.yml](.github/workflows/daily-brief.yml).
