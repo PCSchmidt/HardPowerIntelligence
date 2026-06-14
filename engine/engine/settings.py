@@ -45,6 +45,10 @@ class Settings(BaseSettings):
     # Eval gate (D016)
     brief_faithfulness_threshold: float = 0.95
 
+    # LLM determinism (D058): synthesis + eval run at temperature 0 so brief
+    # generation is reproducible and stays faithful to terse source records.
+    llm_temperature: float = 0.0
+
     # Materiality scoring (D030, D035, D036)
     materiality_threshold: float = 0.35
     magnitude_min_window: int = 10

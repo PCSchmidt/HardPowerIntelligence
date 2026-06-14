@@ -72,7 +72,6 @@ Supabase auth, and Lemon Squeezy subscriptions. Built gate-by-gate (Gates 1–8 
 - **Config:** Supabase Site URL points at another project (email-confirmation links
   misroute); the `.env` `SUPABASE_SERVICE_ROLE_KEY` is wrong (unused by deployed services
   but should be corrected).
-- **`persist_brief`** not idempotent for same-day reruns (UniqueViolation on (desk, date)).
 - Minor: verify the OpenRouter model IDs (non-fatal litellm "Provider List" log noise).
 
 ---

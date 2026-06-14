@@ -14,6 +14,7 @@ from engine.brief.rag import (
     embed_pending_records,
     fetch_passages,
 )
+from engine.eval.citation_eval import extract_citation_indices, strip_uncited_sentences
 from engine.llm.client import llm_client, parse_json
 from engine.settings import settings
 
@@ -184,11 +185,24 @@ async def generate_brief(desk: str, pool: asyncpg.Pool) -> GeneratedBrief:
         messages=messages,
         json_mode=True,
         fallbacks=[settings.llm_model_synthesis_fallback],
+        temperature=settings.llm_temperature,
     )
 
     parsed = parse_json(content)
     if parsed is None:
         raise RuntimeError("Synthesis output was not valid JSON after retries")
+
+    # Enforce the citation invariant: drop any sentence without a [CITE:N] and
+    # re-derive citation indices from the cleaned body, so the published brief
+    # contains only provable claims (D058). Items left empty are dropped.
+    items = []
+    for item in parsed.get("items", []):
+        cleaned = strip_uncited_sentences(item.get("body", ""))
+        if not cleaned:
+            continue
+        item["body"] = cleaned
+        item["citation_indices"] = extract_citation_indices(cleaned)
+        items.append(item)
 
     metadata = {
         "synthesis_model": synthesis_model,
@@ -201,7 +215,7 @@ async def generate_brief(desk: str, pool: asyncpg.Pool) -> GeneratedBrief:
     return GeneratedBrief(
         headline=parsed.get("headline", ""),
         bluf=parsed.get("bluf", ""),
-        items=parsed.get("items", []),
+        items=items,
         passages=passages,
         synthesis_model=synthesis_model,
         model_waterfall_metadata=metadata,
@@ -230,6 +244,12 @@ async def persist_brief(
 
     async with pool.acquire() as conn:
         async with conn.transaction():
+            # Idempotent on (desk, date): replace any existing brief for the day
+            # (cascades to brief_items + citations) so re-runs don't UniqueViolation
+            # and a failed brief can be superseded by a passing one (D058).
+            await conn.execute(
+                "DELETE FROM briefs WHERE desk = $1 AND date = $2", desk, brief_date
+            )
             await conn.execute(
                 """
                 INSERT INTO briefs (

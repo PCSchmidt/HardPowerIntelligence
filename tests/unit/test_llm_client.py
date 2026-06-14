@@ -2,7 +2,6 @@
 Tests for engine/llm/client.py (D037).
 All tests mock litellm — no network calls.
 """
-import json
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -99,6 +98,37 @@ class TestComplete:
                     model="openrouter/deepseek/deepseek-v4-pro",
                     messages=[{"role": "user", "content": "test"}],
                 )
+
+    @pytest.mark.asyncio
+    async def test_temperature_passed_when_set(self):
+        mock_response = MagicMock()
+        mock_response.choices[0].message.content = '{"ok": true}'
+        mock_response.usage.prompt_tokens = 50
+        mock_response.usage.completion_tokens = 10
+
+        with patch("engine.llm.client.litellm.acompletion", new=AsyncMock(return_value=mock_response)) as mock_call:
+            client = LLMClient()
+            await client.complete(
+                model="openrouter/deepseek/deepseek-v4-pro",
+                messages=[{"role": "user", "content": "test"}],
+                temperature=0.0,
+            )
+        assert mock_call.call_args.kwargs.get("temperature") == 0.0
+
+    @pytest.mark.asyncio
+    async def test_temperature_omitted_when_none(self):
+        mock_response = MagicMock()
+        mock_response.choices[0].message.content = '{"ok": true}'
+        mock_response.usage.prompt_tokens = 50
+        mock_response.usage.completion_tokens = 10
+
+        with patch("engine.llm.client.litellm.acompletion", new=AsyncMock(return_value=mock_response)) as mock_call:
+            client = LLMClient()
+            await client.complete(
+                model="openrouter/deepseek/deepseek-v4-pro",
+                messages=[{"role": "user", "content": "test"}],
+            )
+        assert "temperature" not in mock_call.call_args.kwargs
 
     @pytest.mark.asyncio
     async def test_fallbacks_passed_to_litellm(self):

@@ -42,12 +42,15 @@ class LLMClient:
         messages: list[dict],
         json_mode: bool = True,
         fallbacks: list[str] | None = None,
+        temperature: float | None = None,
     ) -> str:
         kwargs: dict = {"model": model, "messages": messages}
         if json_mode:
             kwargs["response_format"] = {"type": "json_object"}
         if fallbacks:
             kwargs["fallbacks"] = fallbacks
+        if temperature is not None:
+            kwargs["temperature"] = temperature
 
         response = await litellm.acompletion(**kwargs)
         content = response.choices[0].message.content

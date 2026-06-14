@@ -37,6 +37,20 @@ def extract_citation_indices(text: str) -> list[int]:
     return list(dict.fromkeys(int(m) for m in _CITE_RE.findall(text)))
 
 
+def strip_uncited_sentences(body: str) -> str:
+    """Remove sentences that lack a ``[CITE:N]`` citation (D058).
+
+    A sentence with no citation is, by the brief's own invariant, unsupported —
+    so rather than fail the whole item on one stray sentence, we drop the
+    offending sentence and publish only what's provable. Returns the cleaned
+    body (possibly empty if nothing was cited)."""
+    if not body:
+        return ""
+    sentences = _SENTENCE_RE.split(body.strip())
+    kept = [s.strip() for s in sentences if s.strip() and _CITE_RE.search(s)]
+    return " ".join(kept)
+
+
 def extract_claims(body: str) -> list[Claim]:
     if not body:
         return []
@@ -108,6 +122,7 @@ class CitationEvaluator:
                 model=self.eval_model,
                 messages=messages,
                 json_mode=True,
+                temperature=settings.llm_temperature,
             )
             parsed = parse_json(content) or {}
             evaluations = {

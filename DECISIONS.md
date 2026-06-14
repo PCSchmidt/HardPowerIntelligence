@@ -1365,3 +1365,30 @@ control-flow + dedup via a fake DB driving the real adapter, retention window ma
 live no-DB smoke test fetched + parsed 100 real USAspending records through the fetcher.
 
 ---
+
+## D058 — Brief reproducibility + citation enforcement on live data *(added 2026-06-14)*
+
+**Decision:** Three changes make brief generation reproducible and reliably faithful once
+fed real (not fixture) data:
+
+- **Deterministic generation.** Synthesis *and* eval LLM calls run at `temperature=0`
+  (`llm_temperature` setting, plumbed through `LLMClient.complete`).
+- **Citation enforcement by sentence-dropping.** After synthesis, any sentence lacking a
+  `[CITE:N]` is removed (`strip_uncited_sentences`) and each item's `citation_indices` is
+  re-derived from the cleaned body; items left empty are dropped. The published brief
+  contains only provable, cited claims.
+- **Idempotent persistence.** `persist_brief` deletes any existing `(desk, date)` brief
+  (cascades to `brief_items` + `citations`) before inserting, so re-runs replace rather than
+  raising `UniqueViolation`, and a passing brief can supersede a failed one.
+
+**Why:** The first live brief run exposed all three. Generation was wildly non-deterministic
+— the same data scored **0.000** one run (every item excluded; the model embellished terse
+USAspending records with facts like "Management Contract *Extension*" not in the source) and
+**0.750** the next (different awards selected, different phrasing). At `temperature=0` the
+model selects and phrases consistently and stays faithful to the sparse source text. The
+0.750 run still failed the 0.95 gate purely because of one **uncited sentence** dragging an
+item to 0.50 — so rather than fail an otherwise-good brief on one stray sentence, we drop the
+unsupported sentence (consistent with fully-autonomous publishing, D055 Q7: publish only what
+is provable). And the run crashed on persist because a failed brief already held the
+`(desk, date)` slot — idempotency was a known D055 gap, now closed. Validated by 9 new unit
+tests (sentence-stripping, temperature plumbing, delete-before-insert) and a live re-run.

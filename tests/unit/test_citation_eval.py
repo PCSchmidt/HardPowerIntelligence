@@ -12,7 +12,34 @@ from engine.eval.citation_eval import (
     EvalResult,
     extract_claims,
     extract_citation_indices,
+    strip_uncited_sentences,
 )
+
+
+class TestStripUncitedSentences:
+    def test_keeps_cited_drops_uncited(self):
+        body = (
+            "SAIC won a $586M CBP contract [CITE:5]. "
+            "This modernizes border security infrastructure."
+        )
+        cleaned = strip_uncited_sentences(body)
+        assert cleaned == "SAIC won a $586M CBP contract [CITE:5]."
+
+    def test_all_cited_unchanged(self):
+        body = "Triad won $35B [CITE:1]. Leidos won $3B [CITE:2]."
+        assert strip_uncited_sentences(body) == body
+
+    def test_all_uncited_returns_empty(self):
+        assert strip_uncited_sentences("No citations here. Still none.") == ""
+
+    def test_empty_body(self):
+        assert strip_uncited_sentences("") == ""
+
+    def test_cleaned_body_has_no_uncited_claims(self):
+        # After cleaning, every extracted claim must be cited (the eval invariant).
+        body = "A [CITE:1]. B. C [CITE:2]. D."
+        cleaned = strip_uncited_sentences(body)
+        assert all(c.is_cited for c in extract_claims(cleaned))
 
 
 class TestExtractClaims:
