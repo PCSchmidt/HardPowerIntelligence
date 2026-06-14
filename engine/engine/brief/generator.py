@@ -46,6 +46,7 @@ async def _get_window_start(pool: asyncpg.Pool) -> datetime:
 async def _score_candidates(
     pool: asyncpg.Pool,
     since: datetime,
+    desk: str,
 ) -> list[tuple[dict, float]]:
     scorer = MaterialityScorer(
         source_weights=json.loads(settings.source_weights),
@@ -65,18 +66,22 @@ async def _score_candidates(
             FROM normalized_records nr
             JOIN raw_records rr ON rr.id = nr.raw_record_id
             WHERE nr.created_at >= $1
+              AND $2 = ANY(nr.desk)
             """,
             since,
+            desk,
         )
 
-        # Fetch window amounts for min-max normalization (D035)
+        # Fetch window amounts for min-max normalization within the desk (D035)
         amount_rows = await conn.fetch(
             """
             SELECT (structured_data->>'amount_usd')::float AS amount
             FROM normalized_records
             WHERE created_at >= now() - INTERVAL '90 days'
+              AND $1 = ANY(desk)
               AND structured_data->>'amount_usd' IS NOT NULL
-            """
+            """,
+            desk,
         )
 
     scorer.window_amounts = [r["amount"] for r in amount_rows if r["amount"]]
@@ -147,19 +152,19 @@ async def generate_brief(desk: str, pool: asyncpg.Pool) -> GeneratedBrief:
     embedded = await embed_pending_records(pool, since)
     log.info("embeddings_bootstrapped", count=embedded)
 
-    # Step 3: Build query vector from top-5 seed records
-    query_vector = await build_query_vector(pool, since, top_k_seed=5)
+    # Step 3: Build query vector from top-5 seed records (desk-scoped)
+    query_vector = await build_query_vector(pool, since, desk, top_k_seed=5)
     if query_vector is None:
-        raise RuntimeError("No embedded records in window — cannot build query vector")
+        raise RuntimeError(f"No embedded {desk} records in window — cannot build query vector")
 
     # Step 4: Retrieve top-K passages (immutable PassageContext list, D041)
     passages = await fetch_passages(
-        pool, query_vector, since, top_k=settings.rag_passage_top_k
+        pool, query_vector, since, settings.rag_passage_top_k, desk
     )
-    log.info("passages_retrieved", count=len(passages))
+    log.info("passages_retrieved", count=len(passages), desk=desk)
 
-    # Step 5: Materiality scoring → candidate filter
-    candidates = await _score_candidates(pool, since)
+    # Step 5: Materiality scoring → candidate filter (desk-scoped, convergence-boosted)
+    candidates = await _score_candidates(pool, since, desk)
     if len(candidates) < settings.brief_min_items:
         raise RuntimeError(
             f"Only {len(candidates)} material candidates — below BRIEF_MIN_ITEMS={settings.brief_min_items}"

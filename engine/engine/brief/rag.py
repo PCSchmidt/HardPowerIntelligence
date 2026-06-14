@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime
 
 import asyncpg
 import openai
@@ -64,21 +64,25 @@ async def embed_pending_records(pool: asyncpg.Pool, since: datetime) -> int:
 async def build_query_vector(
     pool: asyncpg.Pool,
     since: datetime,
+    desk: str,
     top_k_seed: int = 5,
 ) -> list[float] | None:
-    """Embed the top-K (by recency and payload size) records' text_chunks
-    as the RAG query vector. Returns None if no embedded records exist."""
+    """Embed the top-K (by recency) desk records' text_chunks as the RAG query
+    vector. ``desk`` membership test includes multi-desk records (convergence).
+    Returns None if no embedded records exist for the desk."""
     async with pool.acquire() as conn:
         rows = await conn.fetch(
             """
             SELECT text_chunk FROM normalized_records
             WHERE created_at >= $1
+              AND $2 = ANY(desk)
               AND embedding IS NOT NULL
               AND text_chunk IS NOT NULL
             ORDER BY created_at DESC
-            LIMIT $2
+            LIMIT $3
             """,
             since,
+            desk,
             top_k_seed,
         )
 
@@ -100,8 +104,10 @@ async def fetch_passages(
     query_vector: list[float],
     since: datetime,
     top_k: int,
+    desk: str,
 ) -> list[PassageContext]:
-    """Cosine similarity retrieval of top-K passages since window start."""
+    """Cosine-similarity retrieval of top-K passages for the desk since window
+    start. ``desk`` membership includes multi-desk records (convergence)."""
     vector_str = f"[{','.join(str(x) for x in query_vector)}]"
 
     async with pool.acquire() as conn:
@@ -119,12 +125,14 @@ async def fetch_passages(
             JOIN raw_records rr ON rr.id = nr.raw_record_id
             WHERE nr.embedding IS NOT NULL
               AND nr.created_at >= $1
+              AND $4 = ANY(nr.desk)
             ORDER BY nr.embedding <=> $2::vector
             LIMIT $3
             """,
             since,
             vector_str,
             top_k,
+            desk,
         )
 
     return [

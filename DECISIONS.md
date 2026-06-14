@@ -1482,3 +1482,25 @@ graph, since CIK↔ticker is already in the resolver). The probe-set is the D059
 pre-filter applied to filings. Validated: 16 unit tests + a live smoke test that returned
 NuScale/Graham (SMR), Palladyne AI (autonomous weapon), and Skyworks (rare earth/semis) —
 the convergence thesis as citable filings.
+
+---
+
+## D062 — Desk-scoped brief generation (multi-desk) *(added 2026-06-14)*
+
+**Decision:** `generate_brief(desk)` is genuinely desk-scoped. Candidate scoring
+(`_score_candidates`) and RAG retrieval (`build_query_vector`, `fetch_passages`) now filter to
+records where `desk = ANY(nr.desk)`, and the synthesis prompt uses a **desk-aware analyst
+persona** (defense-technology / artificial-intelligence / energy-technology) instead of a
+hardcoded "Defense" one. The `= ANY(desk)` membership test deliberately **includes multi-desk
+records** in every relevant desk's brief — so an EDGAR "rare earth" filing tagged
+`defense+ai+energy` surfaces in all three desk briefs and, thanks to the cross-sector boost
+(D060), ranks near the top of each. `daily-brief.yml` now offers all three desks.
+
+**Why:** Until now `generate_brief` filtered nothing by desk — it scored every record in the
+window and only changed the LLM's framing, which was invisible while only Defense (USAspending)
+flowed. With EDGAR feeding all three desks (D061), an unfiltered AI or Energy brief would have
+pulled defense awards too. Desk membership (not equality) is the right test because convergence
+records legitimately belong to multiple desks; that overlap is the feature, not a bug. This
+unblocks the AI and Energy desk briefs and is the substrate for the eventual flagship
+convergence brief (D060). Validated: 166 tests pass (desk-aware-prompt unit tests added; the
+desk-filter SQL is exercised by the live multi-desk brief run).

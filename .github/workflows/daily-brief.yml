@@ -18,7 +18,7 @@ on:
         description: "Desk to generate"
         default: "defense"
         type: choice
-        options: [defense]
+        options: [defense, ai, energy]
       skip_ingest:
         description: "Skip ingestion (regenerate from existing data only)"
         default: false

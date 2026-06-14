@@ -1,6 +1,14 @@
 import json
 from engine.brief.rag import PassageContext
 
+# Desk-aware analyst persona (D060 multi-desk). The brief covers three desks, so the
+# persona must match the desk — not a hardcoded "Defense" one.
+_DESK_PERSONA = {
+    "defense": "defense-technology",
+    "ai": "artificial-intelligence",
+    "energy": "energy-technology",
+}
+
 
 def build_synthesis_prompt(
     desk: str,
@@ -9,6 +17,7 @@ def build_synthesis_prompt(
     max_items: int,
 ) -> list[dict]:
     facts_block = json.dumps(verified_facts, indent=2) if verified_facts else "[]"
+    persona = _DESK_PERSONA.get(desk, desk)
 
     passages_block = "\n".join(
         f"[{p.index}] {p.source_id} ({p.fetched_at.strftime('%Y-%m-%d')}) "
@@ -31,7 +40,7 @@ def build_synthesis_prompt(
     }, indent=2)
 
     system = (
-        f"You are a senior Defense intelligence analyst producing the daily {desk.upper()} desk brief. "
+        f"You are a senior {persona} intelligence analyst producing the daily {desk.upper()} desk brief. "
         "Write in a precise, factual BLUF style. Every factual claim must cite its source using [CITE:N] "
         "where N is the passage index. Do not invent facts not supported by the provided passages. "
         "Return only valid JSON matching the output schema."
