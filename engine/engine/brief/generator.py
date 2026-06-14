@@ -53,6 +53,7 @@ async def _score_candidates(
         materiality_threshold=settings.materiality_threshold,
         magnitude_min_window=settings.magnitude_min_window,
         window_amounts=[],
+        cross_sector_weight=settings.materiality_cross_sector_weight,
     )
 
     async with pool.acquire() as conn:
@@ -60,7 +61,7 @@ async def _score_candidates(
             """
             SELECT
                 nr.id, nr.source_id, nr.structured_data, nr.entity_mentions,
-                nr.created_at, rr.id AS rr_id
+                nr.desk, nr.created_at, rr.id AS rr_id
             FROM normalized_records nr
             JOIN raw_records rr ON rr.id = nr.raw_record_id
             WHERE nr.created_at >= $1
@@ -120,12 +121,14 @@ async def _score_candidates(
             )
         )
 
+        desk_count = len(row.get("desk") or [])
         score = scorer.score(
             source_id=row["source_id"],
             is_new=True,
             amount_usd=amount_usd,
             entity_type=entity_type,
             corroboration_count=corroboration,
+            desk_count=desk_count,
         )
         if scorer.is_material(score):
             scored.append((dict(row), score))

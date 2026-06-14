@@ -51,6 +51,9 @@ class Settings(BaseSettings):
 
     # Materiality scoring (D030, D035, D036)
     materiality_threshold: float = 0.35
+    # Cross-sector convergence boost (D060): multiply a record's score by
+    # (1 + weight·(desks−1), capped at +2 desks). Rewards items touching ≥2 desks.
+    materiality_cross_sector_weight: float = 0.15
     magnitude_min_window: int = 10
     source_weights: str = (
         '{"usaspending":0.9,"dod_contracts":0.85,"edgar":0.85,'

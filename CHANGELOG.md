@@ -45,6 +45,11 @@ Supabase auth, and Lemon Squeezy subscriptions. Built gate-by-gate (Gates 1–8 
   `daily-brief.yml` GitHub Actions workflow.
 
 ### Changed
+- **Materiality scoring — cross-sector convergence boost (D060)**: a record touching ≥2
+  desks (e.g. an EDGAR "rare earth" filing tagged defense+ai+energy) has its score multiplied
+  by `(1 + weight·(desks−1))`, capped at +2 desks (`MATERIALITY_CROSS_SECTOR_WEIGHT`, default
+  0.15). Single-desk records are unaffected. Makes every brief convergence-aware — the
+  cross-domain signal ranks highest, the mechanical expression of the north-star.
 - **Payments**: switched from Stripe to **Lemon Squeezy** (Merchant of Record) to absorb
   global VAT/GST liability for a solo-operated product (D050). Pricing unchanged
   ($19/mo, $179/yr, 14-day trial).
