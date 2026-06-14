@@ -169,7 +169,9 @@ async def run_source(
                 payload = adapter.build_request_payload(cursor, page)
                 kwargs = {"json": payload} if adapter.http_method == "POST" else {"params": payload}
                 response = await fetcher.fetch_json(
-                    adapter.http_method, adapter.base_url, **kwargs
+                    adapter.http_method, adapter.base_url,
+                    headers=getattr(adapter, "headers", None),  # e.g. EDGAR User-Agent
+                    **kwargs,
                 )
                 records = adapter.parse(response)
                 result.pages_fetched += 1

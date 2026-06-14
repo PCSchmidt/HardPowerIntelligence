@@ -25,6 +25,12 @@ Supabase auth, and Lemon Squeezy subscriptions. Built gate-by-gate (Gates 1–8 
 - **Brand**: parchment-equations backdrop motif recorded for the web reader (D051).
 - **Deployment config**: `DEPLOYMENT_CONFIG.md` — Vercel + Fly.io + Supabase topology
   and env/secrets matrix.
+- **SEC EDGAR adapter (2026-06-14)**: first cross-desk source (`engine/adapters/edgar.py`,
+  D061) — EDGAR full-text search over 8-K filings, driven by convergence-themed probes each
+  tagged to the desk(s) it serves (one adapter feeds Defense + AI + Energy; multi-desk tags
+  are the convergence signal, D060). Runner now passes adapter `headers` (SEC User-Agent).
+  Deferred: company-facts/XBRL capex, Form 4/13F ownership, full-text body. 16 tests; live
+  smoke test surfaced NuScale (SMR), Palladyne AI (autonomy), Skyworks (rare earth/semis).
 - **Production ingestion runner (2026-06-14)**: `engine/ingest/` + `scripts/run_ingest.py`
   — the live-data replacement for `seed_fixtures.py` (D004, D055, D057). Pulls fresh source
   data through a retry/backoff HTTP fetcher, dedups into `raw_records` via the DB unique

@@ -9,11 +9,13 @@ ingestion contract: ``source_id``, ``base_url``, ``http_method``,
 """
 from __future__ import annotations
 
+from engine.adapters.edgar import EDGARFullTextAdapter
 from engine.adapters.usaspending import USASpendingAdapter
 
 # source_id → zero-arg adapter factory. New sources register one line here.
 _ADAPTERS: dict[str, type] = {
     USASpendingAdapter.source_id: USASpendingAdapter,
+    EDGARFullTextAdapter.source_id: EDGARFullTextAdapter,
 }
 
 

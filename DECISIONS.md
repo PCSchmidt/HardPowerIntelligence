@@ -1452,3 +1452,33 @@ a **cross-sector materiality boost** (items touching 2+ desks score higher — t
 signal is the valuable signal); (3) the convergence brief is the headline product, desks feed
 it. Builds on D055 §5 (moat = entity graph + cross-domain edges) and the finance-forward
 source priority (D055 §10). Origin: operator's tri-sector ontology, 2026-06-14.
+
+---
+
+## D061 — SEC EDGAR adapter v1: full-text search, cross-desk probes *(added 2026-06-14)*
+
+**Decision:** The first EDGAR adapter (`engine/adapters/edgar.py`) uses EDGAR's full-text
+search (EFTS, `efts.sec.gov/LATEST/search-index`) over **8-K** material-event filings, driven
+by a curated set of **convergence-themed query probes**, each tagged with the desk(s) it
+serves. A filing matching a multi-desk probe (e.g. "rare earth" → defense+ai+energy) is
+tagged with all of them — that multi-desk tag is the convergence signal (D060). It's the
+first cross-desk source: one adapter feeds Defense, AI, and Energy at once. Requires a
+descriptive `User-Agent` header (SEC policy), supplied via an adapter `headers` attribute now
+passed through by the runner. Probes are walked via the runner's page counter (page → probe
+index); a stateful `_active_probe` carries the desk tags from `build_request_payload` into
+`parse` (calls are sequential per run).
+
+**Deferred to follow-on EDGAR adapters** (different response shapes / prerequisites):
+company-facts/XBRL **capex** (per-CIK — wants the entity graph seeded with CIKs first; it's
+the AI∩Energy demand-engine signal), **Form 4 / 13F** ownership (filing-document XML parsing —
+the smart-money layer, D055 §10), full-text **body** extraction (v1 cites filing *metadata*,
+which is honest for a discovery signal: "X filed an 8-K referencing Y on Z"), and per-probe
+**sub-pagination** (8-K daily volume per convergence phrase is low — first page suffices).
+
+**Why:** EDGAR is the highest-leverage single source under D060 — it spans all three desks
+plus smart-money. EFTS is the cleanest entry point: one GET endpoint, JSON, date/form/query
+filters, returning company + ticker + CIK + accession (which also strengthens the entity
+graph, since CIK↔ticker is already in the resolver). The probe-set is the D059 deterministic
+pre-filter applied to filings. Validated: 16 unit tests + a live smoke test that returned
+NuScale/Graham (SMR), Palladyne AI (autonomous weapon), and Skyworks (rare earth/semis) —
+the convergence thesis as citable filings.
