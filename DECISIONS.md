@@ -1504,3 +1504,29 @@ records legitimately belong to multiple desks; that overlap is the feature, not 
 unblocks the AI and Energy desk briefs and is the substrate for the eventual flagship
 convergence brief (D060). Validated: 166 tests pass (desk-aware-prompt unit tests added; the
 desk-filter SQL is exercised by the live multi-desk brief run).
+
+---
+
+## D063 — A brief is capital-flow + advancement synthesis, not a contract ledger *(added 2026-06-15)*
+
+**Decision:** A desk brief is a **synthesis of where capital is flowing and forming, and where
+technology is advancing** — across **public *and* private** signals — surfacing areas an
+investor may find worth their capital or their next hour of research. It is **not** a list of
+government contract awards. Every item is framed as a **cited investment-relevant signal**
+("capital is concentrating in X; here's why it's notable and what to watch"), never a buy/sell
+recommendation (stays on the informational side of the product's disclaimer). Sharpens D060.
+
+**Why:** The vision is an analyst surfacing concentration of capital and capability, not a
+data dump — which is exactly the convergence moat (synthesis + provenance). This has three
+consequences: (1) **Source breadth** must span the full capital-formation + advancement
+picture, not just government procurement: gov capital (USAspending), public + smart-money
+(EDGAR / Form 4 / 13F), **private** capital (SEC Form D + news), **technology advancement**
+(arXiv, Epoch AI, USPTO patents, Hugging Face), and macro/geopolitics (FRED, GDELT, BIS). The
+current stack skews government + public-company; private capital is a known free-data gap
+(Crunchbase/PitchBook are paid; Form D is the free proxy), and advancement sources aren't wired
+yet. (2) **Synthesis framing** evolves from "prioritize high-dollar awards/filings" toward
+"investment-relevant signal." (3) **Guardrail:** synthesis surfaces + contextualizes signals
+with provenance; it must not tip into recommendations (informational research, not advice).
+This reframes the source-onboarding priority (D055 §10 / per the 2026-06-15 source review):
+re-route USAspending to AI/Energy first (cheapest, daily, structured), then Epoch AI + Ember +
+arXiv + Form D; keep GDELT as the news/radar layer (D055), not a min-items filler.
