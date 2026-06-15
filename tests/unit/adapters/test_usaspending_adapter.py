@@ -146,52 +146,71 @@ class TestCursor:
 
 class TestProbesAndDesks:
     """USAspending is cross-desk: each probe tags records to the desk(s) it serves,
-    so it's a daily feed of government capital formation across all three (D059/D063)."""
+    so it's a daily feed of government capital formation across all three (D059/D064).
+    Probe order (D065): 1 space→def∩ai, 2 kinetic→def, 3 autonomy→def∩ai,
+    4 AI compute→ai, 5 energy→energy, 6 rare earth→def∩ai∩energy."""
 
-    def test_default_probe_is_defense(self, usaspending_response):
-        # parse() without build uses probe[0] (pure defense-tech).
+    def test_six_probes(self):
+        assert USASpendingAdapter().probe_count == 6
+
+    def test_default_probe_is_space_defense_ai(self, usaspending_response):
+        # parse() without build uses probe[0] (space → Defense∩AI, D065).
         records = USASpendingAdapter().parse(usaspending_response)
-        assert set(records[0].desk) == {"defense"}
+        assert set(records[0].desk) == {"defense", "ai"}
 
-    def test_defense_probe_keywords(self):
+    def test_space_probe_keywords(self):
         adapter = USASpendingAdapter()
         kw = " ".join(adapter.build_request_payload(None, page=1)["filters"]["keywords"]).lower()
-        for theme in ("satellite", "directed energy", "drone", "radar",
-                      "guided missile", "electronic warfare"):
+        for theme in ("satellite", "spacecraft", "launch vehicle", "geospatial"):
+            assert theme in kw, f"missing space theme: {theme}"
+
+    def test_kinetic_defense_probe_keywords(self):
+        adapter = USASpendingAdapter()
+        kw = " ".join(adapter.build_request_payload(None, page=2)["filters"]["keywords"]).lower()
+        for theme in ("directed energy", "drone", "radar", "guided missile",
+                      "electronic warfare"):
             assert theme in kw, f"missing defense-tech theme: {theme}"
+
+    def test_kinetic_probe_is_defense_only(self, usaspending_response):
+        adapter = USASpendingAdapter()
+        adapter.build_request_payload(None, page=2)  # kinetic & sensing defense
+        records = adapter.parse(usaspending_response)
+        assert set(records[0].desk) == {"defense"}
 
     def test_autonomy_probe_is_defense_ai(self, usaspending_response):
         adapter = USASpendingAdapter()
-        adapter.build_request_payload(None, page=2)  # autonomy / AI-for-defense
+        adapter.build_request_payload(None, page=3)  # autonomy / AI-for-defense
         records = adapter.parse(usaspending_response)
         assert set(records[0].desk) == {"defense", "ai"}
 
     def test_ai_probe_tags_ai(self, usaspending_response):
         adapter = USASpendingAdapter()
-        adapter.build_request_payload(None, page=3)  # AI compute build-out
+        adapter.build_request_payload(None, page=4)  # AI compute build-out
         records = adapter.parse(usaspending_response)
         assert set(records[0].desk) == {"ai"}
 
     def test_energy_probe_tags_energy(self, usaspending_response):
         adapter = USASpendingAdapter()
-        adapter.build_request_payload(None, page=4)  # energy transformation
+        adapter.build_request_payload(None, page=5)  # energy transformation
         records = adapter.parse(usaspending_response)
         assert set(records[0].desk) == {"energy"}
 
     def test_convergence_probe_tags_all_three(self, usaspending_response):
         adapter = USASpendingAdapter()
-        adapter.build_request_payload(None, page=5)  # rare earth / critical minerals
+        adapter.build_request_payload(None, page=6)  # rare earth / critical minerals
         records = adapter.parse(usaspending_response)
         assert set(records[0].desk) == {"defense", "ai", "energy"}
 
     def test_defense_probes_use_contracts_ai_energy_use_grants(self):
         # Capital formation differs by desk: defense = procurement contracts (A-D);
-        # AI/Energy research+buildout = grants/assistance (02-05). Per-probe award types (D063).
+        # AI/Energy research+buildout = grants/assistance (02-05). Per-probe award types (D064).
         adapter = USASpendingAdapter()
-        defense = adapter.build_request_payload(None, page=1)["filters"]["award_type_codes"]
-        ai = adapter.build_request_payload(None, page=3)["filters"]["award_type_codes"]
-        energy = adapter.build_request_payload(None, page=4)["filters"]["award_type_codes"]
-        assert set(defense) == {"A", "B", "C", "D"}
+        space = adapter.build_request_payload(None, page=1)["filters"]["award_type_codes"]
+        kinetic = adapter.build_request_payload(None, page=2)["filters"]["award_type_codes"]
+        ai = adapter.build_request_payload(None, page=4)["filters"]["award_type_codes"]
+        energy = adapter.build_request_payload(None, page=5)["filters"]["award_type_codes"]
+        assert set(space) == {"A", "B", "C", "D"}
+        assert set(kinetic) == {"A", "B", "C", "D"}
         assert set(ai) == {"02", "03", "04", "05"}
         assert set(energy) == {"02", "03", "04", "05"}
 
@@ -209,6 +228,7 @@ class TestProbesAndDesks:
         adapter = USASpendingAdapter()
         all_kw = []
         for page in range(1, adapter.probe_count + 1):
-            all_kw += [k.lower() for k in adapter.build_request_payload(None, page)["filters"]["keywords"]]
+            payload = adapter.build_request_payload(None, page)
+            all_kw += [k.lower() for k in payload["filters"]["keywords"]]
         for noise in ("it services", "software", "information technology", "support services"):
             assert noise not in all_kw

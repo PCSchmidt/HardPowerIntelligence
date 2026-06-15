@@ -8,7 +8,6 @@ Spec (engine/ingest/fetcher.py):
 import httpx
 import pytest
 import respx
-
 from engine.ingest.fetcher import HttpFetcher
 
 URL = "https://api.example.test/search/"
@@ -25,6 +24,16 @@ async def test_returns_json_on_200():
     async with httpx.AsyncClient() as c:
         out = await _fetcher(c).fetch_json("POST", URL, json={"q": 1})
     assert out == {"results": [1, 2]}
+
+
+@respx.mock
+async def test_returns_text_when_format_is_text():
+    # XML/Atom sources (arXiv) need the raw body, not resp.json().
+    xml = '<?xml version="1.0"?><feed><entry/></feed>'
+    respx.get(URL).mock(return_value=httpx.Response(200, text=xml))
+    async with httpx.AsyncClient() as c:
+        out = await _fetcher(c).fetch_json("GET", URL, response_format="text")
+    assert out == xml
 
 
 @respx.mock

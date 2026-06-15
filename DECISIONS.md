@@ -1558,3 +1558,69 @@ this with `from=0`). After both fixes, all five probes return data live (defense
 55, ai 7, energy 28, convergence 1) — AI and Energy unblocked. A common field set valid for
 both award groups keeps one request shape. Future refinement: AI-grant keywords also catch HHS
 biomedical-HPC grants (tangential); Epoch AI (D063) will give cleaner AI-infrastructure signal.
+
+---
+
+## D065 — Space is a Defense∩AI convergence probe, not defense-only *(added 2026-06-15)*
+
+**Decision:** USAspending's space keywords (satellite, spacecraft, launch vehicle, space launch,
+geospatial, satellite communications, space-based) are split into their own probe tagged
+**Defense∩AI**, separate from the kinetic/sensing defense probe (directed energy, missiles,
+radar, EW, drones → Defense only). Civil-space awards (incl. NASA) are **kept and tagged to both
+desks**, not excluded. This grows USAspending to six probes.
+
+**Why:** The first live multi-desk run surfaced an all-NASA Defense brief (Northrop/SpaceX/
+Honeybee/Astrobotic — civil space), which looked like mis-scoping. The considered fix was to
+exclude NASA from Defense. The operator overruled that: space is a defense capability (ISR,
+launch, resilient comms) **and** AI infrastructure (space-based data centers, satellite-internet
+connectivity), so civil/military space belongs in *both* desks rather than being filtered out.
+Tagging space Defense∩AI (a) keeps the high-dollar space awards that were already flowing, (b)
+routes them into the starved AI desk, and (c) earns them the cross-sector materiality boost
+(D060) as a genuine convergence signal. Kinetic/sensing defense (missiles, radar, EW) stays
+Defense-only because it isn't inherently AI. Keyword sets remain disjoint so desk tags stay
+deterministic under content-hash dedup. Validated: 198 tests pass.
+
+---
+
+## D066 — arXiv adapter: the technology-advancement leg of a brief *(added 2026-06-15)*
+
+**Decision:** Add an arXiv adapter (`ArxivAdapter`, source_id `arxiv`) as the first **advancement**
+source per D063 — capability signal, not capital flow. Five probes: three pure-AI (frontier/
+scaling, AI systems/compute, quantum/chips), one Defense∩AI (autonomy/robotics, cs.RO), one
+AI∩Energy (grid/fusion ML). It is the AI desk's depth source — the desk USAspending+EDGAR leave
+starved (the live AI brief mustered only 3 thin items). Two design points: (1) arXiv returns
+**Atom XML, not JSON**, so the adapter declares `response_format = "text"` and `parse()` takes the
+raw XML body; the fetcher and runner thread the format through (default `"json"`, back-compatible
+with every existing adapter). (2) Papers have **no `amount_usd`**, so the content hash is over
+intrinsic fields (id/version/title/abstract), excluding the probe theme so cross-probe matches
+dedup to one row. source_weight = 0.7.
+
+**Why:** Per D063 a brief is capital flow **and** advancement; every wired source so far is
+capital flow. arXiv is the cheapest, free, daily advancement feed and the most direct unblock for
+the AI desk. The materiality math confirms research surfaces without a dollar amount: novelty
+(0.30) + authority (0.7·0.25 ≈ 0.175) clears the 0.35 threshold on its own, so papers appear but
+rank below billion-dollar awards — correct, since a preprint is a *signal to watch*, not a capital
+event. arXiv abstracts are substantive (unlike EDGAR's thin metadata, D067), so synthesis can
+ground a faithful claim and items survive citation-eval. A `source_registry` migration
+(`20260615000001_add_arxiv_source.sql`) registers the source; operator must apply it + run ingest
+before arxiv appears in briefs. Validated: 198 tests pass (new `test_arxiv_adapter.py` + fetcher
+text-mode test). Author mentions are typed `person` (materiality importance), the one adapter that
+sets `entity_type` — a cross-adapter entity-typing pass is deferred.
+
+---
+
+## D067 — EDGAR full-text items are too thin to survive eval (finding; body extraction deferred)
+
+**Decision (finding):** EDGAR EFTS records, as currently parsed (filing *metadata* only — company,
+form, date, theme), are **excluded at citation-eval** because the chunk carries no substance a
+claim can be grounded in. In the first live Energy brief both EDGAR 8-Ks (USA Rare Earth, Skyworks)
+were dropped (faithfulness 0/1). EDGAR therefore contributes ingested rows but ~0 *published*
+value today. Defer a follow-on enrichment: fetch the actual filing body (the 8-K item text / press
+exhibit) so the chunk has groundable content, per the v1-scope deferral already noted in
+`edgar.py`. Also revisit EFTS reliability (repeated 500s on ingest, recovered by retry).
+
+**Why:** Recording this so the gap is explicit and tracked rather than rediscovered. EDGAR's value
+proposition (D061) is public + smart-money capital signal across all three desks; that only lands
+once filings carry text, not just headers. Lower priority than the AI-desk unblock (D066) because
+USAspending already carries Defense/Energy and EDGAR's convergence probes overlap arXiv's; promote
+when private/public-company capital depth becomes the binding constraint (cf. D063 source breadth).

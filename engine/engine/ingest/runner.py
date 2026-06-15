@@ -171,6 +171,7 @@ async def run_source(
                 response = await fetcher.fetch_json(
                     adapter.http_method, adapter.base_url,
                     headers=getattr(adapter, "headers", None),  # e.g. EDGAR User-Agent
+                    response_format=getattr(adapter, "response_format", "json"),  # arXiv → "text"
                     **kwargs,
                 )
                 records = adapter.parse(response)

@@ -57,7 +57,7 @@ class Settings(BaseSettings):
     magnitude_min_window: int = 10
     source_weights: str = (
         '{"usaspending":0.9,"dod_contracts":0.85,"edgar":0.85,'
-        '"sam_gov":0.8,"congress_gov":0.8,"fred":0.7,"gdelt":0.5}'
+        '"sam_gov":0.8,"congress_gov":0.8,"arxiv":0.7,"fred":0.7,"gdelt":0.5}'
     )
     entity_importance: str = (
         '{"company":1.0,"program":0.85,"person":0.7,'

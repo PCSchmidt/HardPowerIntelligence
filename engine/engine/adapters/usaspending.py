@@ -1,7 +1,7 @@
 import hashlib
 import json
 from dataclasses import dataclass
-from datetime import date, datetime, timezone, timedelta
+from datetime import date, datetime, timedelta, timezone
 
 from .base import NormalizedRecord
 
@@ -40,11 +40,18 @@ class _Probe:
 # terms act as a cross-agency category filter. Each probe is one API query (keywords
 # OR-combined) with its own award-type group; probes are walked via the runner's page
 # counter. Keyword sets are DISJOINT so a record's desk tag is deterministic under
-# content-hash dedup. Multi-desk probes (autonomy, rare earth) are the convergence signal.
+# content-hash dedup. Multi-desk probes (space, autonomy, rare earth) are the convergence signal.
 _PROBES: tuple[_Probe, ...] = (
-    # Pure defense-tech → Defense (procurement contracts)
+    # Space → Defense ∩ AI (procurement contracts). Civil/military space is both a
+    # defense capability (ISR, launch, comms) AND AI infrastructure — space-based
+    # data centers and satellite-internet connectivity — so space awards (incl. NASA
+    # civil-space) are tagged to both desks rather than excluded (D065, per operator).
     _Probe((
         "satellite", "spacecraft", "launch vehicle", "space launch", "geospatial",
+        "satellite communications", "space-based",
+    ), ("defense", "ai"), _CONTRACTS),
+    # Kinetic & sensing defense → Defense (procurement contracts)
+    _Probe((
         "directed energy", "high energy laser", "laser weapon", "microwave weapon",
         "unmanned aircraft", "unmanned aerial", "drone", "loitering munition",
         "guided missile", "hypersonic", "precision strike", "munition", "warhead",

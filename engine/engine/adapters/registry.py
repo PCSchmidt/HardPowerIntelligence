@@ -9,6 +9,7 @@ ingestion contract: ``source_id``, ``base_url``, ``http_method``,
 """
 from __future__ import annotations
 
+from engine.adapters.arxiv import ArxivAdapter
 from engine.adapters.edgar import EDGARFullTextAdapter
 from engine.adapters.usaspending import USASpendingAdapter
 
@@ -16,6 +17,7 @@ from engine.adapters.usaspending import USASpendingAdapter
 _ADAPTERS: dict[str, type] = {
     USASpendingAdapter.source_id: USASpendingAdapter,
     EDGARFullTextAdapter.source_id: EDGARFullTextAdapter,
+    ArxivAdapter.source_id: ArxivAdapter,
 }
 
 

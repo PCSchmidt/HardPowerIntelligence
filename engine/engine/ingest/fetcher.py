@@ -63,9 +63,12 @@ class HttpFetcher:
         json: dict | None = None,
         params: dict | None = None,
         headers: dict | None = None,
-    ) -> dict:
-        """Issue one logical request (with retries) and return the JSON body.
+        response_format: str = "json",
+    ) -> dict | str:
+        """Issue one logical request (with retries) and return the body.
 
+        Returns parsed JSON by default; with ``response_format="text"`` returns the
+        raw response text instead, for sources that speak XML/Atom (e.g. arXiv).
         Retries transport errors, 429, and 5xx with exponential backoff; raises
         on non-retryable 4xx immediately and after the final retry attempt.
         """
@@ -78,7 +81,7 @@ class HttpFetcher:
             ),
             reraise=True,
         )
-        async def _do() -> dict:
+        async def _do() -> dict | str:
             resp = await self._client.request(
                 method.upper(),
                 url,
@@ -93,6 +96,6 @@ class HttpFetcher:
                 )
                 raise RetryableHTTPError(resp.status_code, url)
             resp.raise_for_status()  # non-retryable 4xx → raise now
-            return resp.json()
+            return resp.text if response_format == "text" else resp.json()
 
         return await _do()
