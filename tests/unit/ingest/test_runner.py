@@ -137,11 +137,12 @@ def test_breaker_open_after_cooldown_allows_trial():
 
 async def test_counts_new_and_duplicate():
     # 3 awards; DB says first two are new (return id), third conflicts (None).
+    # max_pages=1 keeps this a single-page test independent of the adapter's probe count.
     conn = FakeConn(make_source(), raw_returns=["id1", "id2", None])
     pool = FakePool(conn)
     fetcher = FakeFetcher([make_response([make_award("A"), make_award("B"), make_award("C")])])
 
-    result = await run_source("usaspending", pool, fetcher=fetcher, embed=False)
+    result = await run_source("usaspending", pool, fetcher=fetcher, embed=False, max_pages=1)
 
     assert result.status == "success"
     assert result.records_fetched == 3
@@ -154,20 +155,21 @@ async def test_only_new_records_are_normalized():
     pool = FakePool(conn)
     fetcher = FakeFetcher([make_response([make_award("A"), make_award("B")])])
 
-    await run_source("usaspending", pool, fetcher=fetcher, embed=False)
+    await run_source("usaspending", pool, fetcher=fetcher, embed=False, max_pages=1)
 
     assert conn.normalized_inserts == 1  # only the new raw_record, not the dup
 
 
-async def test_pagination_follows_next_cursor():
+async def test_pagination_advances_through_pages():
+    # The runner advances page-by-page via next_cursor until max_pages or a terminal cursor.
     conn = FakeConn(make_source(), raw_returns=["id1", "id2"])
     pool = FakePool(conn)
     fetcher = FakeFetcher([
-        make_response([make_award("A")], has_next=True),   # → cursor {"page": 2}
-        make_response([make_award("B")], has_next=False),  # → terminal cursor
+        make_response([make_award("A")]),
+        make_response([make_award("B")]),
     ])
 
-    result = await run_source("usaspending", pool, fetcher=fetcher, embed=False)
+    result = await run_source("usaspending", pool, fetcher=fetcher, embed=False, max_pages=2)
 
     assert fetcher.calls == 2
     assert result.pages_fetched == 2

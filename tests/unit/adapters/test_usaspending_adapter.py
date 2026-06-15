@@ -65,11 +65,11 @@ class TestParse:
         assert "LOCKHEED MARTIN" in chunk
         assert "LRASM" in chunk
 
-    def test_record_type_is_contract_award(self, usaspending_response):
+    def test_record_type_is_federal_award(self, usaspending_response):
         adapter = USASpendingAdapter()
         records = adapter.parse(usaspending_response)
         for record in records:
-            assert record.record_type == "contract_award"
+            assert record.record_type == "federal_award"
 
     def test_desk_is_defense(self, usaspending_response):
         adapter = USASpendingAdapter()
@@ -133,39 +133,82 @@ class TestCursor:
         assert "filters" in payload
         assert "time_period" in payload["filters"]
 
-    def test_next_cursor_from_response_no_next_page(self, usaspending_response):
+    def test_next_cursor_walks_probes(self, usaspending_response):
         adapter = USASpendingAdapter()
-        # has_next_page = False → cursor advances to today's date
-        cursor = adapter.next_cursor(usaspending_response, current_page=1)
-        assert cursor is not None
+        # Within a run, next_cursor advances through probes by page index.
+        assert adapter.next_cursor(usaspending_response, current_page=1) == {"page": 2}
+
+    def test_next_cursor_terminal_after_last_probe(self, usaspending_response):
+        adapter = USASpendingAdapter()
+        cursor = adapter.next_cursor(usaspending_response, current_page=adapter.probe_count)
         assert "last_date" in cursor
 
-    def test_next_cursor_from_response_has_next_page(self, usaspending_response):
+
+class TestProbesAndDesks:
+    """USAspending is cross-desk: each probe tags records to the desk(s) it serves,
+    so it's a daily feed of government capital formation across all three (D059/D063)."""
+
+    def test_default_probe_is_defense(self, usaspending_response):
+        # parse() without build uses probe[0] (pure defense-tech).
+        records = USASpendingAdapter().parse(usaspending_response)
+        assert set(records[0].desk) == {"defense"}
+
+    def test_defense_probe_keywords(self):
         adapter = USASpendingAdapter()
-        response = json.loads(json.dumps(usaspending_response))
-        response["page_metadata"]["has_next_page"] = True
-        cursor = adapter.next_cursor(response, current_page=1)
-        assert cursor["page"] == 2
+        kw = " ".join(adapter.build_request_payload(None, page=1)["filters"]["keywords"]).lower()
+        for theme in ("satellite", "directed energy", "drone", "radar",
+                      "guided missile", "electronic warfare"):
+            assert theme in kw, f"missing defense-tech theme: {theme}"
 
-
-class TestDefenseTechFilter:
-    """The Defense desk is scoped by technology, not agency (D059)."""
-
-    def test_payload_includes_defense_tech_keywords(self):
+    def test_autonomy_probe_is_defense_ai(self, usaspending_response):
         adapter = USASpendingAdapter()
-        payload = adapter.build_request_payload(cursor=None, page=1)
-        keywords = payload["filters"]["keywords"]
-        assert keywords, "expected a non-empty defense-tech keyword filter"
-        # Spot-check coverage of the operator's named themes.
-        joined = " ".join(keywords).lower()
-        for theme in ("satellite", "directed energy", "drone", "autonomous",
-                      "radar", "guided missile", "electronic warfare"):
-            assert theme in joined, f"missing defense-tech theme: {theme}"
+        adapter.build_request_payload(None, page=2)  # autonomy / AI-for-defense
+        records = adapter.parse(usaspending_response)
+        assert set(records[0].desk) == {"defense", "ai"}
+
+    def test_ai_probe_tags_ai(self, usaspending_response):
+        adapter = USASpendingAdapter()
+        adapter.build_request_payload(None, page=3)  # AI compute build-out
+        records = adapter.parse(usaspending_response)
+        assert set(records[0].desk) == {"ai"}
+
+    def test_energy_probe_tags_energy(self, usaspending_response):
+        adapter = USASpendingAdapter()
+        adapter.build_request_payload(None, page=4)  # energy transformation
+        records = adapter.parse(usaspending_response)
+        assert set(records[0].desk) == {"energy"}
+
+    def test_convergence_probe_tags_all_three(self, usaspending_response):
+        adapter = USASpendingAdapter()
+        adapter.build_request_payload(None, page=5)  # rare earth / critical minerals
+        records = adapter.parse(usaspending_response)
+        assert set(records[0].desk) == {"defense", "ai", "energy"}
+
+    def test_defense_probes_use_contracts_ai_energy_use_grants(self):
+        # Capital formation differs by desk: defense = procurement contracts (A-D);
+        # AI/Energy research+buildout = grants/assistance (02-05). Per-probe award types (D063).
+        adapter = USASpendingAdapter()
+        defense = adapter.build_request_payload(None, page=1)["filters"]["award_type_codes"]
+        ai = adapter.build_request_payload(None, page=3)["filters"]["award_type_codes"]
+        energy = adapter.build_request_payload(None, page=4)["filters"]["award_type_codes"]
+        assert set(defense) == {"A", "B", "C", "D"}
+        assert set(ai) == {"02", "03", "04", "05"}
+        assert set(energy) == {"02", "03", "04", "05"}
+
+    def test_probe_keyword_sets_are_disjoint(self):
+        # Disjoint keyword sets keep a record's desk tag deterministic under dedup.
+        from engine.adapters.usaspending import _PROBES
+        seen: set[str] = set()
+        for probe in _PROBES:
+            for k in probe.keywords:
+                assert k not in seen, f"keyword {k!r} appears in multiple probes"
+                seen.add(k)
 
     def test_keywords_exclude_generic_overhead_terms(self):
-        # The whole point is to drop generic federal IT/admin — make sure we didn't
-        # add over-broad terms that would re-admit it.
+        # The whole point is to drop generic federal IT/admin across every probe.
         adapter = USASpendingAdapter()
-        keywords = [k.lower() for k in adapter.build_request_payload(None, 1)["filters"]["keywords"]]
+        all_kw = []
+        for page in range(1, adapter.probe_count + 1):
+            all_kw += [k.lower() for k in adapter.build_request_payload(None, page)["filters"]["keywords"]]
         for noise in ("it services", "software", "information technology", "support services"):
-            assert noise not in keywords
+            assert noise not in all_kw

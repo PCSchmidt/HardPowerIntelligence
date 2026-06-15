@@ -1530,3 +1530,31 @@ with provenance; it must not tip into recommendations (informational research, n
 This reframes the source-onboarding priority (D055 §10 / per the 2026-06-15 source review):
 re-route USAspending to AI/Energy first (cheapest, daily, structured), then Epoch AI + Ember +
 arXiv + Form D; keep GDELT as the news/radar layer (D055), not a min-items filler.
+
+---
+
+## D064 — USAspending re-routed to all three desks (multi-desk probes, per award type) *(added 2026-06-15)*
+
+**Decision:** USAspending is no longer pigeonholed to Defense. It now runs **five thematic
+probes** (the EDGAR probe model, D061), each tagging records to the desk(s) it serves with
+DISJOINT keyword sets (so desk tags are deterministic under content-hash dedup): pure
+defense-tech → Defense; autonomy/AI-for-defense → Defense∩AI; AI compute → AI; energy
+transformation → Energy; rare-earth/critical-minerals → Defense∩AI∩Energy. Multi-desk probes
+are the convergence signal (cross-sector boost, D060). Each probe carries its **own award-type
+group**: Defense probes query procurement **contracts** (A–D); AI/Energy/convergence probes
+query **grants/financial assistance** (02–05). Lookback widened to 14 days.
+
+**Why:** Per D063, USAspending is the cheapest unblock for the starved AI/Energy desks —
+government capital formation, daily, structured, free. Two things had to be right, both found
+by smoke-testing against the live API (cf. PAT-CLOUDGAP): (1) **award-type segregation** —
+`spending_by_award` can't mix contract and assistance types in one query, and AI/Energy
+capital formation (DOE/NSF/ARPA-E research + buildout) flows as *grants*, not procurement
+contracts; querying contracts for AI returned generic gov-IT noise (Peraton/Accenture for Dept
+of Education), while grants returned the real research/buildout money (DOE, SETI, universities).
+(2) **probe-index vs API-pagination** — the runner's `page` counter selects the probe, but it
+was also being passed as the API's `page` field, so probe 4 requested result-page 4 (offset
+300) and returned empty; fixed by pinning API `page=1` (one page per probe; EDGAR already did
+this with `from=0`). After both fixes, all five probes return data live (defense 100, def∩ai
+55, ai 7, energy 28, convergence 1) — AI and Energy unblocked. A common field set valid for
+both award groups keeps one request shape. Future refinement: AI-grant keywords also catch HHS
+biomedical-HPC grants (tangential); Epoch AI (D063) will give cleaner AI-infrastructure signal.

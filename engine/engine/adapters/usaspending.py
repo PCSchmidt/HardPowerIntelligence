@@ -1,48 +1,75 @@
 import hashlib
 import json
+from dataclasses import dataclass
 from datetime import date, datetime, timezone, timedelta
 
 from .base import NormalizedRecord
 
 _SOURCE_ID = "usaspending"
 _BASE_URL = "https://api.usaspending.gov/api/v2/search/spending_by_award/"
-_AWARD_TYPE_CODES = ["A", "B", "C", "D"]  # procurement contracts only
-_DEFAULT_LOOKBACK_DAYS = 7  # thematic filter narrows results, so widen the window
+_DEFAULT_LOOKBACK_DAYS = 14  # grant-funded research/buildout is lower-velocity; widen window
 
-# Defense-Tech thematic filter (D059). The Defense desk is defined by *technology*,
-# not agency — space, directed energy, drones, surveillance, autonomy, robotics,
-# missiles, EW — wherever funded (DoD, DHS, DOE/NNSA, NASA, intel). USAspending's
-# keyword search indexes PSC/NAICS code *descriptions*, so these PSC-informed terms
-# act as a cross-agency category filter (e.g. "guided missile" → PSC 1410, "radar" →
-# PSC 5840s) plus emerging/cross-cutting terms PSC codes lag ("directed energy",
-# "autonomous", "hypersonic"). Keywords are OR-combined by the API. This is the
-# deterministic pre-filter from DATA_ARCHITECTURE_ANALYSIS §4 — relevance before the LLM.
-_DEFENSE_TECH_KEYWORDS = [
-    # Space / satellite
-    "satellite", "spacecraft", "launch vehicle", "space launch", "geospatial",
-    # Directed energy
-    "directed energy", "high energy laser", "laser weapon", "microwave weapon",
-    # Unmanned / counter-unmanned
-    "unmanned aircraft", "unmanned aerial", "drone", "counter-uas", "loitering munition",
-    # Autonomy / robotics
-    "autonomous", "autonomy", "robotic", "robotics",
-    # Missiles / munitions / strike
-    "guided missile", "hypersonic", "precision strike", "munition", "warhead",
-    # Sensing / surveillance / ISR
-    "radar", "surveillance", "reconnaissance", "electro-optical", "infrared sensor",
-    "night vision", "signals intelligence", "persistent surveillance",
-    # Electronic warfare
-    "electronic warfare", "electronic attack", "electromagnetic spectrum",
-    # C2 / AI for defense
-    "command and control", "artificial intelligence", "machine learning",
-]
+# award_type_codes are segregated by group in spending_by_award (you cannot mix contract
+# and assistance types in one query). Defense capital is procurement *contracts* (A–D);
+# AI/Energy capital formation (DOE/NSF/ARPA-E research + buildout) flows as *grants /
+# financial assistance* (02–05) — confirmed against the live API: contract-only AI queries
+# returned generic gov-IT noise, while the real AI/energy money is in grants. So each probe
+# carries its own award-type group (D063).
+_CONTRACTS = ("A", "B", "C", "D")
+_GRANTS = ("02", "03", "04", "05")  # block / formula / project grants + cooperative agreements
+
+# Fields valid for BOTH award groups (verified live) — no contract-only fields, so one
+# request shape serves contracts and grants alike; parse() tolerates missing keys.
 _FIELDS = [
-    "Award ID", "Recipient Name", "Recipient UEI", "Start Date", "End Date",
-    "Award Amount", "Awarding Agency", "Awarding Sub Agency",
-    "Contract Award Type", "Place of Performance City Code",
-    "Place of Performance State Code", "Last Modified Date",
-    "base_and_exercised_options_value", "Award Description", "def_codes",
+    "Award ID", "Recipient Name", "Recipient UEI", "Award Amount",
+    "Awarding Agency", "Awarding Sub Agency", "Start Date", "End Date",
+    "Last Modified Date", "Award Description",
 ]
+
+
+@dataclass(frozen=True)
+class _Probe:
+    keywords: tuple[str, ...]
+    desks: tuple[str, ...]
+    award_types: tuple[str, ...]
+
+
+# Cross-desk thematic probes (D059 generalized across desks, D063). USAspending is no
+# longer pigeonholed to Defense: it's a feed of *government capital formation* across all
+# three desks. Its keyword search indexes PSC/NAICS code *descriptions*, so PSC-informed
+# terms act as a cross-agency category filter. Each probe is one API query (keywords
+# OR-combined) with its own award-type group; probes are walked via the runner's page
+# counter. Keyword sets are DISJOINT so a record's desk tag is deterministic under
+# content-hash dedup. Multi-desk probes (autonomy, rare earth) are the convergence signal.
+_PROBES: tuple[_Probe, ...] = (
+    # Pure defense-tech → Defense (procurement contracts)
+    _Probe((
+        "satellite", "spacecraft", "launch vehicle", "space launch", "geospatial",
+        "directed energy", "high energy laser", "laser weapon", "microwave weapon",
+        "unmanned aircraft", "unmanned aerial", "drone", "loitering munition",
+        "guided missile", "hypersonic", "precision strike", "munition", "warhead",
+        "radar", "surveillance", "reconnaissance", "electro-optical", "infrared sensor",
+        "night vision", "signals intelligence", "electronic warfare", "electronic attack",
+    ), ("defense",), _CONTRACTS),
+    # Autonomy / AI-for-defense → Defense ∩ AI (procurement contracts — drones, robotics)
+    _Probe((
+        "autonomous", "autonomy", "robotic", "robotics", "counter-uas",
+        "artificial intelligence", "machine learning", "command and control",
+    ), ("defense", "ai"), _CONTRACTS),
+    # AI compute build-out → AI (DOE/NSF/ARPA-E grants — research + infrastructure)
+    _Probe((
+        "data center", "high performance computing", "supercomputer", "semiconductor",
+        "advanced computing", "quantum computing", "exascale",
+    ), ("ai",), _GRANTS),
+    # Energy transformation → Energy (DOE/ARPA-E grants)
+    _Probe((
+        "small modular reactor", "grid modernization", "transmission line",
+        "energy storage", "grid scale battery", "nuclear power", "hydrogen",
+        "geothermal", "carbon capture", "high-assay low-enriched uranium",
+    ), ("energy",), _GRANTS),
+    # Trilateral chokepoint → Defense ∩ AI ∩ Energy (DOE/critical-minerals grants)
+    _Probe(("rare earth", "critical minerals"), ("defense", "ai", "energy"), _GRANTS),
+)
 
 
 def _sha256(data: dict) -> str:
@@ -62,13 +89,11 @@ def _normalize_name(name: str) -> str:
 
 def _build_text_chunk(row: dict) -> str:
     parts = [
-        f"Contract award: {row.get('Award Description', '')}",
+        f"Federal award: {row.get('Award Description', '')}",
         f"Recipient: {row.get('Recipient Name', '')}",
         f"Amount: ${row.get('Award Amount', 0):,.0f}",
         f"Agency: {row.get('Awarding Agency', '')} / {row.get('Awarding Sub Agency', '')}",
         f"Period: {row.get('Start Date', '')} to {row.get('End Date', '')}",
-        f"Location: {row.get('Place of Performance City Code', '')}, "
-        f"{row.get('Place of Performance State Code', '')}",
     ]
     return " | ".join(p for p in parts if p.split(": ", 1)[-1].strip())
 
@@ -78,10 +103,21 @@ class USASpendingAdapter:
     base_url: str = _BASE_URL
     http_method: str = "POST"   # USAspending search is a POST with a JSON body
 
+    def __init__(self) -> None:
+        # Set per request in build_request_payload, read in parse() (the runner calls
+        # build → fetch → parse sequentially on one instance). Defaults to the first
+        # probe so parse() works standalone (e.g. in tests).
+        self._active_probe: _Probe = _PROBES[0]
+
+    @property
+    def probe_count(self) -> int:
+        return len(_PROBES)
+
     # ── parse ──────────────────────────────────────────────────────────────────
 
     def parse(self, response: dict) -> list[NormalizedRecord]:
         records = []
+        desks = list(self._active_probe.desks)
         for row in response.get("results", []):
             award_id = row.get("Award ID", "")
             if not award_id:
@@ -94,13 +130,10 @@ class USASpendingAdapter:
                 "amount_usd": row.get("Award Amount"),
                 "awarding_agency": row.get("Awarding Agency"),
                 "awarding_sub_agency": row.get("Awarding Sub Agency"),
-                "contract_type": row.get("Contract Award Type"),
                 "description": row.get("Award Description"),
                 "start_date": row.get("Start Date"),
                 "end_date": row.get("End Date"),
                 "last_modified": row.get("Last Modified Date"),
-                "place_city": row.get("Place of Performance City Code"),
-                "place_state": row.get("Place of Performance State Code"),
             }
 
             entity_mentions = []
@@ -116,8 +149,8 @@ class USASpendingAdapter:
 
             records.append(NormalizedRecord(
                 source_id=_SOURCE_ID,
-                record_type="contract_award",
-                desk=["defense"],
+                record_type="federal_award",
+                desk=desks,
                 entity_mentions=entity_mentions,
                 structured_data=structured,
                 text_chunk=_build_text_chunk(row),
@@ -131,29 +164,31 @@ class USASpendingAdapter:
     # ── cursor / request building ──────────────────────────────────────────────
 
     def build_request_payload(self, cursor: dict | None, page: int = 1) -> dict:
+        # page (1-based) selects the probe; the persisted cursor holds the date watermark.
+        probe = _PROBES[(page - 1) % len(_PROBES)]
+        self._active_probe = probe
+
         if cursor and "last_date" in cursor:
             start_date = cursor["last_date"]
         else:
             lookback = date.today() - timedelta(days=_DEFAULT_LOOKBACK_DAYS)
             start_date = lookback.isoformat()
 
-        end_date = date.today().isoformat()
-
         return {
             "filters": {
-                "time_period": [{"start_date": start_date, "end_date": end_date}],
-                "award_type_codes": _AWARD_TYPE_CODES,
-                "keywords": _DEFENSE_TECH_KEYWORDS,  # cross-agency defense-tech filter (D059)
+                "time_period": [{"start_date": start_date, "end_date": date.today().isoformat()}],
+                "award_type_codes": list(probe.award_types),
+                "keywords": list(probe.keywords),  # cross-desk thematic filter (D059/D063)
             },
             "fields": _FIELDS,
-            "page": page,
+            "page": 1,  # always first page; `page` arg selects the PROBE, not API pagination
             "limit": 100,
             "sort": "Award Amount",
             "order": "desc",
         }
 
     def next_cursor(self, response: dict, current_page: int) -> dict:
-        meta = response.get("page_metadata", {})
-        if meta.get("has_next_page"):
+        # Walk every probe once per run, then advance the date watermark.
+        if current_page < len(_PROBES):
             return {"page": current_page + 1}
         return {"last_date": date.today().isoformat()}
