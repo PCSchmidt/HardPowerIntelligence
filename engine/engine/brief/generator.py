@@ -14,6 +14,7 @@ from engine.brief.rag import (
     embed_pending_records,
     fetch_passages,
 )
+from engine.db import transient_retry
 from engine.eval.citation_eval import extract_citation_indices, strip_uncited_sentences
 from engine.llm.client import llm_client, parse_json
 from engine.settings import settings
@@ -305,6 +306,7 @@ async def generate_brief(desk: str, pool: asyncpg.Pool) -> GeneratedBrief:
     )
 
 
+@transient_retry()
 async def persist_brief(
     brief: GeneratedBrief,
     desk: str,

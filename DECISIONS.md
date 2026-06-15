@@ -1656,3 +1656,32 @@ the AI brief is the operator confirmation. Fact passages don't require embedding
 records are citable even before the embed step completes. Follow-up: the materiality formula still
 caps no-$ records (arXiv) at ~0.58 — a research-novelty weighting could let advancement compete on
 merit rather than via a reserved floor.
+
+---
+
+## D069 — Briefs publish only individually-supported sentences; gate on provable items *(added 2026-06-15)*
+
+**Decision:** Citation faithfulness is now enforced at the **sentence** level, not by an aggregate
+threshold. `eval_item` returns a `cleaned_body` containing only the cited sentences the evaluator
+LLM marks supported; `run_brief` publishes that cleaned body (re-deriving citation_indices) and a
+brief **passes when it has ≥ `brief_min_items` provable items**, dropping the old
+`faithfulness_score ≥ 0.95` gate. A partially over-claimed item is **trimmed** to its provable
+sentences instead of dragging the whole brief below threshold. Separately, `persist_brief` is
+wrapped in a new `db.transient_retry` decorator so a transient DNS/connection blip on the
+post-synthesis write can't discard an already-generated brief.
+
+**Why:** Live runs exposed that brief generation is **not reproducible** despite `temperature=0`
+(deepseek/OpenRouter don't honor it): the Energy desk **failed at 0.947 then passed at 1.000 on
+identical data**, and the same EDGAR 8-Ks that passed in the AI/Defense briefs were excluded
+minutes later in Energy. Gating a publish on an aggregate score that itself flips run-to-run made
+autonomous publishing (the operator's stated goal) a coin flip. Sentence-level cleaning makes
+faithfulness a *construction guarantee* — every published sentence is verified — so the gate can be
+the honest, stable question "are there enough provable items?". This is the natural extension of
+D058 (strip *uncited* sentences) to *unsupported-but-cited* sentences; the per-item pre-clean score
+is still logged as an over-claim signal. The DNS wrap addresses a real crash seen this session:
+Energy's synthesis ran ~4 minutes, by which point the pooler had dropped the idle connection and
+`persist_brief`'s re-acquire hit `getaddrinfo failed` and aborted a good brief (`create_pool`'s
+retry only covers pool creation, D057). Validated: 215 tests pass (6 new — cleaned_body trimming +
+transient_retry). Trade-off: dropping the 0.95 aggregate gate means the stored faithfulness_score
+is no longer the publish gate; it's retained as a quality metric. Follow-up still open from D068
+(research-novelty materiality weighting) and D067 (EDGAR body extraction).

@@ -80,3 +80,44 @@ async def test_missing_dsn_raises_without_network(monkeypatch):
     monkeypatch.setattr(asyncpg, "create_pool", boom)
     with pytest.raises(RuntimeError, match="DATABASE_URL is not configured"):
         await db.create_pool()
+
+
+class TestTransientRetry:
+    """transient_retry decorator for DB ops on a possibly-stale pooled connection (D069)."""
+
+    async def test_retries_dns_then_succeeds(self):
+        calls = {"n": 0}
+
+        @db.transient_retry(wait_min=0, wait_max=0)
+        async def op():
+            calls["n"] += 1
+            if calls["n"] < 3:
+                raise socket.gaierror(11001, "getaddrinfo failed")
+            return "ok"
+
+        assert await op() == "ok"
+        assert calls["n"] == 3  # two retries, then success
+
+    async def test_exhausts_and_reraises(self):
+        calls = {"n": 0}
+
+        @db.transient_retry(max_attempts=3, wait_min=0, wait_max=0)
+        async def op():
+            calls["n"] += 1
+            raise ConnectionResetError("reset")
+
+        with pytest.raises(ConnectionResetError):
+            await op()
+        assert calls["n"] == 3
+
+    async def test_non_transient_not_retried(self):
+        calls = {"n": 0}
+
+        @db.transient_retry(wait_min=0, wait_max=0)
+        async def op():
+            calls["n"] += 1
+            raise asyncpg.InvalidPasswordError("bad password")
+
+        with pytest.raises(asyncpg.InvalidPasswordError):
+            await op()
+        assert calls["n"] == 1  # deterministic error → fail fast

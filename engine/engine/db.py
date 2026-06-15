@@ -76,3 +76,30 @@ async def create_pool(
         )
 
     return await _connect()
+
+
+def transient_retry(
+    *,
+    max_attempts: int = _DEFAULT_MAX_ATTEMPTS,
+    wait_min: float = 1.0,
+    wait_max: float = 15.0,
+):
+    """Decorator: retry a DB *operation* on transient connection failures (D069).
+
+    ``create_pool`` guards pool *creation*, but an operation that acquires a pooled
+    connection long after creation can still fail — e.g. persisting a brief after a
+    multi-minute LLM synthesis call, by which point the pooler may have dropped the
+    idle connection and reopening hits the same DNS flakiness (D057). Reuses that
+    transient-error policy; the wrapped op must be idempotent (persist_brief is, D058).
+    """
+    return retry(
+        stop=stop_after_attempt(max_attempts),
+        wait=wait_exponential(multiplier=1, min=wait_min, max=wait_max),
+        retry=retry_if_exception_type(_TRANSIENT_CONN_ERRORS),
+        reraise=True,
+        before_sleep=lambda rs: log.warning(
+            "db_op_retry",
+            attempt=rs.attempt_number,
+            error=str(rs.outcome.exception()),
+        ),
+    )

@@ -200,3 +200,68 @@ class TestCitationEvaluator:
             EvalResult(item_id="i1", excluded=True, claims_total=3, claims_passing=0, faithfulness_score=0.0),
         ]
         assert evaluator.brief_faithfulness_score(item_results) == 0.0
+
+
+class TestCleanedBody:
+    """D069: eval_item returns a cleaned_body of only the individually-supported,
+    cited sentences, so a partially over-claimed item is trimmed rather than
+    dragging the brief below threshold (the non-determinism failure mode)."""
+
+    def _passages(self):
+        from datetime import datetime, timezone
+
+        from engine.brief.rag import PassageContext
+        return [PassageContext(
+            index=1, raw_record_id="r1", source_id="usaspending",
+            url="https://x", fetched_at=datetime(2026, 6, 5, tzinfo=timezone.utc),
+            native_id="n1", excerpt="Award amount $1.1B for LRASM",
+        )]
+
+    @pytest.mark.asyncio
+    async def test_trims_unsupported_sentence_keeps_supported(self):
+        with patch("engine.eval.citation_eval.llm_client") as mock_client:
+            mock_client.complete = AsyncMock(return_value=json.dumps(
+                {"claim_evaluations": [
+                    {"id": "c0", "supported": True},
+                    {"id": "c1", "supported": False},
+                ]}
+            ))
+            evaluator = CitationEvaluator(eval_model="m")
+            result = await evaluator.eval_item(
+                item_id="i",
+                body="LM won $1.1B [CITE:1]. It triples national capacity [CITE:1].",
+                passages=self._passages(),
+            )
+        # Only the supported first sentence survives; the over-claim is dropped.
+        assert result.cleaned_body == "LM won $1.1B [CITE:1]."
+        assert not result.excluded
+        assert result.faithfulness_score == pytest.approx(0.5)  # pre-clean score unchanged
+
+    @pytest.mark.asyncio
+    async def test_all_unsupported_excluded_with_empty_cleaned_body(self):
+        with patch("engine.eval.citation_eval.llm_client") as mock_client:
+            mock_client.complete = AsyncMock(return_value=json.dumps(
+                {"claim_evaluations": [{"id": "c0", "supported": False}]}
+            ))
+            evaluator = CitationEvaluator(eval_model="m")
+            result = await evaluator.eval_item(
+                item_id="i", body="Unsupported claim [CITE:1].", passages=self._passages(),
+            )
+        assert result.excluded
+        assert result.cleaned_body == ""
+
+    @pytest.mark.asyncio
+    async def test_cleaned_body_is_fully_cited(self):
+        with patch("engine.eval.citation_eval.llm_client") as mock_client:
+            mock_client.complete = AsyncMock(return_value=json.dumps(
+                {"claim_evaluations": [{"id": "c1", "supported": True}]}
+            ))
+            evaluator = CitationEvaluator(eval_model="m")
+            result = await evaluator.eval_item(
+                item_id="i",
+                body="Uncited background sentence. Supported fact [CITE:1].",
+                passages=self._passages(),
+            )
+        # Uncited sentence already gone; only the supported, cited one remains.
+        assert result.cleaned_body == "Supported fact [CITE:1]."
+        assert all(c.is_cited for c in extract_claims(result.cleaned_body))

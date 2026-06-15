@@ -31,6 +31,7 @@ class EvalResult:
     claims_total: int
     claims_passing: int
     faithfulness_score: float
+    cleaned_body: str = ""   # body with only LLM-supported, cited sentences (D069)
 
 
 def extract_citation_indices(text: str) -> list[int]:
@@ -94,6 +95,7 @@ class CitationEvaluator:
         relevant_passages = [p for p in passages if p.index in cited_indices]
 
         passing = 0
+        cleaned_body = ""
 
         if cited:
             sources_block = "\n".join(
@@ -130,9 +132,16 @@ class CitationEvaluator:
                 for e in parsed.get("claim_evaluations", [])
             }
             passing = sum(1 for c in cited if evaluations.get(c.id, False))
+            # Publish only the individually-supported sentences (D069): a partially
+            # over-claimed item is trimmed to its provable sentences rather than
+            # dragging the whole brief below threshold. Sentence order preserved.
+            cleaned_body = " ".join(
+                c.text for c in cited if evaluations.get(c.id, False)
+            )
 
         total = len(claims)
-        excluded = (passing + 0) == 0 and total > 0  # all claims failed
+        # Excluded iff nothing provable survived (equivalent to the old passing==0).
+        excluded = not cleaned_body
 
         if total == 0:
             score = 0.0
@@ -154,6 +163,7 @@ class CitationEvaluator:
             claims_total=total,
             claims_passing=passing,
             faithfulness_score=score,
+            cleaned_body=cleaned_body,
         )
 
     def brief_faithfulness_score(self, results: list[EvalResult]) -> float:
