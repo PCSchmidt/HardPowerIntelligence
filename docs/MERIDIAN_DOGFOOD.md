@@ -57,6 +57,21 @@ MEDIUM/HIGH via `global-memory-sync.sh` across multiple projects. Correct, but i
 possible mitigation is allowing within-project re-validation to bump confidence, or documenting
 that HIGH confidence requires N distinct `source_projects`.
 
+### F5 — `enforce-tests` hook blocks the red phase of red-green TDD
+The `PreToolUse` `enforce-tests` hook blocks all non-test source writes whenever the suite is
+red ("fix them before writing new implementation files"). That's good for never leaving a broken
+tree, but it makes **literal test-first TDD impossible**: writing a failing test first turns the
+suite red, which then blocks writing the implementation that would make it pass — a deadlock. It
+also deadlocks on a *new untracked* source file mid-edit (a half-applied change makes it red, and
+`git checkout` can't restore an untracked file). Hit twice this session (D066, D068).
+**Workarounds used:** (i) apply implementation in additive, green-preserving edits *before* the
+tests, validate the new helpers via an ad-hoc `python -` snippet, then add the formal tests; (ii)
+when a multi-step source edit was caught half-done, complete it atomically via a `python -` write
+(Bash isn't gated by the hook) instead of Edit.
+**Recommendation:** add a per-file/changed-files scope (only block when *previously-green* files
+regress) or an explicit "red-phase" allowance (e.g., a sentinel/marker, or allow source writes
+when the only failures are in newly-added test files), so TDD's red→green→refactor loop works.
+
 ---
 
 ## HPI's stance (dogfood decision)

@@ -70,6 +70,10 @@ class Settings(BaseSettings):
     brief_max_items: int = 8
     brief_min_items: int = 3
     brief_window_hours_fallback: int = 48
+    # Multi-source briefs (D068): reserve up to N fact slots for advancement
+    # (research_paper) records so high-$ capital doesn't crowd out the technology
+    # leg of a brief (D063). 0 disables the floor.
+    brief_advancement_floor: int = 3
 
     # RAG retrieval (D031)
     rag_passage_top_k: int = 20

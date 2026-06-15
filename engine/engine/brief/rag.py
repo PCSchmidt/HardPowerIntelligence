@@ -66,30 +66,37 @@ async def build_query_vector(
     since: datetime,
     desk: str,
     top_k_seed: int = 5,
+    seed_texts: list[str] | None = None,
 ) -> list[float] | None:
-    """Embed the top-K (by recency) desk records' text_chunks as the RAG query
-    vector. ``desk`` membership test includes multi-desk records (convergence).
-    Returns None if no embedded records exist for the desk."""
-    async with pool.acquire() as conn:
-        rows = await conn.fetch(
-            """
-            SELECT text_chunk FROM normalized_records
-            WHERE created_at >= $1
-              AND $2 = ANY(desk)
-              AND embedding IS NOT NULL
-              AND text_chunk IS NOT NULL
-            ORDER BY created_at DESC
-            LIMIT $3
-            """,
-            since,
-            desk,
-            top_k_seed,
-        )
+    """Embed seed text_chunks as the RAG query vector. By default seeds from the
+    most *material* desk records, supplied via ``seed_texts`` (D068) — a high-volume
+    source must not hijack retrieval by recency. Falls back to the top-K (by recency)
+    desk records when ``seed_texts`` is None. ``desk`` membership includes multi-desk
+    records (convergence). Returns None if there is nothing to seed from."""
+    if seed_texts is not None:
+        seeds = [t for t in seed_texts[:top_k_seed] if t]
+    else:
+        async with pool.acquire() as conn:
+            rows = await conn.fetch(
+                """
+                SELECT text_chunk FROM normalized_records
+                WHERE created_at >= $1
+                  AND $2 = ANY(desk)
+                  AND embedding IS NOT NULL
+                  AND text_chunk IS NOT NULL
+                ORDER BY created_at DESC
+                LIMIT $3
+                """,
+                since,
+                desk,
+                top_k_seed,
+            )
+        seeds = [r["text_chunk"] for r in rows]
 
-    if not rows:
+    if not seeds:
         return None
 
-    seed_text = " | ".join(r["text_chunk"] for r in rows)
+    seed_text = " | ".join(seeds)
     client = openai.AsyncOpenAI(api_key=settings.openai_api_key)
     response = await client.embeddings.create(
         model=settings.embedding_model,

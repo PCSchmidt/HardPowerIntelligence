@@ -1,6 +1,6 @@
 import json
 import uuid
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import date, datetime, timedelta, timezone
 
 import asyncpg
@@ -61,8 +61,9 @@ async def _score_candidates(
         rows = await conn.fetch(
             """
             SELECT
-                nr.id, nr.source_id, nr.structured_data, nr.entity_mentions,
-                nr.desk, nr.created_at, rr.id AS rr_id
+                nr.id, nr.source_id, nr.record_type, nr.structured_data,
+                nr.entity_mentions, nr.text_chunk, nr.desk, nr.created_at,
+                rr.id AS rr_id, rr.url, rr.native_id, rr.fetched_at
             FROM normalized_records nr
             JOIN raw_records rr ON rr.id = nr.raw_record_id
             WHERE nr.created_at >= $1
@@ -141,6 +142,63 @@ async def _score_candidates(
     return sorted(scored, key=lambda x: x[1], reverse=True)
 
 
+def _select_facts(
+    candidates: list[tuple[dict, float]],
+    limit: int,
+    advancement_floor: int,
+) -> list[tuple[dict, float]]:
+    """Choose the fact set for synthesis: top candidates by materiality, but reserve
+    up to ``advancement_floor`` slots for advancement records (``research_paper``) so a
+    high-$ capital desk doesn't crowd out the technology-advancement leg (D063/D068).
+    Output preserves materiality order. ``candidates`` is assumed materiality-sorted."""
+    adv = [c for c in candidates if c[0].get("record_type") == "research_paper"]
+    cap = [c for c in candidates if c[0].get("record_type") != "research_paper"]
+    n_adv = min(max(advancement_floor, 0), len(adv), limit)
+    chosen = adv[:n_adv] + cap[: limit - n_adv]
+    if len(chosen) < limit:                       # not enough capital — top up with adv
+        chosen = (chosen + adv[n_adv:])[:limit]
+    chosen_ids = {str(c[0]["rr_id"]) for c in chosen}
+    return [c for c in candidates if str(c[0]["rr_id"]) in chosen_ids]
+
+
+def _candidate_passages(facts: list[tuple[dict, float]]) -> list[PassageContext]:
+    """Build citable passages straight from the material facts, so every fact the
+    synthesis is told to prioritize has a passage to cite (D068). The index is a
+    placeholder here; ``_merge_passages`` assigns the final 1-based [CITE:N] index."""
+    return [
+        PassageContext(
+            index=0,
+            raw_record_id=str(c["rr_id"]),
+            source_id=c["source_id"],
+            url=c.get("url") or "",
+            fetched_at=c["fetched_at"],
+            native_id=c.get("native_id") or "",
+            excerpt=c.get("text_chunk") or "",
+        )
+        for c, _ in facts
+    ]
+
+
+def _merge_passages(
+    fact_passages: list[PassageContext],
+    rag_passages: list[PassageContext],
+    cap: int,
+) -> list[PassageContext]:
+    """Union fact passages (material, always citable) with RAG context passages,
+    dedup by ``raw_record_id`` (fact passages win and keep the lower indices), then
+    re-index 1..N contiguously so [CITE:N] maps correctly (D068)."""
+    seen: set[str] = set()
+    merged: list[PassageContext] = []
+    for p in [*fact_passages, *rag_passages]:
+        if p.raw_record_id in seen:
+            continue
+        seen.add(p.raw_record_id)
+        merged.append(p)
+        if len(merged) >= cap:
+            break
+    return [replace(p, index=i + 1) for i, p in enumerate(merged)]
+
+
 async def generate_brief(desk: str, pool: asyncpg.Pool) -> GeneratedBrief:
     started_at = datetime.now(timezone.utc)
 
@@ -152,32 +210,49 @@ async def generate_brief(desk: str, pool: asyncpg.Pool) -> GeneratedBrief:
     embedded = await embed_pending_records(pool, since)
     log.info("embeddings_bootstrapped", count=embedded)
 
-    # Step 3: Build query vector from top-5 seed records (desk-scoped)
-    query_vector = await build_query_vector(pool, since, desk, top_k_seed=5)
-    if query_vector is None:
-        raise RuntimeError(f"No embedded {desk} records in window — cannot build query vector")
-
-    # Step 4: Retrieve top-K passages (immutable PassageContext list, D041)
-    passages = await fetch_passages(
-        pool, query_vector, since, settings.rag_passage_top_k, desk
-    )
-    log.info("passages_retrieved", count=len(passages), desk=desk)
-
-    # Step 5: Materiality scoring → candidate filter (desk-scoped, convergence-boosted)
+    # Step 3: Materiality scoring → candidate filter (desk-scoped, convergence-boosted).
+    # Done first so retrieval can be seeded by the most material records and the
+    # citation pool can be aligned to the facts we actually write about (D068).
     candidates = await _score_candidates(pool, since, desk)
     if len(candidates) < settings.brief_min_items:
         raise RuntimeError(
             f"Only {len(candidates)} material candidates — below BRIEF_MIN_ITEMS={settings.brief_min_items}"
         )
 
-    # Step 6: Build verified facts from material candidates
+    # Step 4: Choose the fact set — top by materiality, with an advancement floor so
+    # capital flow doesn't crowd out the technology leg (D063/D068).
+    facts = _select_facts(
+        candidates, settings.brief_max_items * 2, settings.brief_advancement_floor
+    )
+
+    # Step 5: Build the citation pool. Fact passages (built straight from the facts)
+    # are ALWAYS citable; RAG passages add semantic context, seeded by the material
+    # facts so a high-volume source can't hijack retrieval by recency (D068, D041).
+    fact_passages = _candidate_passages(facts)
+    query_vector = await build_query_vector(
+        pool, since, desk, seed_texts=[c.get("text_chunk") or "" for c, _ in facts]
+    )
+    rag_passages = (
+        await fetch_passages(pool, query_vector, since, settings.rag_passage_top_k, desk)
+        if query_vector is not None else []
+    )
+    passages = _merge_passages(
+        fact_passages, rag_passages,
+        cap=settings.brief_max_items * 2 + settings.rag_passage_top_k,
+    )
+    log.info(
+        "passages_retrieved", count=len(passages), desk=desk,
+        facts=len(fact_passages), rag=len(rag_passages),
+    )
+
+    # Step 6: Build verified facts (each has a citable passage by construction, D068)
     verified_facts = [
         {
             "record_id": str(c["rr_id"]),
             "source_id": c["source_id"],
             "data": json.loads(c["structured_data"]) if isinstance(c["structured_data"], str) else (c["structured_data"] or {}),
         }
-        for c, _ in candidates[: settings.brief_max_items * 2]
+        for c, _ in facts
     ]
 
     # Step 7: Synthesis LLM call (D028, D037)

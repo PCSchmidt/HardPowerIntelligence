@@ -1624,3 +1624,35 @@ proposition (D061) is public + smart-money capital signal across all three desks
 once filings carry text, not just headers. Lower priority than the AI-desk unblock (D066) because
 USAspending already carries Defense/Energy and EDGAR's convergence probes overlap arXiv's; promote
 when private/public-company capital depth becomes the binding constraint (cf. D063 source breadth).
+
+---
+
+## D068 — Brief citation pool is aligned to the material facts (multi-source unblock) *(added 2026-06-15)*
+
+**Decision:** The brief generator no longer derives its citable passages from RAG similarity
+alone. `generate_brief` now: (1) scores materiality **first**; (2) selects the fact set with
+`_select_facts` — top by materiality but reserving up to `brief_advancement_floor` (default 3)
+slots for advancement records (`research_paper`) so capital flow can't crowd out the technology
+leg (D063); (3) builds a **citable passage for every selected fact** (`_candidate_passages`) and
+**unions** it with RAG context passages (`_merge_passages`, dedup by raw_record_id, fact passages
+win, re-indexed 1..N); (4) seeds the RAG query vector from the **material facts**, not the most
+recent records. Invariant: every verified fact the synthesis is asked to prioritize has a passage
+to cite.
+
+**Why:** The first live multi-source AI brief (USAspending + EDGAR + 190 arXiv) **failed** — 5 of
+6 items excluded, only the arXiv item surviving. Root cause found by dogfooding: the citation pool
+(RAG, similarity-ranked) and the verified facts (materiality, $-ranked) were computed
+independently. `build_query_vector` seeded the query from the 5 most *recent* records, so the
+fresh 190-paper arXiv ingest hijacked retrieval — the top-20 citable passages came back all-arXiv,
+while materiality still handed synthesis the high-$ awards. The model wrote SAIC/Honeybee items it
+could only cite to arXiv passages, and citation-eval correctly failed them (`passing=0`). It had
+worked pre-arXiv only because each desk was effectively single-source, so facts and passages
+coincided by accident; the first high-volume mixed source broke that. Aligning the citation pool
+to the facts (and seeding retrieval by materiality) makes mixed-source briefs publishable, and the
+advancement floor keeps arXiv represented rather than crowded out by high-$ capital. This — not
+more adapters — was the binding constraint; adding Epoch/Ember first would have worsened the
+dilution. Validated: 209 tests pass (11 new alignment tests + helper-level checks); live re-run of
+the AI brief is the operator confirmation. Fact passages don't require embeddings, so material
+records are citable even before the embed step completes. Follow-up: the materiality formula still
+caps no-$ records (arXiv) at ~0.58 — a research-novelty weighting could let advancement compete on
+merit rather than via a reserved floor.
