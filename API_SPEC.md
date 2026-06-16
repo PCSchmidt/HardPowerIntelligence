@@ -198,6 +198,7 @@ staleness indicator.
   "published_at": "2026-06-05T09:35:00Z",
   "headline": "...",
   "bluf": "...",
+  "convergence_read": "Cross-signal thesis tying the day's items together (D073); \"\" if none.",
   "faithfulness_score": 0.97,
   "staleness_indicator": null,
   "items": [
@@ -206,6 +207,8 @@ staleness indicator.
       "item_type": "award",
       "headline": "Lockheed Martin Awarded $1.1B LRASM Production Contract",
       "body": "The Navy awarded Lockheed Martin a...",
+      "read": "Analysis — why this is material, second-order effects (D073). \"\" if withheld.",
+      "watch": "Forward catalyst to watch (D073). \"\" if none.",
       "entity_ids": ["uuid-lmt", "uuid-navy"],
       "citation_ids": ["uuid-cit-1", "uuid-cit-2"],
       "materiality_score": 0.91,
@@ -734,6 +737,7 @@ class BriefSummary(BaseModel):
     faithfulness_score: float | None
 
 class BriefFull(BriefSummary):
+    convergence_read: str  # cross-signal analysis thesis (D073); "" if none/withheld
     items: list[BriefItem] | None
     citations: list[Citation] | None
     sources_missing: list[str]
@@ -745,7 +749,9 @@ class BriefItem(BaseModel):
     id: UUID
     item_type: Literal["award", "filing", "policy", "macro", "signal"]
     headline: str
-    body: str
+    body: str            # cited fact prose (every sentence carries a citation)
+    read: str            # analysis layer: why it's material (D073); "" if withheld by the grounding gate
+    watch: str           # analysis layer: forward catalyst (D073); "" if none
     entity_ids: list[UUID]
     citation_ids: list[UUID]
     materiality_score: float | None
@@ -800,4 +806,4 @@ All secrets in environment variables; never hardcoded.
 - `hpi-api` handles all HTTP: briefs, entities, calendar, auth relay, Lemon Squeezy webhooks, admin.
 - `hpi-worker` handles background processing: scheduler, ingestion adapters, brief generation. It does not expose HTTP endpoints (internal Fly.io network only for health).
 - Next.js calls `hpi-api` for all data. It calls Supabase Auth JS client only for session management (token refresh, sign-in, sign-out).
-- Both services read/write Supabase Postgres. `hpi-api` uses `SUPABASE_SERVICE_ROLE_KEY` for all DB operations (RLS bypass in trusted backend). Row-level security remains on as defense-in-depth.
+- Both services read/write Supabase Postgres **directly via `DATABASE_URL`** (asyncpg pool) as a trusted backend Postgres role — not through Supabase's PostgREST/Auth REST API. User-token verification uses `SUPABASE_JWT_SECRET` (HS256; JWKS path also supported). `SUPABASE_SERVICE_ROLE_KEY` is **not currently used by any service** (declared in settings, reserved for future Supabase Admin API calls, e.g. comp-grants); it is *not* on the request path. Row-level security remains on as defense-in-depth.

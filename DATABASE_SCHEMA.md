@@ -417,6 +417,7 @@ CREATE TABLE briefs (
                                     CHECK (status IN ('pending', 'published', 'failed')),
     headline                    TEXT,
     bluf                        TEXT,           -- 2–3 sentence BLUF summary
+    convergence_read            TEXT NOT NULL DEFAULT '',  -- cross-signal analysis thesis (D073); '' if none/withheld
     faithfulness_score          FLOAT,          -- eval gate score (0–1)
     eval_passed                 BOOLEAN,
     published_at                TIMESTAMPTZ,
@@ -464,7 +465,9 @@ CREATE TABLE brief_items (
                         'award', 'filing', 'policy', 'macro', 'signal'
                     )),
     headline        TEXT NOT NULL,
-    body            TEXT NOT NULL,
+    body            TEXT NOT NULL,           -- cited fact prose (every sentence carries [CITE:N])
+    read            TEXT NOT NULL DEFAULT '', -- analysis layer: why it's material (D073); '' if withheld
+    watch           TEXT NOT NULL DEFAULT '', -- analysis layer: forward catalyst (D073); '' if none
     entity_ids      UUID[] NOT NULL DEFAULT '{}',
     materiality_score FLOAT,
     display_order   INT NOT NULL DEFAULT 0,

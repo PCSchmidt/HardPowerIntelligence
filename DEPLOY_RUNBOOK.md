@@ -134,6 +134,13 @@ fly secrets set --stage --app hpi-api \
 ```bash
 fly deploy --config fly.api.toml --app hpi-api
 ```
+> **Builder DNS gotcha (hit 2026-06-16):** flyctl now defaults to the **Depot** remote builder
+> (`api.depot.dev`). On a flaky/filtered network the build fails with
+> `dial tcp: lookup api.depot.dev: no such host`. Fallbacks, in order:
+> `--depot=false` (use Fly's own remote builder) → `--local-only` (build with local Docker, only
+> needs `registry.fly.io`; requires Docker Desktop running). The `--local-only` path is what
+> succeeded here.
+
 **Verify:**
 ```bash
 fly status --app hpi-api                       # machine "started", health check passing

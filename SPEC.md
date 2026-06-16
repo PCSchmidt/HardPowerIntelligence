@@ -87,6 +87,11 @@ A verifier (entailment check for prose; exact-match for numbers) confirms each
 claim against its source record before the brief is marked publish-ready.
 A brief below the citation-faithfulness threshold does not ship.
 The eval score is a published product metric.
+**Evolved (2026-06-16):** the brief is now *layered* — cited `body` facts plus a `read`/`watch`
+analysis layer and a brief-level `convergence_read`. Facts stay per-sentence cited; analysis is
+held to a separate **grounding** gate (regenerate-then-omit, D073) so it interprets without
+fabricating. Publish gates on **provable claims** (≥3, D070), regenerates on a bad draw or
+generation exception (D072), and down-ranks recently-featured records for freshness (D074).
 
 ## Brief Delivery — Web Cards and PDF
 
@@ -100,9 +105,13 @@ One `Brief` JSON renders to:
 
 Next.js App Router. Defense desk landing page with the current brief.
 Brief cards: BLUF headline → key items → citations drawer (source links).
-"What changed" diff banner between today's brief and yesterday's.
+Per-item "Analysis — HPI interpretation" drill-down (read + "What to watch") and a brief-level
+"Convergence — HPI interpretation" block (D073/P3, as-built 2026-06-16). The planned "what changed"
+diff *banner* was not built as UI — freshness is instead enforced server-side by the novelty gate
+(D074), so each brief is signal rather than a re-summary.
 Catalyst calendar (upcoming scheduled events: NDAA markup, earnings, FOMC).
 Responsive; no mobile app in Cycle 1 — mobile-friendly web is sufficient.
+All three desks (Defense / Energy / AI) are live in nav as-built; pages render via the same reader.
 
 ## Web — Entity 360 Page
 

@@ -111,8 +111,15 @@ fixtures onto live data and became genuinely multi-desk:
 
 - **Production ingestion runner** (`scripts/run_ingest.py`, D057) — pulls fresh data through
   a retry/backoff fetcher with DB-level dedup, per-source cursors + accounting, a circuit
-  breaker, and hot-window retention. Proven on live data; manually run today (the scheduled
-  cron stays gated until enough sources justify it).
+  breaker, and hot-window retention. The `daily-brief.yml` cron is **live** (09:00 UTC, ingest
+  once → publish all three desks), made safe to run unattended by the reliability work below.
+- **Layered analyst brief (2026-06-16, D071/D073)** — each item pairs the cited fact with a
+  grounded `read` (why it's material) and `watch` (forward catalyst), plus a brief-level
+  `convergence_read`, rendered as an "Analysis — HPI interpretation" drill-down (P3). The
+  analysis is held to a grounding gate (regenerate-then-omit) so it adds interpretation without
+  fabricating — depth that keeps the trust model. Reliability + freshness gates make daily
+  publishing trustworthy: provable-claim publish floor (D070), regenerate-on-failure (D072),
+  and a novelty/anti-rehash gate so tomorrow isn't a re-summary of today (D074).
 - **Two live adapters** — **USAspending** (defense-tech awards, thematically scoped cross-agency
   not DoD-only, D059) and **SEC EDGAR** (full-text search, the first cross-desk source — one
   adapter feeds all three desks, D061).
@@ -121,9 +128,11 @@ fixtures onto live data and became genuinely multi-desk:
   Defense desk publishes from live data; AI and Energy are wired and awaiting their first
   published run + dedicated sources for depth.
 
-Remaining before public launch: Lemon Squeezy checkout, dedicated AI/Energy sources (EIA/NRC,
-interconnection queues, more AI-infra), the flagship cross-domain **convergence brief**, and a
-few config fixes — tracked in `DEPLOYMENT_CONFIG.md` §6 and `CHANGELOG.md`.
+Remaining before public launch: Lemon Squeezy go-live (the checkout/webhook code is built;
+needs account creds + variant IDs in Vercel/Fly — config, not engineering), a live-validation
+pass on the AI/Energy desks plus dedicated sources for depth (EIA/NRC, interconnection queues,
+more AI-infra), and the flagship cross-domain **convergence brief**. Auth config (Supabase Site
+URL) is fixed. Tracked in `DEPLOYMENT_CONFIG.md` §6 and `CHANGELOG.md`.
 
 Scope boundaries in [docs/SCOPE.md](docs/SCOPE.md).
 

@@ -55,6 +55,29 @@ live ingestion runner, with Supabase auth and Lemon Squeezy subscriptions. Built
   Dockerfiles + `fly.toml`, `.dockerignore`, `DEPLOY_RUNBOOK.md`, and the interim
   `daily-brief.yml` GitHub Actions workflow.
 
+- **Layered analyst brief + reliability + freshness (2026-06-16)** — the brief evolved from a
+  cited ledger into a layered analyst product, and the publishing path was hardened for unattended
+  operation:
+  - **Layered analysis (D071/D073)**: each item now carries a `read` (why it's material — analysis)
+    and `watch` (forward catalyst), and the brief carries a `convergence_read` (cross-desk thesis),
+    alongside the cited `body`. The analysis layer is held to *grounding*, not per-sentence citation
+    (analyst voice: real domain context + hedged inference allowed; fabricated specifics flagged).
+    A **regenerate-then-omit grounding gate** (`engine/brief/analysis.py`) rewrites a flagged field
+    once, else stores `""` — so only grounded analysis is ever persisted/rendered. Migration
+    `20260616000001` adds `read`/`watch` on `brief_items`, `convergence_read` on `briefs`.
+  - **Drill-down UI (P3)**: BriefReader renders a "Convergence — HPI interpretation" block and a
+    per-item collapsible "Analysis — HPI interpretation" disclosure (read + "What to watch" + a
+    not-advice caption). Omitted fields render nothing. Live on `/desk/defense`.
+  - **Provable-claim publish gate (D070)**: a brief publishes on `≥ brief_min_claims` (3) *provable
+    claims* rather than item count — stable to how the synthesis packs facts into few/many items.
+  - **Regenerate-on-failure + exception hardening (D072)**: `generate_publishable_brief` regenerates
+    (up to `brief_max_attempts`, 3) on a failed gate *or* a generation exception (e.g. deepseek
+    returning a whitespace-only non-JSON body), returning the best attempt — so a bad draw can't
+    crash or dark-publish an unattended desk.
+  - **Novelty / anti-rehash gate (D074)**: records already featured in a recent published brief
+    (`novelty_window_days`, 7) are down-ranked (`novelty_penalty`, 0.5) so fresh items lead;
+    demote-not-drop keeps the brief honest without forcing it empty.
+
 ### Changed
 - **Defense desk scoped by technology, not agency (D059)**: the USAspending adapter filters by
   a PSC-informed defense-tech keyword set (space, directed energy, drones, ISR, autonomy,
@@ -105,12 +128,14 @@ live ingestion runner, with Supabase auth and Lemon Squeezy subscriptions. Built
   AI-infra sources). Until then their daily volume may fall below `BRIEF_MIN_ITEMS`.
 - **Flagship convergence brief** — the cross-domain brief (D060) that synthesizes across the
   three desks is not yet built; the desk briefs + cross-sector boost are its substrate.
-- **Scheduled cadence** — the runner is run manually; `daily-brief.yml` (ingest → brief) is
-  the interim trigger, its cron still commented until source coverage justifies daily spend.
-- **Config:** Supabase Site URL points at another project (email-confirmation links
-  misroute); the `.env` `SUPABASE_SERVICE_ROLE_KEY` is wrong (unused by deployed services
-  but should be corrected).
-- Minor: verify the OpenRouter model IDs (non-fatal litellm "Provider List" log noise).
+- **Scheduled cadence** — `daily-brief.yml` cron is **enabled** (`0 9 * * *`, 09:00 UTC; ingest
+  once → publish all 3 desks). Runs unattended; D072 makes a single bad draw/exception non-fatal.
+- **Config (resolved 2026-06-16):** Supabase **Site URL + Redirect allowlist fixed** (signup/login
+  emails now route to the prod domain — verified with a test signup). `SUPABASE_SERVICE_ROLE_KEY`
+  set on Fly + `.env`, but note it is **not used by any service** (DB access is via `DATABASE_URL`;
+  auth via `SUPABASE_JWT_SECRET`) — reserved for future Supabase Admin API use.
+- Minor: verify the OpenRouter model IDs (non-fatal litellm "Provider List" log noise). deepseek
+  occasionally returns a whitespace-only body; the fallback + D072 retry now absorb it.
 
 ---
 

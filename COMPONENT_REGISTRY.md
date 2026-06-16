@@ -60,7 +60,7 @@ interface NavBarProps {
 - Authenticated + Free/Trial: same + `TrialBanner` below
 - Unauthenticated: logo | "Sign in" link | "Start free trial" button
 
-**Notes:** Desk tabs — Defense (active, `href="/desk/defense"`), Energy (disabled, tooltip "Coming soon"), AI Infrastructure (disabled, tooltip "Coming soon").
+**Notes:** Desk tabs — all three **active** (as-built 2026-06-16): Defense (`/desk/defense`), Energy (`/desk/energy`), AI Infrastructure (`/desk/ai`). The earlier "Coming soon" disabled state is retired.
 
 ---
 
@@ -154,6 +154,15 @@ interface SidebarProps {
 ---
 
 ## 2. Brief
+
+> **As-built note (2026-06-16):** the shipped reader is `BriefReader` (`components/brief/brief-reader.tsx`,
+> Server) → `BriefHeader` + `BriefContent` (`brief-content.tsx`, Client, with inline `CitedBody` for
+> citation chips + `CitationsDrawer`). The entries below describe the original design; some names
+> (`BriefItem`, `BriefBLUF`, `CitationChipButton`) were consolidated into `BriefContent`. The layered
+> analysis (D071/D073, P3) adds: a brief-level "Convergence — HPI interpretation" block in `BriefReader`,
+> and a per-item collapsible **`AnalysisDisclosure`** (in `brief-content.tsx`) showing the grounded
+> `read` + "What to watch" behind an "Analysis — HPI interpretation" label. `ChangeBanner` is not built;
+> the anti-rehash guarantee is enforced server-side by the novelty gate (D074), not a UI banner.
 
 ### `BriefHeader`
 

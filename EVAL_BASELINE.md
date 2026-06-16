@@ -42,6 +42,7 @@ faithfulness_score = passing_claim_checks / total_claim_checks
 | 2026-06-06 | defense | 3 | 1 | 2 | 2 | 1.000 | Yes | First integration run; 3 fixture records, 2 passages retrieved, 1 item excluded (Qwen judged LRASM claim unsupported by available passage), 2 surviving items both scored 1.00 |
 | 2026-06-12 | defense | 3 | 0 | 3 | 3 | 1.000 | Yes | First **production** run (cloud Supabase). After HNSW index fix (D053) retrieval returned all 3 passages; all 3 items survived at 1.00. Published live to `/desk/defense`. |
 | 2026-06-14 | defense | 8 | 0 | 8 | 8 | 1.000 | Yes | First brief from **live-ingested** data (D057 runner, 100 USAspending records) — fixtures retired. Required the D058 fixes: `temperature=0` (earlier runs swung 0.000↔0.750 from non-determinism), drop-uncited-sentences, and idempotent persist. All 8 items 1.00. |
+| 2026-06-16 | defense | 4 | 0 | 9 | 8 | 1.000 | Yes | First **layered** brief in prod (D073): cited facts + grounded `read`/`watch`/`convergence_read`, rendered in the drill-down UI (P3). Publish gate now counts **provable claims** (D070, ≥3) and regenerates on a bad draw/exception (D072); novelty gate (D074) down-ranks recently-featured records. Brief `8abc35a1`. (Note: the `Notes` cell auto-prints "First integration run" — hardcoded in run_brief.py.) |
 
 ---
 

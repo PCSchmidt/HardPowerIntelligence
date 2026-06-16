@@ -154,6 +154,15 @@ verified brief per desk**.
    becomes the source drawer; `license_class` decides full-quote vs link-only.
    Personalization = filtering/reordering by a user's follows, never regeneration.
 
+**Refinements (2026-06-16).** The eval gate (step 4) evolved into a two-layer, self-healing
+publisher: the brief is now **layered** — cited `body` facts plus a `read`/`watch`/`convergence_read`
+*analysis* layer held to a separate **grounding** gate (regenerate-then-omit, never per-sentence
+citation, D071/D073). Publication gates on **provable claims** (≥3, stable to how facts pack into
+items, D070), and the whole generate→eval loop **regenerates on a failed gate or a generation
+exception** (D072) so an unattended run survives a bad model draw. Step 1's materiality additionally
+**down-ranks recently-featured records** (novelty gate, D074) so each daily brief is signal, not a
+re-summary. Rendered drill-down: see COMPONENT_REGISTRY §2 (P3).
+
 ---
 
 ## 7. Data model (high level)
