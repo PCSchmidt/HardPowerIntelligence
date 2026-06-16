@@ -1,5 +1,6 @@
 import { CheckCircle2 } from "lucide-react";
 import type { Brief } from "@/lib/types";
+import { stripCiteMarkers } from "@/lib/utils";
 
 function formatDate(iso: string) {
   return new Date(iso + "T00:00:00Z").toLocaleDateString("en-US", {
@@ -31,7 +32,7 @@ export function BriefHeader({ brief }: { brief: Brief }) {
       <h1 className="font-display text-display-lg text-foreground">{brief.headline}</h1>
       {brief.bluf && (
         <p className="border-l-2 border-brand-secondary pl-4 font-body text-body-lg text-foreground">
-          {brief.bluf}
+          {stripCiteMarkers(brief.bluf)}
         </p>
       )}
     </header>
