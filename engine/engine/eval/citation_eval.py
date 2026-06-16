@@ -34,6 +34,18 @@ class EvalResult:
     cleaned_body: str = ""   # body with only LLM-supported, cited sentences (D069)
 
 
+@dataclass
+class AnalysisEvalResult:
+    """Verdict for the analysis layer of a layered brief (D071).
+
+    The analysis ('read'/'watch'/'convergence_read') is interpretation, not a cited
+    claim, so it is NOT held to per-sentence citation. The only bar is grounding:
+    it must not assert a concrete fact (number, named entity, date, specific event)
+    absent from the cited fact set. ``new_facts`` lists any such fabrications."""
+    grounded: bool
+    new_facts: list[str]
+
+
 def extract_citation_indices(text: str) -> list[int]:
     return list(dict.fromkeys(int(m) for m in _CITE_RE.findall(text)))
 
@@ -181,3 +193,44 @@ class CitationEvaluator:
         non-deterministically packs the same facts into few dense items or many thin
         ones — claim count is stable to that, item count is not."""
         return sum(r.claims_passing for r in results if not r.excluded)
+
+    async def eval_analysis(self, analysis: str, facts: str) -> AnalysisEvalResult:
+        """Ground the analysis layer against the cited facts (D071).
+
+        Unlike :meth:`eval_item`, this does not require citations — analysis is
+        interpretation. It checks one thing: the analysis introduces no concrete
+        fact (number, dollar amount, named company/agency/person, date, or specific
+        event) that isn't present in or directly derivable from ``facts``.
+        Interpretation, implication, comparison, and forward-looking framing are
+        allowed. Returns the offending claims (empty → grounded)."""
+        if not analysis.strip():
+            return AnalysisEvalResult(grounded=True, new_facts=[])
+
+        messages = [
+            {
+                "role": "system",
+                "content": (
+                    "You check whether ANALYSIS for an investment-research brief stays "
+                    "grounded in a set of VERIFIED FACTS. The analysis MAY interpret, "
+                    "contextualize, draw implications, compare, and look forward. It MUST "
+                    "NOT introduce any new concrete fact — a specific number, dollar "
+                    "amount, named company/agency/person, date, or specific event — that "
+                    "is not present in or directly derivable from the verified facts. "
+                    "List every such unsupported concrete fact (empty list if none). "
+                    'Return only JSON: {"new_facts": ["..."]}'
+                ),
+            },
+            {
+                "role": "user",
+                "content": f"VERIFIED FACTS:\n{facts}\n\nANALYSIS:\n{analysis}",
+            },
+        ]
+        content = await llm_client.complete(
+            model=self.eval_model,
+            messages=messages,
+            json_mode=True,
+            temperature=settings.llm_temperature,
+        )
+        parsed = parse_json(content) or {}
+        new_facts = [str(f) for f in parsed.get("new_facts", []) if str(f).strip()]
+        return AnalysisEvalResult(grounded=not new_facts, new_facts=new_facts)

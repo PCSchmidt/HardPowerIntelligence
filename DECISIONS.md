@@ -1707,3 +1707,33 @@ run won't flake on the consolidation lottery. Claims are already verified (D069)
 only provable content. Validated: 220 tests pass (5 new). Minor residual risk: many claims about a
 single record could inflate the count; distinct-cited-records would be even more robust and is a
 possible future refinement. This was the last fragility before enabling autonomous daily publishing.
+
+---
+
+## D071 — Layered brief: gated facts + grounded analysis layer (two-tier eval) *(added 2026-06-16)*
+
+**Decision:** A brief evolves from a cited fact ledger into a **layered** document. Each signal
+carries: a `fact` (cited prose, gated per-sentence exactly as D069/D070), a `read` (analysis — why
+it's material, second-order effects, who's exposed), and an optional `watch` (forward catalyst /
+confirming-or-disconfirming signal); the brief carries a `convergence_read` tying signals across
+desks into the Defense∩AI∩Energy thesis (D060). The analysis layer is **interpretation, not cited
+claim**: it is NOT held to per-sentence citation, but it is held to a new guardrail —
+`CitationEvaluator.eval_analysis` — that flags any **new concrete fact** (number, dollar amount,
+named entity, date, specific event) absent from the cited fact set. Interpretation, implication,
+comparison, and forward framing are allowed; fabrication is not. The disclaimer ("not investment
+advice") covers the analysis layer; framing stays decisioning-lens, never "buy/sell" (D063).
+
+**Why:** The strict citation gate (D069) that earns trust also forces *descriptive* prose — every
+sentence must trace to one source, so interpretive sentences get stripped, leaving "X filed an 8-K"
+ledgers. That's a Google Alert, not something anyone subscribes to; the moat is synthesis +
+provenance and we had only provenance. Operator chose (a) the layered shape and (b) prototyping
+depth before billing — depth is the value driver, so build the thing worth paying for first. The
+resolution is to stop holding analysis to the fact-gate and instead hold it to a *different* bar
+(grounding, not citation), which is what makes analytical depth coexist with the trust model.
+
+Built in phases: **P1a (this commit)** — the `eval_analysis` grounding guardrail + `AnalysisEvalResult`,
+tested in isolation (224 tests pass) since it's the riskiest, most reusable piece; nothing calls it
+yet. **P1b** synthesis prompt + generator emit the layered fields; **P1c** run_brief runs the
+two-tier eval and prints the layered brief to validate quality on one desk before **P2** persistence
+(migration: `read`/`watch` on items, `convergence_read` on briefs) and **P3** BriefReader drill-down
+UI. Validated at the print level before schema/UI so the eval-rework risk is retired cheaply.

@@ -245,6 +245,56 @@ class TestProvableClaimCount:
         assert self._ev().provable_claim_count([]) == 0
 
 
+class TestEvalAnalysis:
+    """D071: the analysis layer ('read'/'watch'/'convergence') is interpretation —
+    no citations required, but it must introduce no concrete fact absent from the
+    cited fact set. eval_analysis is the grounding guardrail that makes layered
+    briefs possible without breaking the trust model."""
+
+    def _ev(self):
+        return CitationEvaluator(eval_model="m")
+
+    @pytest.mark.asyncio
+    async def test_grounded_interpretation_passes(self):
+        with patch("engine.eval.citation_eval.llm_client") as mock_client:
+            mock_client.complete = AsyncMock(return_value=json.dumps({"new_facts": []}))
+            r = await self._ev().eval_analysis(
+                "This continues a pattern of seeding the upstream supply chain.",
+                "DOE awarded $5.9M to Sustainable Energy Solutions.",
+            )
+        assert r.grounded
+        assert r.new_facts == []
+
+    @pytest.mark.asyncio
+    async def test_fabricated_fact_flagged(self):
+        with patch("engine.eval.citation_eval.llm_client") as mock_client:
+            mock_client.complete = AsyncMock(return_value=json.dumps(
+                {"new_facts": ["asserts a $2B follow-on award not in the facts"]}
+            ))
+            r = await self._ev().eval_analysis(
+                "A $2B follow-on award is imminent.",
+                "DOE awarded $5.9M to Sustainable Energy Solutions.",
+            )
+        assert not r.grounded
+        assert len(r.new_facts) == 1
+
+    @pytest.mark.asyncio
+    async def test_empty_analysis_is_grounded_without_llm_call(self):
+        with patch("engine.eval.citation_eval.llm_client") as mock_client:
+            mock_client.complete = AsyncMock(side_effect=AssertionError("should not call LLM"))
+            r = await self._ev().eval_analysis("   ", "some facts")
+        assert r.grounded
+        assert r.new_facts == []
+
+    @pytest.mark.asyncio
+    async def test_blank_strings_in_new_facts_ignored(self):
+        with patch("engine.eval.citation_eval.llm_client") as mock_client:
+            mock_client.complete = AsyncMock(return_value=json.dumps({"new_facts": ["", "  "]}))
+            r = await self._ev().eval_analysis("Some read.", "facts")
+        assert r.grounded          # only blank entries → treated as none
+        assert r.new_facts == []
+
+
 class TestCleanedBody:
     """D069: eval_item returns a cleaned_body of only the individually-supported,
     cited sentences, so a partially over-claimed item is trimmed rather than
