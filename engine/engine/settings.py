@@ -78,6 +78,10 @@ class Settings(BaseSettings):
     # (LLM-supported) claims. Counts claims, not items, so it's stable whether
     # synthesis consolidates facts into few dense items or many thin ones.
     brief_min_claims: int = 3
+    # Regenerate-on-failure (D072): the synthesis model is non-deterministic, so a
+    # gate failure is often a bad draw a re-run clears. Regenerate up to this many
+    # times before persisting the best attempt as failed. 1 disables retries.
+    brief_max_attempts: int = 3
 
     # RAG retrieval (D031)
     rag_passage_top_k: int = 20

@@ -1751,3 +1751,21 @@ headlines + source-passage excerpts), not just the citation-trimmed body — D06
 subject (e.g. the awardee/amount) from the body, which would otherwise read as a fabrication.
 Separately noted: that trimming can leave a semantically thin published fact (an award's period
 without its subject) — a D069 refinement to revisit.
+
+## D072 — Regenerate-on-failure publish gate *(added 2026-06-16)*
+
+**Decision:** Brief generation is wrapped in a small retry loop, `generate_publishable_brief`
+(`engine/brief/publish.py`): generate → evaluate, return the first attempt that clears
+`brief_min_claims` (D070), else regenerate up to `brief_max_attempts` (default 3) and persist the
+**best** attempt seen (most provable claims), marked failed. The publish-gate logic that lived in
+the untested `scripts/run_brief.py` was extracted here (`evaluate_brief` + the `BriefAttempt`
+dataclass) so it is unit-tested; `run_brief.py` now just calls the wrapper and prints.
+
+**Why:** Two live `--desk defense` runs twelve minutes apart on identical data diverged at the gate
+— one published with 5 provable claims, the next *failed* with 2 (5 of 6 items excluded by the
+citation eval). The synthesis model (deepseek) is non-deterministic even at temperature 0, so D069
+(faithfulness) and D070 (item-count) closed the wrong fragility's siblings but left the gate itself
+a coin-flip: on an unlucky draw a scheduled desk silently goes dark. Empirically a re-run usually
+clears it, so regenerating on failure converts the coin-flip into reliable autonomous publishing.
+Only failing desks pay the extra synthesis cost (~$ per attempt); a passing desk returns on attempt
+1. This is the last reliability gap before trustworthy cron publishing (P2 persistence / P3 UI next).
