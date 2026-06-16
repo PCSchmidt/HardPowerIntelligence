@@ -30,6 +30,7 @@ class GeneratedBrief:
     passages: list[PassageContext]
     synthesis_model: str
     model_waterfall_metadata: dict = field(default_factory=dict)
+    convergence_read: str = ""   # cross-signal analysis thesis (D071); "" if none
 
 
 async def _get_window_start(pool: asyncpg.Pool) -> datetime:
@@ -303,6 +304,7 @@ async def generate_brief(desk: str, pool: asyncpg.Pool) -> GeneratedBrief:
         passages=passages,
         synthesis_model=synthesis_model,
         model_waterfall_metadata=metadata,
+        convergence_read=parsed.get("convergence_read", "") or "",
     )
 
 

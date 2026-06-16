@@ -28,11 +28,29 @@ def build_synthesis_prompt(
     schema = json.dumps({
         "headline": "string — one-line brief title",
         "bluf": "string — 2–3 sentence bottom-line-up-front summary",
+        "convergence_read": (
+            "string — cross-signal thesis tying the day's items together, especially "
+            "Defense/AI/Energy overlaps. ANALYSIS, not new facts; no citations required. "
+            "Empty string if there is no genuine through-line."
+        ),
         "items": [
             {
                 "item_type": "award|filing|policy|macro|signal",
                 "headline": "string",
-                "body": "string — prose with [CITE:N] inline citations. Every sentence must end with at least one [CITE:N].",
+                "body": (
+                    "string — the VERIFIABLE FACT as prose with [CITE:N] inline citations. "
+                    "Every sentence must end with at least one [CITE:N]."
+                ),
+                "read": (
+                    "string — ANALYSIS: why this is material, second-order effects, who is "
+                    "exposed, comparables. Grounded in the facts + domain knowledge; introduce "
+                    "NO new concrete facts (numbers, names, dates, events) and NO [CITE:N]. "
+                    "No buy/sell advice."
+                ),
+                "watch": (
+                    "string — optional forward hook: the next catalyst, or a confirming/"
+                    "disconfirming signal to watch. Same grounding rules. Empty string if none."
+                ),
                 "entity_mentions": ["entity name strings"],
                 "citation_indices": ["integer indices of passages cited"],
             }
@@ -41,8 +59,11 @@ def build_synthesis_prompt(
 
     system = (
         f"You are a senior {persona} intelligence analyst producing the daily {desk.upper()} desk brief. "
-        "Write in a precise, factual BLUF style. Every factual claim must cite its source using [CITE:N] "
-        "where N is the passage index. Do not invent facts not supported by the provided passages. "
+        "Each item has two layers: a `body` of VERIFIABLE FACTS where every sentence cites its source with "
+        "[CITE:N], and a `read` (plus optional `watch`) of ANALYSIS — your interpretation of why the facts "
+        "matter, what they imply, and what to watch. The analysis may interpret and look forward but must "
+        "stay grounded in the facts: introduce no new concrete fact (number, name, date, event) and give no "
+        "buy/sell advice. Do not invent facts not supported by the provided passages. "
         "Return only valid JSON matching the output schema."
     )
 
@@ -59,10 +80,15 @@ def build_synthesis_prompt(
 Generate a {desk.upper()} desk BLUF brief with {max_items} items maximum (target 2–3 given the passage count).
 Prioritize high-dollar contract awards, significant filings, and policy developments.
 
-CRITICAL CITATION RULE: Every single sentence in every item body MUST end with [CITE:N].
-If a sentence does not have [CITE:N] at the end, it will be automatically failed by the evaluation system.
-Only write sentences you can directly support with a provided passage. Do not add context, background,
-or analysis that is not in the passages. One sentence per item is better than two sentences where one is uncited."""
+CRITICAL CITATION RULE (applies to `body` only): Every single sentence in every item `body` MUST end with
+[CITE:N]. If a body sentence has no [CITE:N], it is automatically dropped by the evaluation system.
+Only write body sentences you can directly support with a provided passage.
+
+ANALYSIS LAYER (`read`, `watch`, `convergence_read`): this is your interpretation, so it does NOT carry
+[CITE:N]. Say why the facts matter, the second-order implications, who is exposed, and what to watch next —
+as a decisioning lens, never buy/sell advice. It must stay grounded in the facts above: do not assert any
+new number, name, date, or event that is not in the facts. Leave a field as an empty string rather than
+padding it with fabrication."""
 
     return [
         {"role": "system", "content": system},

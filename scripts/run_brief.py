@@ -76,6 +76,29 @@ async def main(desk: str, brief_date: str) -> None:
     print(f"Provable claims: {provable_claims}")
     print(f"Eval: {'PASSED' if eval_passed else 'FAILED'} (need >= {settings.brief_min_claims} provable claims)")
 
+    # ── Layered brief (D071 prototype): facts are gated above; the read/watch/
+    # convergence layer is ANALYSIS, held only to grounding — it must add no new
+    # concrete fact vs the published facts. Print it with grounding flags so we can
+    # judge the analysis quality before persisting/rendering it (P2/P3).
+    surviving_items = [it for it in brief.items if it.get("_item_id") not in excluded_ids]
+    facts_text = "\n".join(it.get("body", "") for it in surviving_items)
+
+    async def _show_analysis(label: str, text: str) -> None:
+        text = (text or "").strip()
+        if not text:
+            return
+        verdict = await evaluator.eval_analysis(text, facts_text)
+        flag = "" if verdict.grounded else f"   [!] UNGROUNDED: {verdict.new_facts}"
+        print(f"  {label}: {text}{flag}")
+
+    print("\n--- LAYERED BRIEF (D071 prototype) ---")
+    await _show_analysis("CONVERGENCE", brief.convergence_read)
+    for i, item in enumerate(surviving_items):
+        print(f"\n[{i+1}] {item.get('headline', '')}")
+        print(f"  FACT: {item.get('body', '')}")
+        await _show_analysis("READ", item.get("read", ""))
+        await _show_analysis("WATCH", item.get("watch", ""))
+
     brief_id = await persist_brief(
         brief=brief,
         desk=desk,
