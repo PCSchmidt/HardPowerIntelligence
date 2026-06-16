@@ -10,7 +10,6 @@ verdict is encoded in each item body, so the loop logic is tested in isolation.
 from unittest.mock import AsyncMock, patch
 
 import pytest
-
 from engine.brief.generator import GeneratedBrief
 from engine.brief.publish import evaluate_brief, generate_publishable_brief
 from engine.eval.citation_eval import EvalResult
@@ -127,6 +126,51 @@ class TestGeneratePublishableBrief:
             )
         assert attempt.eval_passed is False
         assert gen.call_count == 1
+
+    @pytest.mark.asyncio
+    async def test_generation_exception_is_retried(self):
+        # First attempt raises (e.g. synthesis returned whitespace → JSON error);
+        # the loop retries and the second attempt publishes.
+        with patch(
+            "engine.brief.publish.generate_brief",
+            new=AsyncMock(side_effect=[RuntimeError("whitespace stall"), _brief("claims=3")]),
+        ) as gen:
+            attempt = await generate_publishable_brief(
+                desk="defense", pool=None, evaluator=FakeEvaluator(),
+                min_claims=3, max_attempts=3,
+            )
+        assert attempt.eval_passed is True
+        assert gen.call_count == 2
+
+    @pytest.mark.asyncio
+    async def test_all_attempts_raise_reraises_runtimeerror(self):
+        original = ValueError("provider exploded")
+        with patch(
+            "engine.brief.publish.generate_brief",
+            new=AsyncMock(side_effect=[original, original]),
+        ) as gen:
+            with pytest.raises(RuntimeError, match="after 2 attempt"):
+                await generate_publishable_brief(
+                    desk="defense", pool=None, evaluator=FakeEvaluator(),
+                    min_claims=3, max_attempts=2,
+                )
+        assert gen.call_count == 2
+
+    @pytest.mark.asyncio
+    async def test_exception_then_failed_gate_returns_best_not_crash(self):
+        # One attempt raises, the other produces a sub-floor brief — return the brief
+        # (marked failed) rather than crashing on the earlier exception.
+        with patch(
+            "engine.brief.publish.generate_brief",
+            new=AsyncMock(side_effect=[RuntimeError("stall"), _brief("claims=1")]),
+        ) as gen:
+            attempt = await generate_publishable_brief(
+                desk="defense", pool=None, evaluator=FakeEvaluator(),
+                min_claims=3, max_attempts=2,
+            )
+        assert attempt.eval_passed is False
+        assert attempt.provable_claims == 1
+        assert gen.call_count == 2
 
     @pytest.mark.asyncio
     async def test_uses_settings_defaults_when_unspecified(self):

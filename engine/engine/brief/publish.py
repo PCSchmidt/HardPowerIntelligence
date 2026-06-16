@@ -95,20 +95,38 @@ async def generate_publishable_brief(
     min_claims: int | None = None,
     max_attempts: int | None = None,
 ) -> BriefAttempt:
-    """Generate and evaluate a brief, regenerating on a failed gate (D072).
+    """Generate and evaluate a brief, regenerating on a failed gate OR a generation
+    failure (D072).
 
     Returns the first attempt that clears ``min_claims``; if none do within
     ``max_attempts``, returns the best attempt (most provable claims) so the caller
-    can still persist the strongest brief, marked failed.
+    can still persist the strongest brief, marked failed. A generation/eval *exception*
+    (e.g. the synthesis model returning a whitespace-only non-JSON body, or a transient
+    provider error) is treated as a failed attempt and retried within the same budget,
+    not propagated — so an unlucky draw can't crash an unattended desk run. If every
+    attempt raises and none produced a brief, the last exception is re-raised as a
+    RuntimeError so the caller's failure path still fires.
     """
     min_claims = settings.brief_min_claims if min_claims is None else min_claims
     max_attempts = settings.brief_max_attempts if max_attempts is None else max_attempts
     max_attempts = max(1, max_attempts)
 
     best: BriefAttempt | None = None
+    last_exc: Exception | None = None
     for attempt in range(1, max_attempts + 1):
-        brief = await generate_brief(desk=desk, pool=pool)
-        result = await evaluate_brief(brief, evaluator, min_claims)
+        try:
+            brief = await generate_brief(desk=desk, pool=pool)
+            result = await evaluate_brief(brief, evaluator, min_claims)
+        except Exception as exc:  # noqa: BLE001 — any generation/eval failure is a retryable bad draw
+            last_exc = exc
+            log.warning(
+                "brief_attempt_failed",
+                desk=desk,
+                attempt=attempt,
+                max_attempts=max_attempts,
+                error=str(exc),
+            )
+            continue
         log.info(
             "brief_attempt",
             desk=desk,
@@ -122,5 +140,10 @@ async def generate_publishable_brief(
         if best is None or result.provable_claims > best.provable_claims:
             best = result
 
-    assert best is not None  # loop runs at least once (max_attempts >= 1)
-    return best
+    if best is not None:
+        return best
+    # Every attempt raised — surface it on the caller's failure path (run_brief catches
+    # RuntimeError), chaining the original cause for diagnosis.
+    raise RuntimeError(
+        f"Brief generation failed for desk '{desk}' after {max_attempts} attempt(s)"
+    ) from last_exc

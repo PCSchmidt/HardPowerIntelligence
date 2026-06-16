@@ -1794,3 +1794,13 @@ Scope: P2a (this commit) is persistence + the grounding gate, unit-tested with e
 (240 tests). **P2b** batches the per-field eval into one call (today it's ~one eval per field, plus a
 regen call per flag) — a pure optimization, deferred. **P3** renders `read`/`watch`/`convergence_read`
 in BriefReader behind an "Analysis — HPI interpretation" label (D071 residual-risk control).
+
+**Hardening (generation exceptions, added 2026-06-16):** `generate_publishable_brief` now treats a
+generation/eval *exception* as a failed attempt and retries within the same budget, not just a
+failed claim-count gate. Motivation: a live run showed deepseek occasionally returns a
+whitespace-only, non-JSON body; litellm's configured fallback usually recovers, but if both primary
+and fallback fail the call raises (litellm `APIError`, or the `RuntimeError` from invalid JSON) —
+which `run_brief` only caught as `RuntimeError`, so an unattended desk run would crash instead of
+regenerating. The loop now catches any attempt exception, logs `brief_attempt_failed`, and retries;
+if some attempt produced a (sub-floor) brief it returns the best, and only if EVERY attempt raised
+does it re-raise as `RuntimeError` (chaining the cause) so the caller's failure path still fires.
