@@ -1823,3 +1823,30 @@ recognized. Demote-not-drop keeps the existing safety valve intact: if a desk ge
 fresh, it still produces its strongest brief rather than failing `brief_min_items` and going dark —
 honesty over novelty when forced to choose. Only *published* briefs count as "already covered"; a
 failed/superseded brief never reached a reader. Tunable: penalty 1.0 or window 0 disables the gate.
+
+## D075 — Subscription state: Lemon Squeezy webhook persistence + comp grants *(added 2026-06-16)*
+
+**Decision:** The Lemon Squeezy webhook now **persists** subscription state (it was a Gate-6 stub
+that only logged), and a comp-grant path lets us grant Pro without payment. Supporting both required
+making the `subscriptions` table provider-correct: migration `20260616000002` renames `stripe_*` →
+`ls_*`, drops `NOT NULL` on `ls_customer_id`, and adds `source TEXT CHECK (lemonsqueezy|comp)`. The
+webhook (`api/app/routers/webhooks.py`) upserts one row per `user_id` (from checkout `custom_data`)
+on `subscription_*` events — `tier='pro'`, status mapped from LS (`on_trial→trialing`, `active→active`,
+`past_due/unpaid→past_due`, `cancelled/expired/paused→cancelled`), `current_period_end` from
+`renews_at`, `source='lemonsqueezy'` — idempotent and signature-verified, degrading to
+accept-and-ignore when unconfigured (D045). Comps are a `source='comp'` row (tier pro / status active,
+no LS IDs, optional expiry) written by `scripts/grant_comp.py --email`. `resolve_tier` treats paid
+and comp identically (`tier='pro' AND status IN ('active','trialing')`).
+
+**Why:** Checkout was wired but the webhook never wrote the row, so a paying user would still
+resolve to `free` — the revenue loop was silently broken. The table was also Stripe-named (pre-D050
+leftover) and its `stripe_customer_id NOT NULL UNIQUE` made comps impossible. The table was empty
+(no subscription ever succeeded), so the rename was zero-data-risk. Comp grants are the marketing
+lever (press/VIP access) the operator asked to bake in; keeping them in the same `subscriptions`
+surface (distinguished only by `source`) means one tier-resolution path and no parallel system.
+The webhook never clobbers a comp because it always writes `source='lemonsqueezy'` on its own rows
+and comps are managed out-of-band.
+
+Operator steps to go live: `supabase db push` (apply the migration); create the LS webhook +
+`fly secrets set LEMONSQUEEZY_WEBHOOK_SECRET`; then a test-card purchase flips the account to Pro
+end-to-end. `grant_comp.py` requires DB access to `auth.users` and the user to have signed up first.

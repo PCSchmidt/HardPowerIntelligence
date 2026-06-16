@@ -588,15 +588,19 @@ Next.js or by Supabase client-side calls.
 > planned before the webhook persists rows (Gate 7/8).
 
 ```sql
+-- Provider is Lemon Squeezy (D050); columns renamed stripe_* → ls_* and made
+-- comp-compatible by migration 20260616000002 (D075). Reflected below.
 CREATE TABLE subscriptions (
     id                      UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id                 UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
-    stripe_customer_id      TEXT NOT NULL UNIQUE,
-    stripe_subscription_id  TEXT UNIQUE,
+    ls_customer_id          TEXT UNIQUE,        -- nullable: comps have no LS customer
+    ls_subscription_id      TEXT UNIQUE,
     tier                    TEXT NOT NULL DEFAULT 'free'
                                 CHECK (tier IN ('free', 'pro')),
     status                  TEXT NOT NULL DEFAULT 'active'
                                 CHECK (status IN ('active', 'past_due', 'cancelled', 'trialing')),
+    source                  TEXT NOT NULL DEFAULT 'lemonsqueezy'
+                                CHECK (source IN ('lemonsqueezy', 'comp')),  -- paid vs comped (D075)
     current_period_start    TIMESTAMPTZ,
     current_period_end      TIMESTAMPTZ,
     cancelled_at            TIMESTAMPTZ,
@@ -606,12 +610,17 @@ CREATE TABLE subscriptions (
 
 CREATE UNIQUE INDEX subscriptions_user_id
     ON subscriptions (user_id);     -- one subscription row per user
-CREATE INDEX subscriptions_stripe_customer
-    ON subscriptions (stripe_customer_id);
-CREATE INDEX subscriptions_stripe_subscription
-    ON subscriptions (stripe_subscription_id)
-    WHERE stripe_subscription_id IS NOT NULL;
+CREATE INDEX subscriptions_ls_customer
+    ON subscriptions (ls_customer_id);
+CREATE INDEX subscriptions_ls_subscription
+    ON subscriptions (ls_subscription_id)
+    WHERE ls_subscription_id IS NOT NULL;
 ```
+
+The Lemon Squeezy webhook (`/v1/webhooks/lemon-squeezy`) upserts this table on
+`subscription_*` events keyed by `user_id` (from checkout `custom_data`); comps are
+granted via `scripts/grant_comp.py` (source='comp', no LS IDs). `resolve_tier` grants
+Pro when `tier='pro' AND status IN ('active','trialing')` — identical for paid and comp.
 
 ---
 
