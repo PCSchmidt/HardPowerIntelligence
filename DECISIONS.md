@@ -1737,3 +1737,17 @@ yet. **P1b** synthesis prompt + generator emit the layered fields; **P1c** run_b
 two-tier eval and prints the layered brief to validate quality on one desk before **P2** persistence
 (migration: `read`/`watch` on items, `convergence_read` on briefs) and **P3** BriefReader drill-down
 UI. Validated at the print level before schema/UI so the eval-rework risk is retired cheaply.
+
+**Calibration (analyst voice, after the first live P1 run):** the first prototype run showed the
+guardrail mis-tuned — it flagged *legitimate* analytical context (real DoD programs like Replicator/
+JADC2, end-uses like "rare earths in radar/EW") as fabrication, which is the analytical value, not
+a violation. Per operator, the analysis layer uses an **analyst voice**: `eval_analysis` now flags
+ONLY *fabricated specifics about the cited subjects* (a wrong/invented amount, date, or quantity; or
+asserting as definite a contract/award/event the facts don't support); general domain knowledge,
+naming real programs/agencies/end-uses as context, and hedged speculation are allowed. Residual risk
+is carried by an "Analysis — HPI interpretation" label (P3 UI) + the not-advice disclaimer (D063).
+The same run also exposed that analysis must be grounded against the **rich** fact set (item
+headlines + source-passage excerpts), not just the citation-trimmed body — D069 trimming can strip a
+subject (e.g. the awardee/amount) from the body, which would otherwise read as a fabrication.
+Separately noted: that trimming can leave a semantically thin published fact (an award's period
+without its subject) — a D069 refinement to revisit.

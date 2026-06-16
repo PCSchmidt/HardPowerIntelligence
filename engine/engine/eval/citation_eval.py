@@ -36,12 +36,15 @@ class EvalResult:
 
 @dataclass
 class AnalysisEvalResult:
-    """Verdict for the analysis layer of a layered brief (D071).
+    """Verdict for the analysis layer of a layered brief (D071, analyst voice).
 
-    The analysis ('read'/'watch'/'convergence_read') is interpretation, not a cited
-    claim, so it is NOT held to per-sentence citation. The only bar is grounding:
-    it must not assert a concrete fact (number, named entity, date, specific event)
-    absent from the cited fact set. ``new_facts`` lists any such fabrications."""
+    The analysis ('read'/'watch'/'convergence_read') is a domain analyst's
+    interpretation, so it is NOT held to per-sentence citation and IS expected to
+    bring real-world domain context (real programs/agencies/end-uses) and hedged
+    forward inference. The only bar is no **fabricated specifics about the cited
+    subjects**: a wrong/invented dollar amount, date, or quantity, or asserting as
+    definite a contract/award/event the facts don't support. ``new_facts`` lists
+    those fabrications (general domain context and hedged speculation are allowed)."""
     grounded: bool
     new_facts: list[str]
 
@@ -195,14 +198,15 @@ class CitationEvaluator:
         return sum(r.claims_passing for r in results if not r.excluded)
 
     async def eval_analysis(self, analysis: str, facts: str) -> AnalysisEvalResult:
-        """Ground the analysis layer against the cited facts (D071).
+        """Ground the analysis layer against the cited facts (D071, analyst voice).
 
-        Unlike :meth:`eval_item`, this does not require citations — analysis is
-        interpretation. It checks one thing: the analysis introduces no concrete
-        fact (number, dollar amount, named company/agency/person, date, or specific
-        event) that isn't present in or directly derivable from ``facts``.
-        Interpretation, implication, comparison, and forward-looking framing are
-        allowed. Returns the offending claims (empty → grounded)."""
+        Unlike :meth:`eval_item`, this does not require citations — analysis is a
+        domain analyst's interpretation, and bringing real-world context is the
+        point. It flags ONLY fabricated specifics about the cited subjects (a
+        wrong/invented amount, date, or quantity; asserting as definite a
+        contract/award/event the facts don't support). Domain knowledge, naming real
+        programs/agencies/end-uses as context, and hedged speculation are allowed.
+        Returns the fabrications (empty → grounded)."""
         if not analysis.strip():
             return AnalysisEvalResult(grounded=True, new_facts=[])
 
@@ -210,13 +214,18 @@ class CitationEvaluator:
             {
                 "role": "system",
                 "content": (
-                    "You check whether ANALYSIS for an investment-research brief stays "
-                    "grounded in a set of VERIFIED FACTS. The analysis MAY interpret, "
-                    "contextualize, draw implications, compare, and look forward. It MUST "
-                    "NOT introduce any new concrete fact — a specific number, dollar "
-                    "amount, named company/agency/person, date, or specific event — that "
-                    "is not present in or directly derivable from the verified facts. "
-                    "List every such unsupported concrete fact (empty list if none). "
+                    "You review an ANALYSIS written for an investment-research brief by a "
+                    "domain analyst, against a set of VERIFIED FACTS. The analyst is EXPECTED "
+                    "to add what the facts alone don't: interpretation, real-world domain "
+                    "context (naming actual government programs, agencies, or end-use "
+                    "applications), comparisons, and clearly-hedged forward-looking inference "
+                    "('could', 'may', 'likely'). All of that is allowed and good. Flag ONLY a "
+                    "claim that fabricates a SPECIFIC, checkable fact about the cited subjects: "
+                    "a dollar amount, date, or quantity that contradicts or isn't in the facts, "
+                    "or stating as definite that a particular contract, award, partnership, or "
+                    "event has occurred when the facts don't support it. Do NOT flag general "
+                    "domain knowledge, real program/agency names used as context or possibility, "
+                    "or hedged speculation. List only genuine fabrications (empty list if none). "
                     'Return only JSON: {"new_facts": ["..."]}'
                 ),
             },

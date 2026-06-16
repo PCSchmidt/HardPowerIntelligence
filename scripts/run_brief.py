@@ -81,7 +81,18 @@ async def main(desk: str, brief_date: str) -> None:
     # concrete fact vs the published facts. Print it with grounding flags so we can
     # judge the analysis quality before persisting/rendering it (P2/P3).
     surviving_items = [it for it in brief.items if it.get("_item_id") not in excluded_ids]
-    facts_text = "\n".join(it.get("body", "") for it in surviving_items)
+    # Ground analysis against the RICH fact set — item headlines + bodies + the source
+    # passage excerpts — not just the trimmed body, so a subject the citation gate
+    # stripped from the body (e.g. the awardee/amount) is still present for grounding.
+    facts_text = "\n".join(
+        part
+        for part in (
+            [it.get("headline", "") for it in surviving_items]
+            + [it.get("body", "") for it in surviving_items]
+            + [p.excerpt for p in brief.passages]
+        )
+        if part
+    )
 
     async def _show_analysis(label: str, text: str) -> None:
         text = (text or "").strip()
