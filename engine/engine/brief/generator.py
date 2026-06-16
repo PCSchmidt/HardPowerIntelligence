@@ -144,6 +144,54 @@ async def _score_candidates(
     return sorted(scored, key=lambda x: x[1], reverse=True)
 
 
+def _novelty_key(row: dict) -> str:
+    """Stable identity for anti-rehash dedup: source + external native id (D074).
+
+    native_id (e.g. an award number or 8-K accession) is stable across re-ingestion,
+    unlike raw_record_id, so a long-lived item is recognized even if re-fetched."""
+    return f"{row.get('source_id', '')}:{row.get('native_id', '')}"
+
+
+async def _recently_featured(pool: asyncpg.Pool, desk: str, window_days: int) -> set[str]:
+    """``_novelty_key`` set for records cited in this desk's PUBLISHED briefs within the
+    last ``window_days`` (D074). Only published briefs count — a failed/superseded brief
+    never reached a reader, so its items aren't "already covered"."""
+    if window_days <= 0:
+        return set()
+    async with pool.acquire() as conn:
+        rows = await conn.fetch(
+            """
+            SELECT DISTINCT c.source_id, c.native_id
+            FROM citations c
+            JOIN briefs b ON b.id = c.brief_id
+            WHERE b.desk = $1 AND b.status = 'published' AND b.date >= $2
+            """,
+            desk,
+            date.today() - timedelta(days=window_days),
+        )
+    return {f"{r['source_id']}:{r['native_id']}" for r in rows}
+
+
+def apply_novelty_penalty(
+    candidates: list[tuple[dict, float]],
+    featured_keys: set[str],
+    penalty: float,
+) -> list[tuple[dict, float]]:
+    """Down-rank recently-featured records, then re-sort by adjusted score (D074).
+
+    Multiplies the materiality score of any candidate already featured in a recent
+    published brief by ``penalty`` (<1), so fresh items lead. It demotes rather than
+    drops, so a long-lived item still re-leads when nothing fresher is material —
+    keeping the brief honest (no rehash) without ever forcing it empty."""
+    if not featured_keys or penalty >= 1.0:
+        return candidates
+    adjusted = [
+        (row, score * penalty if _novelty_key(row) in featured_keys else score)
+        for row, score in candidates
+    ]
+    return sorted(adjusted, key=lambda x: x[1], reverse=True)
+
+
 def _select_facts(
     candidates: list[tuple[dict, float]],
     limit: int,
@@ -216,6 +264,11 @@ async def generate_brief(desk: str, pool: asyncpg.Pool) -> GeneratedBrief:
     # Done first so retrieval can be seeded by the most material records and the
     # citation pool can be aligned to the facts we actually write about (D068).
     candidates = await _score_candidates(pool, since, desk)
+    # Anti-rehash (D074): down-rank records already featured in recent published briefs
+    # so a long-lived item (e.g. a multi-year award) doesn't lead the brief day after day.
+    featured = await _recently_featured(pool, desk, settings.novelty_window_days)
+    candidates = apply_novelty_penalty(candidates, featured, settings.novelty_penalty)
+    log.info("novelty_applied", desk=desk, featured_records=len(featured))
     if len(candidates) < settings.brief_min_items:
         raise RuntimeError(
             f"Only {len(candidates)} material candidates — below BRIEF_MIN_ITEMS={settings.brief_min_items}"

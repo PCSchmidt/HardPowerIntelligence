@@ -66,6 +66,14 @@ class Settings(BaseSettings):
         '"geography":0.55,"segment":0.7}'
     )
 
+    # Novelty / anti-rehash (D074): down-rank a record whose (source_id, native_id) was
+    # already cited in a PUBLISHED brief for this desk within the last
+    # ``novelty_window_days`` by multiplying its materiality score by ``novelty_penalty``.
+    # Demotes (doesn't drop) so a long-lived item only re-leads when nothing fresher
+    # exists. penalty 1.0 disables; window 0 disables.
+    novelty_window_days: int = 7
+    novelty_penalty: float = 0.5
+
     # Brief generation (D039, D040)
     brief_max_items: int = 8
     brief_min_items: int = 3

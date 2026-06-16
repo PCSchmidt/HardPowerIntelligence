@@ -1804,3 +1804,22 @@ which `run_brief` only caught as `RuntimeError`, so an unattended desk run would
 regenerating. The loop now catches any attempt exception, logs `brief_attempt_failed`, and retries;
 if some attempt produced a (sub-floor) brief it returns the best, and only if EVERY attempt raised
 does it re-raise as `RuntimeError` (chaining the cause) so the caller's failure path still fires.
+
+## D074 — Novelty / anti-rehash gate *(added 2026-06-16)*
+
+**Decision:** Before fact selection, `generate_brief` down-ranks any candidate record whose
+`(source_id, native_id)` was already cited in a **published** brief for that desk within the last
+`novelty_window_days` (default 7), by multiplying its materiality score by `novelty_penalty`
+(default 0.5) and re-sorting (`apply_novelty_penalty` + `_recently_featured` in
+`engine/brief/generator.py`). It demotes, it does not drop: a long-lived item can still re-lead when
+nothing fresher is material, so the brief is never forced empty by the gate.
+
+**Why:** The daily window already scopes to records ingested since the last publish (`_get_window_start`),
+but long-lived records re-surface — the $22.4B Boeing/NASA award led the defense brief on multiple
+consecutive days because it keeps re-scoring material whenever re-ingested. For a *daily* product
+that reads as rehash, which kills credibility. Keying on `native_id` (a stable external id — award
+number, 8-K accession) rather than `raw_record_id` means re-ingestion of the same item is still
+recognized. Demote-not-drop keeps the existing safety valve intact: if a desk genuinely has nothing
+fresh, it still produces its strongest brief rather than failing `brief_min_items` and going dark —
+honesty over novelty when forced to choose. Only *published* briefs count as "already covered"; a
+failed/superseded brief never reached a reader. Tunable: penalty 1.0 or window 0 disables the gate.
