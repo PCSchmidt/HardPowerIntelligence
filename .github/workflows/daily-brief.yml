@@ -3,8 +3,8 @@
 # Two steps: (1) scripts/run_ingest.py pulls FRESH government data from live source APIs
 # into raw_records/normalized_records, embeds new chunks, advances cursors, and prunes the
 # hot window (D004, D055); (2) scripts/run_brief.py synthesizes + evals + publishes the
-# brief from that fresh data. The cron is still commented by default — enable it once you
-# have enough registered sources that a daily run is worth the LLM cost (D006).
+# brief from that fresh data. A scheduled run ingests once, then publishes ALL THREE desks
+# (defense/ai/energy); a manual workflow_dispatch publishes just the chosen desk (ad-hoc).
 #
 # Required repo secrets (gh secret set ...): DATABASE_URL, OPENROUTER_API_KEY,
 # OPENAI_API_KEY, and optionally ANTHROPIC_API_KEY.
@@ -23,9 +23,10 @@ on:
         description: "Skip ingestion (regenerate from existing data only)"
         default: false
         type: boolean
-  # Enable once enough sources are registered to make a daily run worth the LLM cost:
-  # schedule:
-  #   - cron: "0 11 * * *"   # 11:00 UTC daily (≈ 6-7am ET); adjust to your cadence
+  schedule:
+    # 09:00 UTC daily (~5am ET) so the ~15-min ingest+3-desk run finishes before the
+    # site's "5:30am ET" promise. Adjust to your cadence (and keep the copy in sync).
+    - cron: "0 9 * * *"
 
 concurrency:
   group: daily-brief
@@ -53,10 +54,24 @@ jobs:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
         run: uv run python scripts/run_ingest.py
 
-      - name: Generate + eval + publish brief
+      - name: Generate + eval + publish brief(s)
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-        run: uv run python scripts/run_brief.py --desk "${{ inputs.desk || 'defense' }}"
+        run: |
+          # Scheduled run publishes every desk off the single ingest above; a manual
+          # dispatch publishes just the chosen desk.
+          if [ "${{ github.event_name }}" = "schedule" ]; then
+            DESKS="defense ai energy"
+          else
+            DESKS="${{ inputs.desk || 'defense' }}"
+          fi
+          fail=0
+          for d in $DESKS; do
+            echo "::group::brief $d"
+            uv run python scripts/run_brief.py --desk "$d" || fail=1
+            echo "::endgroup::"
+          done
+          exit $fail   # attempt all desks, then surface a failure if any desk failed
