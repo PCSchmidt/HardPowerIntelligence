@@ -12,8 +12,8 @@ import { cn } from "@/lib/utils";
 
 const DESKS = [
   { label: "Defense", href: "/desk/defense", active: true },
-  { label: "Energy", href: "#", active: false },
-  { label: "AI Infrastructure", href: "#", active: false },
+  { label: "Energy", href: "/desk/energy", active: true },
+  { label: "AI Infrastructure", href: "/desk/ai", active: true },
 ];
 
 export function NavBar() {
