@@ -340,13 +340,13 @@ async def persist_brief(
             await conn.execute(
                 """
                 INSERT INTO briefs (
-                    id, desk, date, status, headline, bluf,
+                    id, desk, date, status, headline, bluf, convergence_read,
                     faithfulness_score, eval_passed, published_at,
                     synthesis_model, model_waterfall_metadata
-                ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
+                ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
                 """,
                 brief_id, desk, brief_date, status,
-                brief.headline, brief.bluf,
+                brief.headline, brief.bluf, brief.convergence_read,
                 faithfulness_score, eval_passed, published_at,
                 brief.synthesis_model,
                 json.dumps(brief.model_waterfall_metadata),
@@ -357,14 +357,16 @@ async def persist_brief(
                 await conn.execute(
                     """
                     INSERT INTO brief_items (
-                        id, brief_id, item_type, headline, body,
+                        id, brief_id, item_type, headline, body, read, watch,
                         entity_ids, display_order
-                    ) VALUES ($1,$2,$3,$4,$5,$6,$7)
+                    ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
                     """,
                     item_id, brief_id,
                     item.get("item_type", "signal"),
                     item.get("headline", ""),
                     item.get("body", ""),
+                    item.get("read", ""),    # analysis layer, grounded gate applied (D073)
+                    item.get("watch", ""),
                     [],   # entity_ids resolved in Gate 6 after entity graph is seeded
                     i,
                 )

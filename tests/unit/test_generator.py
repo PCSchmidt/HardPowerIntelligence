@@ -74,3 +74,24 @@ async def test_persist_failed_brief_also_replaces():
         pool=FakePool(conn),
     )
     assert any("DELETE FROM briefs" in s for s in conn.executed)
+
+
+async def test_persist_writes_layered_fields():
+    # D073: the analysis layer (convergence_read / read / watch) is persisted.
+    conn = FakeConn()
+    brief = GeneratedBrief(
+        headline="H", bluf="B",
+        items=[{"item_type": "filing", "headline": "i0", "body": "b0",
+                "read": "R0", "watch": "W0", "citation_indices": []}],
+        passages=[], synthesis_model="m", model_waterfall_metadata={},
+        convergence_read="Cross-desk thesis.",
+    )
+    await persist_brief(
+        brief=brief, desk="defense", brief_date="2026-06-14",
+        faithfulness_score=1.0, eval_passed=True, excluded_item_ids=set(),
+        pool=FakePool(conn),
+    )
+    briefs_insert = next(s for s in conn.executed if "INSERT INTO briefs" in s)
+    items_insert = next(s for s in conn.executed if "INSERT INTO brief_items" in s)
+    assert "convergence_read" in briefs_insert
+    assert "read" in items_insert and "watch" in items_insert

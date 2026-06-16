@@ -17,6 +17,7 @@ from datetime import date
 
 sys.path.insert(0, "engine")
 
+from engine.brief.analysis import ground_brief_analysis
 from engine.brief.generator import persist_brief
 from engine.brief.publish import generate_publishable_brief
 from engine.db import create_pool
@@ -85,21 +86,27 @@ async def main(desk: str, brief_date: str) -> None:
         if part
     )
 
-    async def _show_analysis(label: str, text: str) -> None:
-        text = (text or "").strip()
-        if not text:
-            return
-        verdict = await evaluator.eval_analysis(text, facts_text)
-        flag = "" if verdict.grounded else f"   [!] UNGROUNDED: {verdict.new_facts}"
-        print(f"  {label}: {text}{flag}")
+    # Grounding gate (D073): regenerate-then-omit any analysis field that fabricates a
+    # specific, so only grounded analysis is persisted/rendered. Mutates brief in place.
+    report = await ground_brief_analysis(brief, surviving_items, facts_text, evaluator)
+    status_by_label = {r.label: r for r in report}
 
-    print("\n--- LAYERED BRIEF (D071 prototype) ---")
-    await _show_analysis("CONVERGENCE", brief.convergence_read)
+    def _show(label: str, text: str, key: str) -> None:
+        text = (text or "").strip()
+        res = status_by_label.get(key)
+        tag = f" [{res.status}]" if res and res.status in ("regenerated", "omitted") else ""
+        if res and res.status == "omitted":
+            print(f"  {label}: (omitted — fabricated: {res.fabrications})")
+        elif text:
+            print(f"  {label}{tag}: {text}")
+
+    print("\n--- LAYERED BRIEF (D071/D073) ---")
+    _show("CONVERGENCE", brief.convergence_read, "convergence_read")
     for i, item in enumerate(surviving_items):
         print(f"\n[{i+1}] {item.get('headline', '')}")
         print(f"  FACT: {item.get('body', '')}")
-        await _show_analysis("READ", item.get("read", ""))
-        await _show_analysis("WATCH", item.get("watch", ""))
+        _show("READ", item.get("read", ""), f"item{i}.read")
+        _show("WATCH", item.get("watch", ""), f"item{i}.watch")
 
     brief_id = await persist_brief(
         brief=brief,

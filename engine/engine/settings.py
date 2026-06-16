@@ -82,6 +82,10 @@ class Settings(BaseSettings):
     # gate failure is often a bad draw a re-run clears. Regenerate up to this many
     # times before persisting the best attempt as failed. 1 disables retries.
     brief_max_attempts: int = 3
+    # Analysis grounding gate (D073): when eval_analysis flags an analysis field as
+    # fabricating a specific, rewrite it this many times before omitting it. 0 omits
+    # immediately (no regeneration).
+    analysis_max_regen: int = 1
 
     # RAG retrieval (D031)
     rag_passage_top_k: int = 20

@@ -1769,3 +1769,28 @@ a coin-flip: on an unlucky draw a scheduled desk silently goes dark. Empirically
 clears it, so regenerating on failure converts the coin-flip into reliable autonomous publishing.
 Only failing desks pay the extra synthesis cost (~$ per attempt); a passing desk returns on attempt
 1. This is the last reliability gap before trustworthy cron publishing (P2 persistence / P3 UI next).
+
+## D073 — Persist the layered analysis layer behind a grounding gate *(added 2026-06-16)*
+
+**Decision:** The analysis layer (per-item `read`/`watch`, brief-level `convergence_read`) is now
+persisted (migration `20260616000001`: `read`/`watch` on `brief_items`, `convergence_read` on
+`briefs`, all `NOT NULL DEFAULT ''`) so it can be rendered (P3). Before persistence every analysis
+field passes a **regenerate-then-omit** grounding gate (`engine/brief/analysis.py:ground_brief_analysis`):
+if `eval_analysis` (D071 analyst voice) flags a field for fabricating a specific, rewrite it once
+(`analysis_max_regen`=1) to strip the fabrication while keeping the analyst voice, re-check, and if
+it still doesn't ground, store `""`. So a persisted/rendered analysis field is **always grounded** —
+an empty field means analysis was withheld, never that a fabrication reached the reader.
+
+**Why:** P1 validated the layered *form* and the analyst-voice eval, but two live runs showed the
+synthesis reliably re-invents the same checkable specific (a "CARLA-VR integration" not in the cited
+paper). The eval catches it every time, so the missing piece before rendering is a gate that *acts*
+on the flag. Operator chose regenerate-then-omit (over omit-immediately or persist-with-a-flag): it
+preserves an otherwise-good read by stripping just the bad specific, and only spends an extra LLM
+call when a field is actually flagged — mirroring D069 (trim facts to the provable) and D072
+(regenerate the brief on a bad draw). This is the trust model extended to analysis: never publish
+unprovable content, whether it's a fact (citation gate) or an interpretation (grounding gate).
+
+Scope: P2a (this commit) is persistence + the grounding gate, unit-tested with eval/LLM mocked
+(240 tests). **P2b** batches the per-field eval into one call (today it's ~one eval per field, plus a
+regen call per flag) — a pure optimization, deferred. **P3** renders `read`/`watch`/`convergence_read`
+in BriefReader behind an "Analysis — HPI interpretation" label (D071 residual-risk control).
