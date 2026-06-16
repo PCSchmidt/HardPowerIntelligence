@@ -1,4 +1,4 @@
-import { AlertTriangle } from "lucide-react";
+import { AlertTriangle, Sparkles } from "lucide-react";
 import type { Brief } from "@/lib/types";
 import { BriefHeader } from "./brief-header";
 import { BriefContent } from "./brief-content";
@@ -15,6 +15,15 @@ export function BriefReader({ brief }: { brief: Brief }) {
         </div>
       )}
       <BriefHeader brief={brief} />
+      {brief.convergence_read && (
+        <section className="mt-8 rounded-md border border-brand-secondary/30 bg-muted/40 p-5">
+          <div className="mb-2 flex items-center gap-2 text-ui-xs font-medium uppercase tracking-wide text-brand-secondary">
+            <Sparkles size={14} className="shrink-0" />
+            Convergence — HPI interpretation
+          </div>
+          <p className="prose-brief text-foreground">{brief.convergence_read}</p>
+        </section>
+      )}
       <BriefContent items={brief.items} citations={brief.citations} />
       <footer className="mt-8 border-t border-border pt-4 text-ui-sm text-muted-foreground">
         {brief.model_waterfall.synthesis_model && (

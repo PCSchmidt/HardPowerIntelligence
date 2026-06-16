@@ -27,6 +27,10 @@ export interface BriefItem {
   item_type: ItemType;
   headline: string;
   body: string;
+  // Analysis layer (D071/D073): grounded HPI interpretation. Empty string when the
+  // grounding gate withheld it — render nothing, never a placeholder.
+  read: string;
+  watch: string;
   entity_ids: string[];
   citation_ids: string[];
   materiality_score: number | null;
@@ -47,6 +51,8 @@ export interface Brief {
   published_at: string | null;
   headline: string | null;
   bluf: string | null;
+  // Cross-signal thesis tying the day's items together (D071/D073). "" if none.
+  convergence_read: string;
   faithfulness_score: number | null;
   staleness_indicator: StalenessIndicator | null;
   items: BriefItem[];

@@ -24,7 +24,8 @@ def _validate_desk(desk: str) -> None:
 async def _assemble_brief(conn: asyncpg.Connection, brief: asyncpg.Record, staleness: dict | None = None) -> dict:
     items = await conn.fetch(
         """
-        SELECT id, item_type, headline, body, entity_ids, materiality_score, display_order
+        SELECT id, item_type, headline, body, read, watch,
+               entity_ids, materiality_score, display_order
         FROM brief_items WHERE brief_id = $1 ORDER BY display_order
         """,
         brief["id"],
@@ -53,6 +54,8 @@ async def _assemble_brief(conn: asyncpg.Connection, brief: asyncpg.Record, stale
         "headline": brief["headline"],
         "bluf": brief["bluf"],
         "faithfulness_score": brief["faithfulness_score"],
+        # Cross-signal analysis thesis (D071/D073); grounded gate applied at persist.
+        "convergence_read": brief["convergence_read"],
         "staleness_indicator": staleness,
         "items": [
             {
@@ -60,6 +63,9 @@ async def _assemble_brief(conn: asyncpg.Connection, brief: asyncpg.Record, stale
                 "item_type": it["item_type"],
                 "headline": it["headline"],
                 "body": it["body"],
+                # Analysis layer (D071/D073): grounded interpretation, "" if withheld.
+                "read": it["read"],
+                "watch": it["watch"],
                 "entity_ids": [str(e) for e in (it["entity_ids"] or [])],
                 "citation_ids": cit_ids_by_item.get(str(it["id"]), []),
                 "materiality_score": it["materiality_score"],
