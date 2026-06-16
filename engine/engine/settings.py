@@ -74,6 +74,10 @@ class Settings(BaseSettings):
     # (research_paper) records so high-$ capital doesn't crowd out the technology
     # leg of a brief (D063). 0 disables the floor.
     brief_advancement_floor: int = 3
+    # Publish gate (D070): a brief publishes when it has >= this many provable
+    # (LLM-supported) claims. Counts claims, not items, so it's stable whether
+    # synthesis consolidates facts into few dense items or many thin ones.
+    brief_min_claims: int = 3
 
     # RAG retrieval (D031)
     rag_passage_top_k: int = 20

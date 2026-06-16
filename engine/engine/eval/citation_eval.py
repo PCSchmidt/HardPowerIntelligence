@@ -173,3 +173,11 @@ class CitationEvaluator:
         total = sum(r.claims_total for r in surviving)
         passing = sum(r.claims_passing for r in surviving)
         return passing / total if total else 0.0
+
+    def provable_claim_count(self, results: list[EvalResult]) -> int:
+        """Total individually-supported claims across surviving items (D070).
+
+        The publish gate counts provable *claims*, not items, because the synthesis
+        non-deterministically packs the same facts into few dense items or many thin
+        ones — claim count is stable to that, item count is not."""
+        return sum(r.claims_passing for r in results if not r.excluded)

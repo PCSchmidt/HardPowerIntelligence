@@ -202,6 +202,49 @@ class TestCitationEvaluator:
         assert evaluator.brief_faithfulness_score(item_results) == 0.0
 
 
+class TestProvableClaimCount:
+    """D070: publish gate counts provable claims, not items, so it's stable whether
+    synthesis consolidates facts into few dense items or expands to many thin ones."""
+
+    def _ev(self):
+        return CitationEvaluator(eval_model="m")
+
+    def test_sums_passing_over_surviving(self):
+        # Two dense items (3 + 6 provable) == 9, same as if spread over nine items.
+        results = [
+            EvalResult(item_id="i1", excluded=False, claims_total=3, claims_passing=3, faithfulness_score=1.0),
+            EvalResult(item_id="i2", excluded=False, claims_total=6, claims_passing=6, faithfulness_score=1.0),
+        ]
+        assert self._ev().provable_claim_count(results) == 9
+
+    def test_excluded_items_dont_count(self):
+        results = [
+            EvalResult(item_id="i1", excluded=False, claims_total=2, claims_passing=2, faithfulness_score=1.0),
+            EvalResult(item_id="i2", excluded=True, claims_total=3, claims_passing=0, faithfulness_score=0.0),
+        ]
+        assert self._ev().provable_claim_count(results) == 2
+
+    def test_trimmed_item_counts_only_supported_claims(self):
+        # A partially over-claimed item (4 written, 1 supported) contributes 1.
+        results = [
+            EvalResult(item_id="i1", excluded=False, claims_total=4, claims_passing=1, faithfulness_score=0.25),
+        ]
+        assert self._ev().provable_claim_count(results) == 1
+
+    def test_stable_across_consolidation_vs_expansion(self):
+        # Same 6 facts, packed as 1 dense item or 6 thin items → identical count.
+        dense = [EvalResult(item_id="d", excluded=False, claims_total=6, claims_passing=6, faithfulness_score=1.0)]
+        expanded = [
+            EvalResult(item_id=f"e{i}", excluded=False, claims_total=1, claims_passing=1, faithfulness_score=1.0)
+            for i in range(6)
+        ]
+        ev = self._ev()
+        assert ev.provable_claim_count(dense) == ev.provable_claim_count(expanded) == 6
+
+    def test_empty_results_zero(self):
+        assert self._ev().provable_claim_count([]) == 0
+
+
 class TestCleanedBody:
     """D069: eval_item returns a cleaned_body of only the individually-supported,
     cited sentences, so a partially over-claimed item is trimmed rather than

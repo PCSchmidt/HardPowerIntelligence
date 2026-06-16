@@ -62,16 +62,19 @@ async def main(desk: str, brief_date: str) -> None:
             print(f"  [{i+1}] score={result.faithfulness_score:.2f}{trimmed}: {item.get('headline', '')[:60]}")
 
     surviving = len(item_results) - len(excluded_ids)
-    # Faithfulness is now guaranteed by construction — only LLM-supported sentences
-    # are published — so publication gates on having enough *provable* items, not on
-    # an aggregate-score threshold that flipped pass/fail on identical data (D069).
+    # Faithfulness is guaranteed by construction — only LLM-supported sentences are
+    # published (D069). Publication gates on provable *claims*, not items, because
+    # synthesis non-deterministically packs the same facts into few dense items or
+    # many thin ones; claim count is stable to that, item count is not (D070).
+    provable_claims = evaluator.provable_claim_count(item_results)
     score = 1.0 if surviving else 0.0
-    eval_passed = surviving >= settings.brief_min_items
+    eval_passed = provable_claims >= settings.brief_min_claims
 
     pre_clean = evaluator.brief_faithfulness_score(item_results)
     print(f"\nPublished faithfulness: {score:.3f} | pre-clean synthesis: {pre_clean:.3f}")
     print(f"Items: {len(item_results)} generated, {len(excluded_ids)} excluded, {surviving} surviving")
-    print(f"Eval: {'PASSED' if eval_passed else 'FAILED'} (need >= {settings.brief_min_items} provable items)")
+    print(f"Provable claims: {provable_claims}")
+    print(f"Eval: {'PASSED' if eval_passed else 'FAILED'} (need >= {settings.brief_min_claims} provable claims)")
 
     brief_id = await persist_brief(
         brief=brief,

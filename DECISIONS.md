@@ -1685,3 +1685,25 @@ retry only covers pool creation, D057). Validated: 215 tests pass (6 new — cle
 transient_retry). Trade-off: dropping the 0.95 aggregate gate means the stored faithfulness_score
 is no longer the publish gate; it's retained as a quality metric. Follow-up still open from D068
 (research-novelty materiality weighting) and D067 (EDGAR body extraction).
+
+---
+
+## D070 — Publish gate counts provable claims, not items *(added 2026-06-16)*
+
+**Decision:** A brief publishes when it has `>= brief_min_claims` (default 3) **provable claims**
+— the sum of LLM-supported claims across surviving items (`CitationEvaluator.provable_claim_count`)
+— replacing the `surviving_items >= brief_min_items` gate in `run_brief`. `brief_min_items` is
+kept, but only for its other role: the minimum *material candidates* required to attempt a brief
+(the `generate_brief` guard).
+
+**Why:** D069 removed the faithfulness coin-flip, but the live re-runs showed the fragility had
+just moved to item *count*. The synthesis (deepseek, non-deterministic even at temperature 0)
+packs the same facts into **few dense items or many thin ones** run-to-run: Energy published as 2
+items carrying 9 claims, Defense as 8 items of 1 claim each. Gating on item count left Energy
+sitting right at the minimum — a heavier-consolidation run could publish 1 item of 9 claims and
+*fail* an item-count gate despite being substantive. Counting claims is invariant to how synthesis
+distributes facts across items, so the gate measures substance, not packaging, and an autonomous
+run won't flake on the consolidation lottery. Claims are already verified (D069), so this counts
+only provable content. Validated: 220 tests pass (5 new). Minor residual risk: many claims about a
+single record could inflate the count; distinct-cited-records would be even more robust and is a
+possible future refinement. This was the last fragility before enabling autonomous daily publishing.
