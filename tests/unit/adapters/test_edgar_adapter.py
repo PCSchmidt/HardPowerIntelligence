@@ -2,7 +2,6 @@
 Fixture mirrors a real EFTS response — no network calls.
 """
 import pytest
-
 from engine.adapters.edgar import EDGARFullTextAdapter
 
 
@@ -140,3 +139,44 @@ class TestProbesAndDesks:
 
     def test_headers_include_user_agent(self):
         assert "User-Agent" in EDGARFullTextAdapter().headers
+
+
+class TestWidenedProbes:
+    """The widened probe set (D077) — breadth without breaking pinned positions."""
+
+    def test_probe_set_widened(self):
+        # Was 8; widening must materially increase coverage.
+        assert EDGARFullTextAdapter().probe_count >= 30
+
+    def test_max_pages_matches_probe_count(self):
+        # The runner reads adapter.max_pages so the global cap doesn't truncate probes.
+        adapter = EDGARFullTextAdapter()
+        assert adapter.max_pages == adapter.probe_count
+
+    def test_first_eight_probes_unchanged(self):
+        adapter = EDGARFullTextAdapter()
+        expected = [
+            '"small modular reactor"',
+            '"high-assay low-enriched uranium"',
+            '"hyperscale data center"',
+            '"directed energy weapon"',
+            '"counter-unmanned aircraft"',
+            '"hypersonic"',
+            '"autonomous weapon"',
+            '"rare earth"',
+        ]
+        for page, q in enumerate(expected, start=1):
+            assert adapter.build_request_payload(cursor=None, page=page)["q"] == q
+
+    def test_every_desk_has_coverage(self):
+        from engine.adapters.edgar import _PROBES
+        covered = {d for p in _PROBES for d in p.desks}
+        assert covered == {"defense", "ai", "energy"}
+
+    def test_added_probes_present(self):
+        from engine.adapters.edgar import _PROBES
+        queries = {p.query for p in _PROBES}
+        # spot-check representative new probes across desks + the trilateral core
+        for q in ("grid-scale storage", "munitions production",
+                  "large language model", "gallium"):
+            assert q in queries

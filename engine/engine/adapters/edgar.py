@@ -38,9 +38,15 @@ class _Probe:
     desks: tuple[str, ...]
 
 
-# Convergence-themed probes (D060). Each is one EFTS phrase query; multi-desk
-# probes are the cross-sector chokepoints where the thesis actually shows up.
+# Convergence-themed probes (D060, widened D077). Each is one EFTS phrase query;
+# multi-desk probes are the cross-sector chokepoints where the thesis actually shows
+# up. EFTS has no regex/wildcards — only exact phrases and boolean OR — so breadth
+# comes from MORE probes, and one phrase per probe preserves clean theme + desk
+# attribution (D059). The first 8 are the original set (their page positions are
+# pinned by tests); everything after widens coverage so a sparse desk has enough
+# fresh, fact-dense filings to clear the provable-claim floor on a slow day (D076).
 _PROBES: tuple[_Probe, ...] = (
+    # ── Original 8 (positions pinned: page 1 = SMR, page 8 = rare earth) ──────────
     _Probe("small modular reactor", ("energy", "ai")),       # AI∩Energy power
     _Probe("high-assay low-enriched uranium", ("energy",)),  # HALEU fuel chokepoint
     _Probe("hyperscale data center", ("ai", "energy")),      # AI∩Energy demand engine
@@ -49,6 +55,42 @@ _PROBES: tuple[_Probe, ...] = (
     _Probe("hypersonic", ("defense",)),                      # Defense
     _Probe("autonomous weapon", ("defense", "ai")),          # Defense∩AI
     _Probe("rare earth", ("defense", "ai", "energy")),       # trilateral chokepoint
+    # ── Energy depth ─────────────────────────────────────────────────────────────
+    _Probe("grid-scale storage", ("energy", "ai")),          # AI load ↔ storage
+    _Probe("battery energy storage", ("energy",)),
+    _Probe("transmission interconnection", ("energy", "ai")),# the data-center queue
+    _Probe("power purchase agreement", ("energy", "ai")),    # hyperscaler PPAs
+    _Probe("liquefied natural gas", ("energy",)),
+    _Probe("uranium enrichment", ("energy", "defense")),     # fuel ↔ naval/defense
+    _Probe("nuclear fuel", ("energy", "defense")),
+    _Probe("solid-state battery", ("energy", "ai")),
+    _Probe("geothermal", ("energy", "ai")),                  # firm power for compute
+    _Probe("microgrid", ("energy", "defense")),              # base/installation resilience
+    # ── Defense depth ────────────────────────────────────────────────────────────
+    _Probe("munitions production", ("defense",)),
+    _Probe("missile defense", ("defense",)),
+    _Probe("loitering munition", ("defense", "ai")),
+    _Probe("unmanned surface vessel", ("defense", "ai")),
+    _Probe("solid rocket motor", ("defense",)),
+    _Probe("electronic warfare", ("defense",)),
+    _Probe("satellite constellation", ("defense", "ai")),
+    _Probe("shipbuilding", ("defense",)),
+    _Probe("Defense Production Act", ("defense", "energy")),
+    # ── AI / compute depth ───────────────────────────────────────────────────────
+    _Probe("generative artificial intelligence", ("ai",)),
+    _Probe("large language model", ("ai",)),
+    _Probe("graphics processing unit", ("ai", "energy")),    # GPUs ↔ power draw
+    _Probe("semiconductor fabrication", ("ai", "defense")),
+    _Probe("advanced packaging", ("ai",)),                   # chiplets/HBM
+    _Probe("liquid cooling", ("ai", "energy")),              # data-center thermal
+    _Probe("edge computing", ("ai", "defense")),
+    # ── Trilateral chokepoints (the convergence core) ────────────────────────────
+    _Probe("rare earth magnet", ("defense", "ai", "energy")),
+    _Probe("permanent magnet", ("defense", "energy")),
+    _Probe("gallium", ("defense", "ai", "energy")),          # semis + export controls
+    _Probe("germanium", ("defense", "ai", "energy")),
+    _Probe("critical minerals", ("defense", "ai", "energy")),
+    _Probe("quantum computing", ("defense", "ai")),
 )
 
 
@@ -85,6 +127,12 @@ class EDGARFullTextAdapter:
 
     @property
     def probe_count(self) -> int:
+        return len(_PROBES)
+
+    @property
+    def max_pages(self) -> int:
+        # One page per probe — the runner reads this so the global ingest_max_pages
+        # safety cap (10) doesn't silently truncate the widened probe set (D077).
         return len(_PROBES)
 
     # ── parse ────────────────────────────────────────────────────────────────

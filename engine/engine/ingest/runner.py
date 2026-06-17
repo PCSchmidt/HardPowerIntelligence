@@ -129,7 +129,7 @@ async def run_source(
     failures are recorded on the run and returned as ``status='failed'`` so a
     multi-source schedule isn't aborted by one bad source. Programmer errors
     (unknown source/adapter) still raise."""
-    max_pages = max_pages or settings.ingest_max_pages
+    # max_pages is resolved after the adapter loads (it may declare its own cap).
     now = datetime.now(timezone.utc)
     run_id = str(uuid.uuid4())
 
@@ -149,6 +149,9 @@ async def run_source(
             return RunResult(source_id, run_id, "skipped", error="breaker_open")
 
         adapter = get_adapter(source_id)  # raises KeyError if unbuilt — fail loud
+        # An adapter may declare its own page cap (EDGAR walks one page per probe, so
+        # its bound is the probe count, not the global default). Explicit caller wins.
+        max_pages = max_pages or getattr(adapter, "max_pages", None) or settings.ingest_max_pages
         cursor = src["last_cursor"]
         if isinstance(cursor, str):
             cursor = json.loads(cursor)

@@ -1878,3 +1878,24 @@ daily-brief.yml` captures each desk's code, writes a `published / skipped / cras
 "run failed" email) ONLY when a desk crashes or nothing published. A sparse desk skipping on a slow
 news day is now a normal green run, not a false "All jobs failed" alarm — the signal operators (and
 soon testers) watch is trustworthy.
+
+
+## D077 — Widen the EDGAR probe set (desk depth)
+
+**Decision:** Expanded the EDGAR full-text probe set from 8 to 40 convergence-themed phrase
+queries (`engine/adapters/edgar.py`), keeping the original 8 at their pinned page positions and
+appending depth per desk: Energy (grid-scale storage, PPAs, LNG, uranium enrichment, geothermal,
+microgrid, …), Defense (munitions production, missile defense, loitering munition, shipbuilding,
+Defense Production Act, …), AI/compute (large language model, GPU, semiconductor fabrication,
+advanced packaging, liquid cooling, …), and trilateral chokepoints (rare-earth magnet, gallium,
+germanium, critical minerals, quantum). The adapter now exposes `max_pages = probe_count`, and
+`engine/ingest/runner.py` reads an adapter-declared `max_pages` (explicit caller arg > adapter cap >
+global `ingest_max_pages`) so the global safety cap of 10 no longer silently truncates the probe walk.
+
+**Why:** The 06-17 energy miss exposed that a single sparse desk can fall below the 3-provable-claim
+floor on a slow window — and the EDGAR net was only 8 phrases over 8-K metadata, so energy's entire
+input was a handful of filings. EFTS has no regex/wildcards (only exact phrases + boolean OR), so
+breadth comes from more probes; one phrase per probe preserves clean theme + desk attribution (D059)
+and is trivially editable by the operator (the probe list IS the convergence-thesis curation, the
+moat). More fact-dense filings per desk per day → more candidate facts → a reliable claim floor.
+This is the query-breadth half; D078 (filing bodies) adds extraction depth per filing.
