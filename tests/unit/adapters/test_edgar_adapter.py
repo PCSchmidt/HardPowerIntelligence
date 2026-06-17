@@ -120,7 +120,7 @@ class TestProbesAndDesks:
         adapter = EDGARFullTextAdapter()
         p1 = adapter.build_request_payload(cursor=None, page=1)
         assert p1["q"] == '"small modular reactor"'
-        assert p1["forms"] == "8-K"
+        assert p1["forms"] == "8-K,D"   # 8-K material events + Form D placements (D081)
         assert "startdt" in p1 and "enddt" in p1
         p2 = adapter.build_request_payload(cursor=None, page=2)
         assert p2["q"] == '"high-assay low-enriched uranium"'
@@ -244,6 +244,23 @@ class TestEnrich:
         fetcher = _FakeFetcher(body="<p>$1 million</p>")
         await adapter.enrich(records, fetcher)
         assert fetcher.calls == 1                    # capped at 1 body fetch
+
+    @pytest.mark.asyncio
+    async def test_enrich_routes_form_d_to_offering_extractor(self):
+        adapter = EDGARFullTextAdapter()
+        resp = {"hits": {"hits": [{
+            "_id": "0001234567-26-000001:primary_doc.xml",
+            "_source": {"display_names": ["NUCLEARCO Inc  (NUKE)  (CIK 0001234567)"],
+                        "adsh": "0001234567-26-000001", "form": "D", "file_date": "2026-06-01"},
+        }]}}
+        records = adapter.parse(resp)
+        assert records[0].structured_data["form"] == "D"
+        xml = ("<totalOfferingAmount>5000000</totalOfferingAmount>"
+               "<totalAmountSold>2000000</totalAmountSold>")
+        out = await adapter.enrich(records, _FakeFetcher(body=xml))
+        assert out[0].structured_data["amount_usd"] == 5_000_000.0   # offering → materiality
+        assert out[0].structured_data["form_d"]["total_sold_usd"] == 2_000_000.0
+        assert out[0].text_chunk.startswith("SEC Form D private placement by NUCLEARCO Inc")
 
     @pytest.mark.asyncio
     async def test_enrich_skips_browse_edgar_fallback(self):

@@ -7,10 +7,11 @@ tagged with the desk(s) it serves — the deterministic pre-filter pattern (D059
 applied to filings. A filing matching a multi-desk probe is tagged with multiple
 desks; that multi-desk tag IS the convergence signal.
 
-v1 scope: EFTS metadata only (company, ticker, CIK, form, date, accession) over
-8-K material-event filings. Deferred to follow-on adapters: company-facts/XBRL
-capex (per-CIK), Form 4/13F ownership (XML), full-text body extraction, and
-sub-pagination (per-probe daily 8-K volume is low). Requires a descriptive
+Scope: EFTS hits over **8-K** material-event filings and **Form D** Reg D private
+placements (D081). ``enrich()`` then fetches each document — 8-K HTML bodies mined for
+amounts/dates/% (D078), Form D ``primary_doc.xml`` mined for the offering size — so
+records carry checkable facts, not just metadata. Still deferred: company-facts/XBRL
+capex (per-CIK), Form 4/13F ownership, and sub-pagination. Requires a descriptive
 User-Agent header (SEC policy) — supplied via ``headers`` and read by the runner.
 """
 import asyncio
@@ -25,13 +26,21 @@ import structlog
 from engine.settings import settings
 
 from .base import NormalizedRecord
-from .edgar_body import build_enriched_chunk, extract_facts, strip_html
+from .edgar_body import (
+    build_enriched_chunk,
+    build_form_d_chunk,
+    extract_facts,
+    extract_form_d_facts,
+    strip_html,
+)
 
 log = structlog.get_logger()
 
 _SOURCE_ID = "edgar"
 _BASE_URL = "https://efts.sec.gov/LATEST/search-index"
-_FORMS = "8-K"  # material-event reports — the timely, daily-cadence signal
+# 8-K = timely material events; D = Reg D private placements (D081) — the private-capital
+# formation signal (offering size lives in the Form D XML, mined in enrich()).
+_FORMS = "8-K,D"
 _DEFAULT_LOOKBACK_DAYS = 7
 
 # "Display name" is like: "NUSCALE POWER Corp  (SMR)  (CIK 0001822966)"
@@ -203,14 +212,15 @@ class EDGARFullTextAdapter:
     # ── body enrichment (D078) ─────────────────────────────────────────────────
 
     async def enrich(self, records: list[NormalizedRecord], fetcher) -> list[NormalizedRecord]:
-        """Fetch each filing's document and fold its facts into the record (D078).
+        """Fetch each filing's document and fold its facts into the record (D078, D081).
 
-        The runner calls this after :meth:`parse`, before persist. For each record we
-        GET the filing body, strip HTML, extract dollar amounts / dates / percentages,
-        set ``structured_data['amount_usd']`` (so the materiality scorer can magnitude-
-        rank it) and rebuild ``text_chunk`` with a substantive, citable excerpt. Bounded
-        by ``edgar_max_bodies_per_run``; any fetch/parse failure leaves the metadata
-        record intact (best-effort enrichment never drops a record)."""
+        The runner calls this after :meth:`parse`, before persist. An 8-K is mined from
+        its HTML body (dollar amounts / dates / percentages); a Form D is mined from its
+        structured ``primary_doc.xml`` for the offering size (the private-capital signal,
+        D081). Both set ``structured_data['amount_usd']`` so the materiality scorer can
+        magnitude-rank the record, and rebuild ``text_chunk`` with citable specifics.
+        Bounded by ``edgar_max_bodies_per_run``; any fetch/parse failure leaves the
+        metadata record intact (best-effort enrichment never drops a record)."""
         if not settings.edgar_fetch_bodies:
             return records
 
@@ -218,33 +228,71 @@ class EDGARFullTextAdapter:
         for rec in records:
             if fetched >= settings.edgar_max_bodies_per_run:
                 break
-            url = rec.url
-            if not url or "browse-edgar" in url:  # no resolvable document (no CIK)
-                continue
             try:
-                raw = await fetcher.fetch_json(
-                    "GET", url, headers=self.headers, response_format="text"
-                )
-                body = strip_html(raw if isinstance(raw, str) else "")
-                if not body:
-                    continue
-                facts = extract_facts(body)
-                rec.text_chunk = build_enriched_chunk(
-                    rec.text_chunk, body, facts,
-                    excerpt_chars=settings.edgar_body_excerpt_chars,
-                )
-                rec.structured_data["body_amounts_usd"] = facts.amounts_usd[:25]
-                rec.structured_data["body_dates"] = facts.dates[:25]
-                if facts.max_amount_usd is not None:
-                    rec.structured_data["amount_usd"] = facts.max_amount_usd
-                fetched += 1
-                await asyncio.sleep(0.15)  # ~7/s — under SEC's 10 req/s courtesy limit
-            except Exception as exc:  # noqa: BLE001 — body is best-effort; keep metadata
-                log.warning("edgar_body_failed", url=url, error=str(exc)[:200])
+                if (rec.structured_data.get("form") or "").upper().startswith("D"):
+                    hit = await self._enrich_form_d(rec, fetcher)
+                else:
+                    hit = await self._enrich_body(rec, fetcher)
+                if hit:
+                    fetched += 1
+                    await asyncio.sleep(0.15)  # ~7/s — under SEC's 10 req/s courtesy
+            except Exception as exc:  # noqa: BLE001 — enrichment is best-effort; keep metadata
+                log.warning("edgar_enrich_failed", url=rec.url, error=str(exc)[:200])
                 continue
 
         log.info("edgar_bodies_enriched", fetched=fetched, total=len(records))
         return records
+
+    async def _enrich_body(self, rec: NormalizedRecord, fetcher) -> bool:
+        """8-K HTML body → amounts/dates/% (D078). Returns True if it fetched a body."""
+        url = rec.url
+        if not url or "browse-edgar" in url:  # no resolvable document (no CIK)
+            return False
+        raw = await fetcher.fetch_json("GET", url, headers=self.headers, response_format="text")
+        body = strip_html(raw if isinstance(raw, str) else "")
+        if not body:
+            return False
+        facts = extract_facts(body)
+        rec.text_chunk = build_enriched_chunk(
+            rec.text_chunk, body, facts, excerpt_chars=settings.edgar_body_excerpt_chars
+        )
+        rec.structured_data["body_amounts_usd"] = facts.amounts_usd[:25]
+        rec.structured_data["body_dates"] = facts.dates[:25]
+        if facts.max_amount_usd is not None:
+            rec.structured_data["amount_usd"] = facts.max_amount_usd
+        return True
+
+    async def _enrich_form_d(self, rec: NormalizedRecord, fetcher) -> bool:
+        """Form D primary_doc.xml → offering size (D081). Returns True if it fetched."""
+        cik = rec.structured_data.get("cik")
+        adsh = rec.structured_data.get("accession")
+        if not cik or not adsh:
+            return False
+        raw = await fetcher.fetch_json(
+            "GET", self._form_d_xml_url(cik, adsh),
+            headers=self.headers, response_format="text",
+        )
+        fd = extract_form_d_facts(raw if isinstance(raw, str) else "")
+        rec.text_chunk = build_form_d_chunk(
+            rec.structured_data.get("company_name") or "",
+            rec.structured_data.get("ticker"), fd,
+        )
+        rec.structured_data["form_d"] = {
+            "total_offering_usd": fd.total_offering_usd,
+            "total_sold_usd": fd.total_sold_usd,
+            "industry": fd.industry,
+        }
+        if fd.amount_usd is not None:
+            rec.structured_data["amount_usd"] = fd.amount_usd
+        return True
+
+    @staticmethod
+    def _form_d_xml_url(cik: str, adsh: str) -> str:
+        # Form D's structured primary document lives at a stable path per accession.
+        return (
+            f"https://www.sec.gov/Archives/edgar/data/{int(cik)}/"
+            f"{adsh.replace('-', '')}/primary_doc.xml"
+        )
 
     @staticmethod
     def _build_text_chunk(company, ticker, form, file_date, theme) -> str:

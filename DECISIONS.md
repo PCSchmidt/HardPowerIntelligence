@@ -1961,3 +1961,24 @@ your Lemon Squeezy receipt email" note), so the Vercel deploy of the page is saf
 Deploy ORDER matters: `supabase db push` (add the column) BEFORE `fly deploy` the API (which SELECTs
 it). Known limitation: the stored portal URL is a signed link that LS rotates (~24h); it's refreshed on
 each subscription_* event. Hardening (post-launch): fetch it fresh from the LS API on demand.
+
+
+## D081 — SEC Form D ingestion (private-capital-formation signal)
+
+**Decision:** The EDGAR adapter now queries `forms=8-K,D` (was `8-K`), so the convergence
+probes also surface **Form D** Reg D private-placement filings. `enrich()` routes by form type:
+an 8-K is mined from its HTML body (D078); a Form D is mined from its structured
+`primary_doc.xml` (`_form_d_xml_url`) for `totalOfferingAmount` / `totalAmountSold` / industry
+(`engine/adapters/edgar_body.py: extract_form_d_facts`). The offering size populates
+`structured_data['amount_usd']` (so the materiality scorer magnitude-ranks it) and `text_chunk`
+becomes a citable line: "SEC Form D private placement by <co>: offering $X; $Y sold; industry Z."
+
+**Why:** First "obvious win" toward thicker output — it reuses the existing EDGAR auth/dedup/
+entity/enrich plumbing yet opens an entirely new **citable** signal class: private companies
+raising capital in AI-infra / defense / energy (the Crunchbase/PitchBook signal, free via SEC).
+Offering amounts are exactly the fact-dense, numeric specifics the provable-claim gate rewards.
+**Known v1 limitation:** Form D has little free text, so EFTS theme-phrase recall is low-but-high-
+precision — we catch placements whose issuer name / clarification matches a probe, and miss others.
+v2 (deferred): an industry-filtered Form D pull (Reg D industryGroupType → desk) for fuller recall,
+rather than relying on full-text phrase matching. Distinct from the GDELT "Signal" color work
+(next): Form D adds *cited facts*; GDELT will add *labeled, attributed aggregate context* (D082).

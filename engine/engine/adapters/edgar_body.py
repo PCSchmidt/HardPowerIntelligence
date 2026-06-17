@@ -155,3 +155,69 @@ def _meaningful_excerpt(body_text: str, excerpt_chars: int) -> str:
     else:
         start = min(len(body_text), 400)  # skip typical cover-page boilerplate
     return body_text[start:start + excerpt_chars].strip()
+
+
+# ── Form D (Reg D private placement) extraction (D081) ───────────────────────────
+# Form D's primary document is structured XML (primary_doc.xml), not prose — the
+# offering figures live in named tags, so they parse cleanly with targeted regex.
+_FORMD_OFFERING_RE = re.compile(
+    r"<totalOfferingAmount>\s*([\d,.]+)\s*</totalOfferingAmount>", re.IGNORECASE
+)
+_FORMD_SOLD_RE = re.compile(
+    r"<totalAmountSold>\s*([\d,.]+)\s*</totalAmountSold>", re.IGNORECASE
+)
+_FORMD_INDUSTRY_RE = re.compile(
+    r"<industryGroupType>\s*([^<]+?)\s*</industryGroupType>", re.IGNORECASE
+)
+
+
+def _to_float(raw: str | None) -> float | None:
+    if not raw:
+        return None
+    try:
+        return float(raw.replace(",", ""))
+    except ValueError:
+        return None  # Form D allows "Indefinite" for the offering amount
+
+
+@dataclass
+class FormDFacts:
+    total_offering_usd: float | None = None
+    total_sold_usd: float | None = None
+    industry: str | None = None
+
+    @property
+    def amount_usd(self) -> float | None:
+        """The figure to feed materiality: the raise size, else what's sold so far."""
+        return self.total_offering_usd or self.total_sold_usd
+
+    def summary(self) -> str:
+        bits: list[str] = []
+        if self.total_offering_usd is not None:
+            bits.append(f"offering {_fmt_usd(self.total_offering_usd)}")
+        if self.total_sold_usd is not None:
+            bits.append(f"{_fmt_usd(self.total_sold_usd)} sold to date")
+        if self.industry:
+            bits.append(f"industry {self.industry}")
+        return "; ".join(bits)
+
+
+def extract_form_d_facts(xml: str) -> FormDFacts:
+    """Pull the offering size, amount sold, and industry from a Form D primary_doc.xml."""
+    if not xml:
+        return FormDFacts()
+    off = _FORMD_OFFERING_RE.search(xml)
+    sold = _FORMD_SOLD_RE.search(xml)
+    ind = _FORMD_INDUSTRY_RE.search(xml)
+    return FormDFacts(
+        total_offering_usd=_to_float(off.group(1) if off else None),
+        total_sold_usd=_to_float(sold.group(1) if sold else None),
+        industry=ind.group(1).strip() if ind else None,
+    )
+
+
+def build_form_d_chunk(company: str, ticker: str | None, facts: FormDFacts) -> str:
+    """A citable one-line text_chunk for a Form D private placement (D081)."""
+    tick = f" ({ticker})" if ticker else ""
+    detail = facts.summary() or "amount not disclosed"
+    return f"SEC Form D private placement by {company}{tick}: {detail}."

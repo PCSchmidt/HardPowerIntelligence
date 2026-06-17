@@ -2,9 +2,19 @@
 from engine.adapters.edgar_body import (
     FilingFacts,
     build_enriched_chunk,
+    build_form_d_chunk,
     extract_facts,
+    extract_form_d_facts,
     strip_html,
 )
+
+_FORM_D_XML = """<?xml version="1.0"?>
+<edgarSubmission><offeringData><offeringSalesAmounts>
+<totalOfferingAmount>5000000</totalOfferingAmount>
+<totalAmountSold>2000000</totalAmountSold>
+</offeringSalesAmounts>
+<industryGroup><industryGroupType>Other Technology</industryGroupType></industryGroup>
+</offeringData></edgarSubmission>"""
 
 
 class TestStripHtml:
@@ -62,3 +72,29 @@ class TestEnrichedChunk:
         assert chunk.startswith(meta)
         assert "$5M" in chunk          # facts summary folded in
         assert "grid-scale storage" in chunk   # excerpt centred on the amount
+
+
+class TestFormD:
+    def test_extracts_offering_sold_industry(self):
+        fd = extract_form_d_facts(_FORM_D_XML)
+        assert fd.total_offering_usd == 5_000_000.0
+        assert fd.total_sold_usd == 2_000_000.0
+        assert fd.industry == "Other Technology"
+        assert fd.amount_usd == 5_000_000.0   # offering preferred for materiality
+
+    def test_indefinite_offering_falls_back_to_sold(self):
+        xml = ("<totalOfferingAmount>Indefinite</totalOfferingAmount>"
+               "<totalAmountSold>750000</totalAmountSold>")
+        fd = extract_form_d_facts(xml)
+        assert fd.total_offering_usd is None
+        assert fd.amount_usd == 750_000.0     # falls back to amount sold
+
+    def test_empty_xml_is_all_none(self):
+        fd = extract_form_d_facts("")
+        assert fd.amount_usd is None and fd.industry is None
+
+    def test_chunk_is_citable(self):
+        fd = extract_form_d_facts(_FORM_D_XML)
+        chunk = build_form_d_chunk("NuclearCo Inc", "NUKE", fd)
+        assert chunk.startswith("SEC Form D private placement by NuclearCo Inc (NUKE):")
+        assert "$5M" in chunk and "Other Technology" in chunk
