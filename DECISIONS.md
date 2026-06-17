@@ -1850,3 +1850,22 @@ and comps are managed out-of-band.
 Operator steps to go live: `supabase db push` (apply the migration); create the LS webhook +
 `fly secrets set LEMONSQUEEZY_WEBHOOK_SECRET`; then a test-card purchase flips the account to Pro
 end-to-end. `grant_comp.py` requires DB access to `auth.users` and the user to have signed up first.
+
+
+## D076 — LLM call-layer backoff for transient provider failures
+
+**Decision:** `LLMClient` now wraps every `litellm.acompletion` call in delay-and-retry with
+exponential backoff + jitter (`engine/llm/client.py`, settings `llm_max_retries=4`,
+`llm_backoff_base_seconds=2.0`, `llm_backoff_max_seconds=30.0`). Retryable errors are
+`RateLimitError`, `APIError`, `APIConnectionError`, `Timeout`, `ServiceUnavailableError`,
+`InternalServerError` (built defensively via `getattr` so a litellm version drop can't break import);
+anything else propagates immediately. Both the primary call and the JSON-repair retry route through it.
+
+**Why:** The 2026-06-17 scheduled run sent a false "All jobs failed" email. Root cause from the logs
+was NOT data starvation — it was an OpenRouter **429** ("qwen3.7-max temporarily rate-limited upstream")
+plus a deepseek non-JSON `APIError`. The three desks run back-to-back and exhaust the free-tier rate
+budget, so energy (last) gets refused. A rate-limit is a *time window*; the brief-level re-roll (D072)
+retried immediately and landed inside the same blocked window, so it couldn't clear it. Backoff at the
+call layer sleeps past the window and self-heals. Paired operator action: add paid OpenRouter credits
+(removes the free-tier upstream limit entirely); backoff covers transient blips regardless. Jitter
+de-syncs concurrent desk calls. This is reliability for unattended daily publishing, not a quality change.

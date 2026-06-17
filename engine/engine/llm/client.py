@@ -1,5 +1,7 @@
+import asyncio
 import json
 import os
+import random
 import re
 
 import litellm
@@ -8,6 +10,26 @@ import structlog
 from engine.settings import settings
 
 log = structlog.get_logger()
+
+# Transient provider failures worth a delay-and-retry (D076). The 06-17 outage was a
+# litellm.RateLimitError (OpenRouter 429) and a litellm.APIError (deepseek non-JSON);
+# both are retryable. Built defensively so a litellm version that drops one of these
+# names doesn't break import.
+_RETRYABLE_ERRORS = tuple(
+    exc
+    for exc in (
+        getattr(litellm, name, None)
+        for name in (
+            "RateLimitError",
+            "APIConnectionError",
+            "Timeout",
+            "ServiceUnavailableError",
+            "InternalServerError",
+            "APIError",
+        )
+    )
+    if isinstance(exc, type)
+)
 
 # LiteLLM reads credentials from os.environ, not from our Settings object.
 # Ensure they're present before any API call is made.
@@ -36,6 +58,37 @@ def parse_json(text: str) -> dict | list | None:
 
 
 class LLMClient:
+    async def _acompletion_with_retry(self, **kwargs):
+        """Call litellm with exponential backoff + jitter on transient errors (D076).
+
+        A rate-limit (429) is a time window, so an immediate re-try just hits the same
+        wall; we sleep with doubling backoff (plus jitter to de-sync the three desks)
+        so the window passes. Non-retryable errors propagate immediately."""
+        last_exc: Exception | None = None
+        for attempt in range(settings.llm_max_retries + 1):
+            try:
+                return await litellm.acompletion(**kwargs)
+            except _RETRYABLE_ERRORS as exc:
+                last_exc = exc
+                if attempt >= settings.llm_max_retries:
+                    break
+                delay = min(
+                    settings.llm_backoff_base_seconds * (2 ** attempt),
+                    settings.llm_backoff_max_seconds,
+                )
+                delay += random.uniform(0, delay * 0.25)  # jitter
+                log.warning(
+                    "llm_retry",
+                    model=kwargs.get("model"),
+                    attempt=attempt + 1,
+                    max_attempts=settings.llm_max_retries + 1,
+                    delay=round(delay, 1),
+                    error=str(exc)[:200],
+                )
+                await asyncio.sleep(delay)
+        assert last_exc is not None  # only reached after a retryable failure
+        raise last_exc
+
     async def complete(
         self,
         model: str,
@@ -52,7 +105,7 @@ class LLMClient:
         if temperature is not None:
             kwargs["temperature"] = temperature
 
-        response = await litellm.acompletion(**kwargs)
+        response = await self._acompletion_with_retry(**kwargs)
         content = response.choices[0].message.content
 
         usage = response.usage
@@ -71,7 +124,7 @@ class LLMClient:
                     {"role": "user", "content": "Your response was not valid JSON. Return only valid JSON, no other text."},
                 ]
                 repair_kwargs = {**kwargs, "messages": repair_messages}
-                response = await litellm.acompletion(**repair_kwargs)
+                response = await self._acompletion_with_retry(**repair_kwargs)
                 content = response.choices[0].message.content
                 if parse_json(content) is None:
                     raise LLMError(f"JSON parse failed after repair retry for model={model}")

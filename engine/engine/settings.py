@@ -25,6 +25,16 @@ class Settings(BaseSettings):
     llm_model_synthesis_fallback: str = "openrouter/qwen/qwen3.7-max"
     llm_model_fallback_last_resort: str = "claude-sonnet-4-6"
 
+    # LLM transient-failure resilience (D076). The daily run fires several calls per
+    # desk across three desks back-to-back; the OpenRouter free tier rate-limits (429)
+    # under that burst, and a 429 is a *time window* — the brief-level re-roll (D072)
+    # retries immediately and lands inside the same blocked window, so it can't clear
+    # it. These add delay-and-retry with exponential backoff + jitter at the call layer
+    # so a transient 429 / 5xx / connection blip self-heals before it fails a desk.
+    llm_max_retries: int = 4               # retries after the first try (5 attempts total)
+    llm_backoff_base_seconds: float = 2.0  # first backoff; doubles each retry
+    llm_backoff_max_seconds: float = 30.0  # cap per-retry sleep
+
     # Anthropic
     anthropic_api_key: str = ""
 

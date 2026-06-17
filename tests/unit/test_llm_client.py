@@ -4,9 +4,24 @@ All tests mock litellm — no network calls.
 """
 from unittest.mock import AsyncMock, MagicMock, patch
 
+import litellm
 import pytest
 
 from engine.llm.client import LLMClient, LLMError
+
+
+def _ok_response(content='{"ok": true}'):
+    r = MagicMock()
+    r.choices[0].message.content = content
+    r.usage.prompt_tokens = 50
+    r.usage.completion_tokens = 10
+    return r
+
+
+def _rate_limit():
+    return litellm.RateLimitError(
+        message="429 too many requests", llm_provider="openrouter", model="x"
+    )
 
 
 class TestComplete:
@@ -146,6 +161,91 @@ class TestComplete:
             )
         call_kwargs = mock_call.call_args.kwargs
         assert call_kwargs.get("fallbacks") == ["openrouter/qwen/qwen3.7-max"]
+
+
+class TestRetry:
+    """Transient-failure backoff (D076). asyncio.sleep is patched so tests don't wait."""
+
+    @pytest.mark.asyncio
+    async def test_retries_then_succeeds_on_rate_limit(self):
+        good = _ok_response()
+        with (
+            patch(
+                "engine.llm.client.litellm.acompletion",
+                new=AsyncMock(side_effect=[_rate_limit(), _rate_limit(), good]),
+            ) as mock_call,
+            patch("engine.llm.client.asyncio.sleep", new=AsyncMock()) as mock_sleep,
+        ):
+            client = LLMClient()
+            result = await client.complete(
+                model="openrouter/qwen/qwen3.7-max",
+                messages=[{"role": "user", "content": "test"}],
+            )
+        assert result == '{"ok": true}'
+        assert mock_call.call_count == 3      # two 429s, then success
+        assert mock_sleep.await_count == 2    # one sleep before each retry
+
+    @pytest.mark.asyncio
+    async def test_raises_after_exhausting_retries(self):
+        with (
+            patch(
+                "engine.llm.client.litellm.acompletion",
+                new=AsyncMock(side_effect=_rate_limit()),
+            ) as mock_call,
+            patch("engine.llm.client.asyncio.sleep", new=AsyncMock()),
+            patch("engine.llm.client.settings.llm_max_retries", 4),
+        ):
+            client = LLMClient()
+            with pytest.raises(litellm.RateLimitError):
+                await client.complete(
+                    model="openrouter/qwen/qwen3.7-max",
+                    messages=[{"role": "user", "content": "test"}],
+                )
+        assert mock_call.call_count == 5      # first try + 4 retries
+
+    @pytest.mark.asyncio
+    async def test_non_retryable_error_propagates_immediately(self):
+        with (
+            patch(
+                "engine.llm.client.litellm.acompletion",
+                new=AsyncMock(side_effect=ValueError("boom")),
+            ) as mock_call,
+            patch("engine.llm.client.asyncio.sleep", new=AsyncMock()) as mock_sleep,
+        ):
+            client = LLMClient()
+            with pytest.raises(ValueError, match="boom"):
+                await client.complete(
+                    model="openrouter/deepseek/deepseek-v4-pro",
+                    messages=[{"role": "user", "content": "test"}],
+                )
+        assert mock_call.call_count == 1      # no retry on a non-transient error
+        mock_sleep.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_backoff_grows_exponentially(self):
+        delays: list[float] = []
+
+        async def _capture(d):
+            delays.append(d)
+
+        with (
+            patch(
+                "engine.llm.client.litellm.acompletion",
+                new=AsyncMock(side_effect=_rate_limit()),
+            ),
+            patch("engine.llm.client.asyncio.sleep", new=_capture),
+            patch("engine.llm.client.random.uniform", return_value=0.0),
+            patch("engine.llm.client.settings.llm_max_retries", 3),
+            patch("engine.llm.client.settings.llm_backoff_base_seconds", 2.0),
+            patch("engine.llm.client.settings.llm_backoff_max_seconds", 30.0),
+        ):
+            client = LLMClient()
+            with pytest.raises(litellm.RateLimitError):
+                await client.complete(
+                    model="openrouter/qwen/qwen3.7-max",
+                    messages=[{"role": "user", "content": "test"}],
+                )
+        assert delays == [2.0, 4.0, 8.0]      # 2·2^0, 2·2^1, 2·2^2 (jitter zeroed)
 
 
 class TestMaterialize:
