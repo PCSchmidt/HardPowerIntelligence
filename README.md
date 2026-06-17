@@ -124,9 +124,10 @@ fixtures onto live data and became genuinely multi-desk:
   not DoD-only, D059) and **SEC EDGAR** (full-text search, the first cross-desk source — one
   adapter feeds all three desks, D061).
 - **Convergence-aware, multi-desk briefs** — generation is desk-scoped across Defense / AI /
-  Energy (D062); a record touching ≥2 desks is boosted as the convergence signal (D060). The
-  Defense desk publishes from live data; AI and Energy are wired and awaiting their first
-  published run + dedicated sources for depth.
+  Energy (D062); a record touching ≥2 desks is boosted as the convergence signal (D060). All
+  three desks publish from live data with the layered analyst voice (BLUF → at-a-glance ledger →
+  convergence → cited facts → grounded analysis → GDELT signal). A strategic-significance gate
+  (D085) drops true-but-trivial items so a desk skips cleanly rather than publishing filler.
 
 Remaining before public launch: Lemon Squeezy go-live (the checkout/webhook code is built;
 needs account creds + variant IDs in Vercel/Fly — config, not engineering), a live-validation

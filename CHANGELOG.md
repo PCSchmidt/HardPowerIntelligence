@@ -13,6 +13,14 @@ live ingestion runner, with Supabase auth and Lemon Squeezy subscriptions. Built
 (Gates 1–8 closed).
 
 ### Added
+- **Reliability + quality hardening** (post-Gate-8, D076–D086): LLM call-layer backoff for
+  transient 429/5xx (D076); honest daily-run reporting + ingest resilience so a flaky source
+  doesn't take the pipeline dark (D076/D079); EDGAR widened 8→40 probes (D077) + filing-body
+  fact-extraction (D078) + SEC Form D private-placement ingestion (D081); GDELT media-attention
+  Signal as labeled aggregate color (D082); a strategic-significance gate that drops
+  true-but-trivial items (D085); analysis grounding made best-effort so a grounding hiccup never
+  loses a passed brief (D086); the `/account` page (tier + Pro badge + manage-subscription, D080);
+  and UX Tier 1 — the at-a-glance ledger + provenance discoverability (D084, FRONTEND_SPEC §9).
 - **Data pipeline** (Gate 4): USAspending adapter + entity resolver
   (contractor → ticker/CIK/UEI), proven against golden fixtures.
 - **Brief engine** (Gate 5): brief generator + citation-faithfulness eval harness;

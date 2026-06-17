@@ -163,6 +163,13 @@ interface SidebarProps {
 > and a per-item collapsible **`AnalysisDisclosure`** (in `brief-content.tsx`) showing the grounded
 > `read` + "What to watch" behind an "Analysis — HPI interpretation" label. `ChangeBanner` is not built;
 > the anti-rehash guarantee is enforced server-side by the novelty gate (D074), not a UI banner.
+>
+> **As-built note (2026-06-17, D082/D084):** `BriefReader` also renders **`BriefGlance`**
+> (`components/brief/brief-glance.tsx`, Server) — an "At a glance" ledger above the read: per item a
+> type swatch, headline anchor-link, normalized $ magnitude bar (`lib/amounts.ts`), and sources count,
+> with an "N items · ≈$X tracked · 100% cited" strip — plus a dashed **GDELT Signal** block. `BriefContent`
+> now also exposes a visible "Sources (N)" control per item (opening `CitationsDrawer`, which shows
+> prettified source names via `lib/sources.ts`).
 
 ### `BriefHeader`
 
