@@ -2,6 +2,7 @@
 
 import { ExternalLink, X } from "lucide-react";
 import type { Citation } from "@/lib/types";
+import { sourceName } from "@/lib/sources";
 
 // Slide-in citations panel. Right overlay on lg+, bottom sheet on mobile (D023).
 // Rendered open when `citations` is non-null.
@@ -42,7 +43,7 @@ export function CitationsDrawer({
           citations.map((c) => (
             <div key={c.id} className="space-y-1 rounded-lg border border-border bg-background p-4 shadow-sm">
               <div className="flex items-center gap-2 text-ui-xs uppercase tracking-wide text-muted-foreground">
-                <span className="font-medium">{c.source_id}</span>
+                <span className="font-medium">{sourceName(c.source_id)}</span>
                 <span>·</span>
                 <span>{new Date(c.fetched_at).toLocaleDateString("en-US", { timeZone: "UTC" })}</span>
               </div>

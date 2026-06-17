@@ -2007,3 +2007,25 @@ backend-agnostic, so a richer **BigQuery GKG** backend (baseline-relative spikes
 GCAM → `entity_edges`) swaps in later for the convergence-graph moat — only the fetch layer
 changes. Complements D081 (Form D = new *cited* facts); together they thicken output from both
 the fact and the context sides.
+
+
+## D084 — Visual/UX Tier 1: at-a-glance ledger + provenance discoverability
+
+**Decision:** First UX pass toward "worth $19.99/mo", grounded in a competitive scan (AlphaSense's
+click-to-source, SemiAnalysis's data-first reports, fintech glanceability best practice). Front-end
+only, no backend change. (1) **`BriefGlance`** — a scannable "At a glance" ledger above the long read:
+per item a type swatch + label, headline that anchor-links to the item, a normalized **magnitude bar**
+from the key dollar figure (parsed headline-first via `lib/amounts.ts`, body fallback), and a sources
+count; plus a summary strip ("N items · ≈$X tracked · 100% cited"). (2) **Provenance discoverability** —
+a visible "Sources (N)" control per item (the `CitationsDrawer` source cards already existed but were
+only reachable via tiny inline chips), and `source_id` prettified to display names (`lib/sources.ts`).
+Full roadmap (Tiers 1–4) written to `FRONTEND_SPEC.md §9`.
+
+**Why:** HPI's two differentiators — provenance (moat) and convergence (identity) — were visually
+under-expressed, and the reader had no data layer or scannable summary (the #1 dashboard failure mode is
+prose overload). The at-a-glance delivers the day in ~10 seconds (importance-first); the bars answer
+"compared to what?"; surfacing sources turns the citation moat from invisible into a felt feature. NOTE
+the dependency: the at-a-glance is brutally honest — a filler item (no $, no event) shows an empty row —
+so significance-filtering (the content gate) should land alongside, or the UI spotlights weak items. The
+PDF print export had flattened the interactive citation chips to bare superscripts, which had overstated
+the provenance-UX gap; the drawer was already solid and is now merely more discoverable.

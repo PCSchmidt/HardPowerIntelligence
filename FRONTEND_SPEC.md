@@ -554,3 +554,48 @@ Dynamic OG image generation for the marketing home and subscribe pages.
 - **No brief published (new deploy):** `EmptyState` on `/desk/defense` — "Today's brief is being prepared. Check back at 5:30am ET."
 - **Entity with no data:** Per-tab `EmptyState` — "No [awards] on record for this entity yet."
 - **No follows:** `EmptyState` on `/account` follows section — "Follow entities from any brief or entity page."
+
+
+## 9. Visual / UX Enhancement Roadmap (D084)
+
+Grounded in a 2026 competitive scan (The Diff $20/mo, Stratechery $15/mo, The Information
+$399/yr, SemiAnalysis institutional, AlphaSense $10–40k/seat). The takeaways: AlphaSense's
+defining UX is **click-a-claim → see the source passage**; SemiAnalysis sells **charts/data**,
+not prose; The Information moved to an **app-like multi-feed IA**; and fintech-intel best practice
+is **card layouts + sparklines, "compared to what?" context, importance-first hierarchy, beware
+prose overload**.
+
+**Design thesis:** HPI's editorial typographic reader (Stratechery-like) is an asset — keep it.
+But HPI's two differentiators — **provenance** (the moat) and **convergence** (the identity) — are
+visually under-expressed, and there is no **data layer** or **scannable summary**. Foreground both
+differentiators; add glanceability; don't lose the calm reader. Target feel: *Stratechery typography
++ Bloomberg glanceability + AlphaSense click-to-source.*
+
+**Already built (do not rebuild):** `CitationsDrawer` (per-item source cards: source · date · title ·
+excerpt · "View source ↗"); item-type color tokens (`--color-item-award|filing|policy|macro|signal`);
+inline `[CITE:N]` chips that open the drawer; the layered Convergence + Analysis disclosure cards.
+
+### Tier 1 — provenance visible + at-a-glance (this gate, no backend change)
+- **At-a-glance header** (`brief-glance.tsx`): a compact, scannable ledger above the long read — per
+  item: type swatch + label, headline (anchor-links to the item), a normalized **magnitude bar** from
+  the item's key dollar figure (parsed from headline, then body), and a **Sources (N)** count. A summary
+  strip: "N items · ≈$X tracked · 100% cited." Delivers the day in ~10 seconds (importance-first).
+- **Provenance discoverability:** a visible **"Sources (N) ↗"** control on each item (not just the tiny
+  inline chips) opening the existing drawer; prettify `source_id` → display name (SEC EDGAR,
+  USASpending.gov, arXiv, GDELT…) in the drawer + glance.
+
+### Tier 2 — the data layer
+- **Magnitude bars** inline on dollar figures ("$55.9M" against the "$137M asset" → instant "compared
+  to what?"). **Signal sparkline + arrow** replacing the dashed text line. Consistent **type icons**.
+
+### Tier 3 — entity + convergence as first-class
+- **Entity chips** (company + ticker) linking to Entity 360 (`/entity/[id]`), teasing the Pro feature in
+  the free brief. **Convergence visualization** — a small entity/theme relationship graph of the day's
+  cross-desk links; the visual front-end for the `entity_edges` moat (D055).
+
+### Tier 4 — information architecture (later)
+- A cross-desk **front page / feed** and **archive search** — the app-like step (cf. The Information).
+
+**Dependency:** Tier 1's at-a-glance + Tier 2's bars are *honest* — a filler item (no $, no event) shows
+an empty row. So significance-filtering (the content gate) should land first or alongside, or the new UI
+will spotlight weak items rather than hide them. Selection quality and visualization reinforce each other.

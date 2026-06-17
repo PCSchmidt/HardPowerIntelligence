@@ -1,6 +1,6 @@
 "use client";
 
-import { ChevronDown, Sparkles } from "lucide-react";
+import { ChevronDown, FileText, Sparkles } from "lucide-react";
 import { useMemo, useState } from "react";
 import type { BriefItem, Citation } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -112,7 +112,7 @@ export function BriefContent({
   return (
     <div className="divide-y divide-border">
       {items.map((item) => (
-        <article key={item.id} className="space-y-3 py-8">
+        <article key={item.id} id={item.id} className="scroll-mt-20 space-y-3 py-8">
           <div className="flex items-center gap-2 text-ui-xs font-medium uppercase tracking-wide text-muted-foreground">
             <span className={cn("size-2 rounded-full", ITEM_DOT[item.item_type])} />
             {ITEM_LABEL[item.item_type]}
@@ -121,6 +121,16 @@ export function BriefContent({
           <CitedBody body={item.body} onCite={() => openForItem(item)} />
           {(item.read || item.watch) && (
             <AnalysisDisclosure read={item.read} watch={item.watch} />
+          )}
+          {item.citation_ids.length > 0 && (
+            <button
+              type="button"
+              onClick={() => openForItem(item)}
+              className="inline-flex items-center gap-1.5 text-ui-sm font-medium text-primary hover:underline"
+            >
+              <FileText size={14} />
+              Sources ({item.citation_ids.length})
+            </button>
           )}
         </article>
       ))}
