@@ -25,18 +25,20 @@ export function SignupForm() {
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
-      options: { emailRedirectTo: `${window.location.origin}/subscribe` },
+      options: { emailRedirectTo: `${window.location.origin}/desk/defense` },
     });
     setLoading(false);
     if (error) {
       setError(error.message);
       return;
     }
-    // When email confirmation is disabled, signUp returns a live session — the
-    // user is already signed in, so move them into the trial flow. Otherwise a
-    // confirmation email was sent.
+    // Land new users on the product (today's free brief), not the /subscribe paywall —
+    // a free account already sees the full current-day brief, so leading with the
+    // upgrade page (which reads as "you must pay", and shows "not configured" until
+    // Lemon Squeezy is live) was confusing. When email confirmation is disabled signUp
+    // returns a live session; otherwise a confirmation email was sent.
     if (data.session) {
-      router.push("/subscribe");
+      router.push("/desk/defense");
       router.refresh();
       return;
     }
