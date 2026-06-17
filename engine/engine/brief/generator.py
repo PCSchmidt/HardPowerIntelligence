@@ -14,6 +14,7 @@ from engine.brief.rag import (
     embed_pending_records,
     fetch_passages,
 )
+from engine.brief.significance import filter_significant
 from engine.db import transient_retry
 from engine.eval.citation_eval import extract_citation_indices, strip_uncited_sentences
 from engine.llm.client import llm_client, parse_json
@@ -280,6 +281,16 @@ async def generate_brief(desk: str, pool: asyncpg.Pool) -> GeneratedBrief:
     facts = _select_facts(
         candidates, settings.brief_max_items * 2, settings.brief_advancement_floor
     )
+
+    # Step 4b: Significance gate (D085) — drop true-but-trivial items (routine commodity
+    # procurement, filings with no material event, stale actions) so the brief isn't
+    # padded with filler. Fail-open and never empties; the publish gate handles thin days.
+    facts, dropped = await filter_significant(facts, desk)
+    if dropped:
+        log.info(
+            "significance_filtered", desk=desk, kept=len(facts), dropped=len(dropped),
+            reasons=[r for _d, _s, r in dropped][:8],
+        )
 
     # Step 5: Build the citation pool. Fact passages (built straight from the facts)
     # are ALWAYS citable; RAG passages add semantic context, seeded by the material

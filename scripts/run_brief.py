@@ -100,7 +100,19 @@ async def main(desk: str, brief_date: str) -> int:
 
     # Grounding gate (D073): regenerate-then-omit any analysis field that fabricates a
     # specific, so only grounded analysis is persisted/rendered. Mutates brief in place.
-    report = await ground_brief_analysis(brief, surviving_items, facts_text, evaluator)
+    # Best-effort (D085): the analysis layer is decorative — the FACTS are already gated and
+    # citable. If grounding itself fails (e.g. a provider outage on its eval calls, which on
+    # 2026-06-17 crashed an already-passed AI brief before persist), degrade to a facts-only
+    # brief rather than lose it: clear the ungrounded analysis and publish the cited facts.
+    try:
+        report = await ground_brief_analysis(brief, surviving_items, facts_text, evaluator)
+    except Exception as exc:  # noqa: BLE001 — never lose a passed brief over the analysis layer
+        print(f"Analysis grounding failed ({exc}); publishing cited facts without analysis.")
+        brief.convergence_read = ""
+        for it in brief.items:
+            it["read"] = ""
+            it["watch"] = ""
+        report = []
     status_by_label = {r.label: r for r in report}
 
     def _show(label: str, text: str, key: str) -> None:

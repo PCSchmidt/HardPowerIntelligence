@@ -96,6 +96,14 @@ class Settings(BaseSettings):
     # (LLM-supported) claims. Counts claims, not items, so it's stable whether
     # synthesis consolidates facts into few dense items or many thin ones.
     brief_min_claims: int = 3
+    # Significance gate (D085): after materiality selection, an LLM triage drops items
+    # that are true+cited but strategically trivial — routine commodity procurement,
+    # filings disclosing no material event, stale actions. Materiality ranks by $/source;
+    # this judges "so what" for the desk thesis. Fail-open (unscored → kept) and never
+    # empties the pool. threshold 0..1; enabled toggles it; "" model → eval model.
+    significance_enabled: bool = True
+    significance_threshold: float = 0.45
+    significance_model: str = ""
     # Regenerate-on-failure (D072): the synthesis model is non-deterministic, so a
     # gate failure is often a bad draw a re-run clears. Regenerate up to this many
     # times before persisting the best attempt as failed. 1 disables retries.

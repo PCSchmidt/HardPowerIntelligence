@@ -2029,3 +2029,41 @@ the dependency: the at-a-glance is brutally honest — a filler item (no $, no e
 so significance-filtering (the content gate) should land alongside, or the UI spotlights weak items. The
 PDF print export had flattened the interactive citation chips to bare superscripts, which had overstated
 the provenance-UX gap; the drawer was already solid and is now merely more discoverable.
+
+
+## D085 — Strategic-significance gate (drop true-but-trivial items)
+
+**Decision:** After materiality selection and before synthesis, `generate_brief` runs an LLM
+**significance triage** (`engine/brief/significance.py: filter_significant`) that scores each
+selected candidate 0–1 for strategic significance to the desk thesis and drops those below
+`significance_threshold` (0.45). It targets exactly the "not worth $19.99" failures seen on the
+live desks: routine commodity procurement (the Defense desk's cellular-service contracts), filings
+that disclose no material event (the "filed an 8-K, contents unknown" rare-earth filler), and stale
+actions resurfacing. Two safety properties: **fail-open** (a candidate the model didn't score, or a
+triage-call failure, keeps everything — a junk filter must never be why a brief fails) and **never
+empties the pool** (if all score low, the single best survives and the publish gate, not this gate,
+decides whether the thin day publishes or cleanly skips). One extra LLM call per brief (the eval
+model), temperature 0. Tunable via `significance_enabled` / `significance_threshold`.
+
+**Why:** Materiality ranks by $/source/novelty but not "so what." The publish gate proves claims are
+true and cited, but **true ≠ significant** — so trivially-true items padded the briefs and broke the
+premium impression (and the new at-a-glance ledger, D084, made them glaringly visible as empty rows).
+This gate is the lever that turns "nice format" into "worth paying for." A desk with no significant
+news now skips cleanly (better than filler) — which also surfaces, honestly, which desks need deeper
+sources. Intentional consequence: thin desks may skip more often pre-launch; that's the correct
+quality trade while iterating, and it points the sourcing roadmap.
+
+## D086 — Analysis grounding is best-effort (never lose a passed brief)
+
+**Decision:** `run_brief.py` now wraps the D073 analysis-grounding step in try/except: if grounding
+fails, it clears the (ungrounded) analysis fields and publishes the **cited facts only**, rather than
+crashing. The FACT layer is already gated and citable; the read/watch/convergence analysis is
+decorative and only shown when grounded — so a grounding outage should degrade to a facts-only brief,
+not lose it.
+
+**Why:** Root-caused the stale AI desk — on 2026-06-17 the AI brief generated and **passed eval (6
+claims)**, but the grounding step's eval-model calls hit the same 429 storm that killed energy, threw,
+and crashed `run_brief` **before persist**, so AI never wrote that day's brief and the page kept showing
+the Jun-15 pre-layered brief. D076 backoff now covers those calls, but this hardening closes the
+structural gap so an analysis-layer hiccup can never again silently drop an already-publishable brief.
+Same best-effort principle as the GDELT signal (D082).
