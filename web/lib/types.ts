@@ -67,6 +67,8 @@ export interface AuthMe {
   tier: Tier;
   subscribed_at: string | null;
   current_period_end: string | null;
+  source?: "lemonsqueezy" | "comp" | null;
+  customer_portal_url?: string | null;
 }
 
 export interface CalendarEvent {

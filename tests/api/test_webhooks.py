@@ -150,3 +150,22 @@ def test_non_uuid_user_acknowledged_not_persisted(fake_pool):
     resp = _post(_sub_payload("subscription_created", "not-a-uuid", "active"))
     assert resp.status_code == 200
     assert fake_pool.calls == []
+
+
+def test_stores_customer_portal_url(fake_pool):
+    url = "https://hpi.lemonsqueezy.com/billing?expires=123&signature=abc"
+    resp = _post(
+        _sub_payload(
+            "subscription_created", str(uuid.uuid4()), "active",
+            urls={"customer_portal": url},
+        )
+    )
+    assert resp.status_code == 200
+    args = fake_pool.calls[0][1]
+    assert args[6] == url          # customer_portal_url is the 7th bind arg (D080)
+
+
+def test_missing_urls_persists_null_portal(fake_pool):
+    resp = _post(_sub_payload("subscription_updated", str(uuid.uuid4()), "active"))
+    assert resp.status_code == 200
+    assert fake_pool.calls[0][1][6] is None

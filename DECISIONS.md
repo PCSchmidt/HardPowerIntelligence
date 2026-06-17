@@ -1939,3 +1939,25 @@ ingest layer: a flaky upstream source should degrade input freshness, not take t
 EDGAR can 500 and the job still proceeds to publish; only a systemic failure (e.g. DB unreachable,
 all sources down) exits non-zero. The D077/D078 depth improvements still need EFTS up to be exercised
 on fresh data — re-validate on a run when SEC is healthy.
+
+
+## D080 — /account page (tier + Pro badge + manage-subscription link)
+
+**Decision:** Added the `/account` page (`web/app/account/page.tsx`, a server component) so a
+subscriber can see and manage their plan. It reads the existing `/auth/me`, which now also returns
+`source` ('lemonsqueezy' | 'comp' | null) and `customer_portal_url`. Rendering by state: **Free** →
+FREE badge + "Upgrade to Pro" → /subscribe + benefits list; **Pro (paid)** → PRO badge, member-since,
+renews-on, and a "Manage subscription" button → the Lemon Squeezy customer portal; **Pro (comp)** →
+"PRO · COMPLIMENTARY" badge + a note that there's no billing to manage. To supply the portal link,
+migration `20260617000001` adds `subscriptions.customer_portal_url`, and the webhook now stores
+`data.attributes.urls.customer_portal` (COALESCE-preserved across events that omit it). The navbar
+already linked `/account`; the page just didn't exist (404 until now).
+
+**Why:** Field testing needs the tester experience complete — a Pro user had nowhere to see "Pro" or
+cancel. Comp grants (the field-test mechanism, D075) are explicitly handled: a comp has no LS billing,
+so the page says so rather than dangling a dead "manage" link. The page **degrades gracefully** if the
+API isn't redeployed yet (`source`/`customer_portal_url` come back undefined → it shows a "manage via
+your Lemon Squeezy receipt email" note), so the Vercel deploy of the page is safe ahead of the API.
+Deploy ORDER matters: `supabase db push` (add the column) BEFORE `fly deploy` the API (which SELECTs
+it). Known limitation: the stored portal URL is a signed link that LS rotates (~24h); it's refreshed on
+each subscription_* event. Hardening (post-launch): fetch it fresh from the LS API on demand.

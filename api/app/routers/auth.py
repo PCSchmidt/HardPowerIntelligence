@@ -18,7 +18,8 @@ async def me(
 ) -> dict:
     async with pool.acquire() as conn:
         sub = await conn.fetchrow(
-            "SELECT created_at, current_period_end FROM subscriptions WHERE user_id = $1",
+            "SELECT created_at, current_period_end, source, customer_portal_url "
+            "FROM subscriptions WHERE user_id = $1",
             uuid.UUID(principal.user_id),
         )
     return {
@@ -27,4 +28,8 @@ async def me(
         "tier": principal.tier,
         "subscribed_at": sub["created_at"] if sub else None,
         "current_period_end": sub["current_period_end"] if sub else None,
+        # source distinguishes a paying subscriber from a comp (no billing to manage);
+        # customer_portal_url is the Lemon Squeezy "Manage subscription" link (D080).
+        "source": sub["source"] if sub else None,
+        "customer_portal_url": sub["customer_portal_url"] if sub else None,
     }

@@ -448,9 +448,15 @@ session hydration to get authoritative tier from FastAPI (D012).
   "email": "user@example.com",
   "tier": "pro",
   "subscribed_at": "2026-01-15T14:22:00Z",
-  "current_period_end": "2026-07-15T14:22:00Z"
+  "current_period_end": "2026-07-15T14:22:00Z",
+  "source": "lemonsqueezy",
+  "customer_portal_url": "https://store.lemonsqueezy.com/billing?..."
 }
 ```
+
+`source` is `"lemonsqueezy"` (paying), `"comp"` (complimentary), or `null` (free, no row).
+`customer_portal_url` is the Lemon Squeezy "Manage subscription" link for paying
+subscribers, else `null` (D080). The `/account` page renders these.
 
 ---
 

@@ -66,14 +66,17 @@ async def _persist_subscription(
     ls_customer_id = (
         str(attrs["customer_id"]) if attrs.get("customer_id") is not None else None
     )
+    # Signed customer-portal URL for the "Manage subscription" link (D080). Refreshed
+    # on every subscription_* event; None on events that omit it (we keep the prior one).
+    portal_url = (attrs.get("urls") or {}).get("customer_portal")
 
     async with pool.acquire() as conn:
         await conn.execute(
             """
             INSERT INTO subscriptions (
                 user_id, ls_customer_id, ls_subscription_id, tier, status,
-                current_period_end, cancelled_at, source, updated_at
-            ) VALUES ($1, $2, $3, 'pro', $4, $5, $6, 'lemonsqueezy', now())
+                current_period_end, cancelled_at, source, customer_portal_url, updated_at
+            ) VALUES ($1, $2, $3, 'pro', $4, $5, $6, 'lemonsqueezy', $7, now())
             ON CONFLICT (user_id) DO UPDATE SET
                 ls_customer_id = EXCLUDED.ls_customer_id,
                 ls_subscription_id = EXCLUDED.ls_subscription_id,
@@ -81,10 +84,13 @@ async def _persist_subscription(
                 status = EXCLUDED.status,
                 current_period_end = EXCLUDED.current_period_end,
                 cancelled_at = EXCLUDED.cancelled_at,
+                customer_portal_url = COALESCE(
+                    EXCLUDED.customer_portal_url, subscriptions.customer_portal_url
+                ),
                 updated_at = now()
             """,
             user_id, ls_customer_id, ls_subscription_id, status,
-            period_end, cancelled_at,
+            period_end, cancelled_at, portal_url,
         )
 
 

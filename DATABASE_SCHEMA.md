@@ -604,6 +604,7 @@ CREATE TABLE subscriptions (
     current_period_start    TIMESTAMPTZ,
     current_period_end      TIMESTAMPTZ,
     cancelled_at            TIMESTAMPTZ,
+    customer_portal_url     TEXT,               -- LS "Manage subscription" link (D080); null for comps
     created_at              TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at              TIMESTAMPTZ NOT NULL DEFAULT now()
 );
