@@ -31,6 +31,7 @@ class GeneratedBrief:
     synthesis_model: str
     model_waterfall_metadata: dict = field(default_factory=dict)
     convergence_read: str = ""   # cross-signal analysis thesis (D071); "" if none
+    signal: str = ""             # labeled GDELT media-attention momentum (D082); "" if none
 
 
 async def _get_window_start(pool: asyncpg.Pool) -> datetime:
@@ -395,14 +396,15 @@ async def persist_brief(
                 INSERT INTO briefs (
                     id, desk, date, status, headline, bluf, convergence_read,
                     faithfulness_score, eval_passed, published_at,
-                    synthesis_model, model_waterfall_metadata
-                ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
+                    synthesis_model, model_waterfall_metadata, signal
+                ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
                 """,
                 brief_id, desk, brief_date, status,
                 brief.headline, brief.bluf, brief.convergence_read,
                 faithfulness_score, eval_passed, published_at,
                 brief.synthesis_model,
                 json.dumps(brief.model_waterfall_metadata),
+                brief.signal,
             )
 
             for i, item in enumerate(surviving_items):

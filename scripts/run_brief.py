@@ -15,14 +15,19 @@ import asyncio
 import sys
 from datetime import date
 
+import httpx
+
 sys.path.insert(0, "engine")
 
+from engine.adapters.edgar import themes_for_desk
 from engine.brief.analysis import ground_brief_analysis
 from engine.brief.generator import persist_brief
 from engine.brief.publish import generate_publishable_brief
 from engine.db import create_pool
 from engine.eval.citation_eval import CitationEvaluator
+from engine.ingest.fetcher import HttpFetcher
 from engine.settings import settings
+from engine.signal.gdelt import compute_brief_signal
 
 
 async def main(desk: str, brief_date: str) -> int:
@@ -114,6 +119,13 @@ async def main(desk: str, brief_date: str) -> int:
         print(f"  FACT: {item.get('body', '')}")
         _show("READ", item.get("read", ""), f"item{i}.read")
         _show("WATCH", item.get("watch", ""), f"item{i}.watch")
+
+    # GDELT media-attention signal (D082): labeled, disclaimed momentum color, computed
+    # separately from the citable-fact path. Best-effort — never fails the brief.
+    async with httpx.AsyncClient() as client:
+        brief.signal = await compute_brief_signal(themes_for_desk(desk), HttpFetcher(client))
+    if brief.signal:
+        print(f"\nSIGNAL: {brief.signal}")
 
     brief_id = await persist_brief(
         brief=brief,

@@ -418,6 +418,7 @@ CREATE TABLE briefs (
     headline                    TEXT,
     bluf                        TEXT,           -- 2–3 sentence BLUF summary
     convergence_read            TEXT NOT NULL DEFAULT '',  -- cross-signal analysis thesis (D073); '' if none/withheld
+    signal                      TEXT NOT NULL DEFAULT '',  -- GDELT media-attention momentum (D082); aggregate color, not a cited fact
     faithfulness_score          FLOAT,          -- eval gate score (0–1)
     eval_passed                 BOOLEAN,
     published_at                TIMESTAMPTZ,

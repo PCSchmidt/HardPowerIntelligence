@@ -1,4 +1,4 @@
-import { AlertTriangle, Sparkles } from "lucide-react";
+import { Activity, AlertTriangle, Sparkles } from "lucide-react";
 import type { Brief } from "@/lib/types";
 import { BriefHeader } from "./brief-header";
 import { BriefContent } from "./brief-content";
@@ -25,6 +25,12 @@ export function BriefReader({ brief }: { brief: Brief }) {
         </section>
       )}
       <BriefContent items={brief.items} citations={brief.citations} />
+      {brief.signal && (
+        <section className="mt-8 flex items-start gap-2 rounded-md border border-dashed border-border bg-muted/30 px-4 py-3 text-ui-sm text-muted-foreground">
+          <Activity size={14} className="mt-0.5 shrink-0" />
+          <span>{brief.signal}</span>
+        </section>
+      )}
       <footer className="mt-8 border-t border-border pt-4 text-ui-sm text-muted-foreground">
         {brief.model_waterfall.synthesis_model && (
           <span>Synthesis: {brief.model_waterfall.synthesis_model}</span>

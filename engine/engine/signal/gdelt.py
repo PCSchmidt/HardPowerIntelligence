@@ -55,7 +55,9 @@ class Momentum:
         return self.delta_pct is not None and self.delta_pct <= -25.0
 
 
-def compute_momentum(series: list[float], recent_days: int = 7, baseline_days: int = 21) -> Momentum:
+def compute_momentum(
+    series: list[float], recent_days: int = 7, baseline_days: int = 21
+) -> Momentum:
     """Recent-window mean vs. the immediately-preceding baseline-window mean.
 
     Designed to degrade gracefully on short series (GDELT can return sparse data): if
@@ -103,6 +105,15 @@ def build_signal_line(signals: list[ThemeSignal]) -> str:
         + "; ".join(phrases[:5])
         + "."
     )
+
+
+async def compute_brief_signal(themes: list[str], fetcher, *, max_themes: int = 6) -> str:
+    """Fetch momentum for up to ``max_themes`` themes and build one labeled signal line.
+
+    Capped to bound GDELT calls per brief; returns "" if nothing moved (or GDELT is
+    unreachable) — the brief simply renders no Signal block in that case."""
+    signals = [await fetch_theme_signal(t, fetcher) for t in themes[:max_themes]]
+    return build_signal_line(signals)
 
 
 async def fetch_theme_signal(theme: str, fetcher, *, timespan: str = "6w") -> ThemeSignal:

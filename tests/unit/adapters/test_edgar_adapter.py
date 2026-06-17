@@ -181,6 +181,13 @@ class TestWidenedProbes:
                   "large language model", "gallium"):
             assert q in queries
 
+    def test_themes_for_desk_filters_by_desk(self):
+        from engine.adapters.edgar import themes_for_desk
+        energy = themes_for_desk("energy")
+        assert "small modular reactor" in energy        # energy + ai probe
+        assert "munitions production" not in energy      # defense-only probe
+        assert "gallium" in themes_for_desk("defense")   # trilateral probe
+
 
 class _FakeFetcher:
     """Captures calls; returns a fixed body (or raises) for body enrichment (D078)."""

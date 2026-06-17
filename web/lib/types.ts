@@ -53,6 +53,8 @@ export interface Brief {
   bluf: string | null;
   // Cross-signal thesis tying the day's items together (D071/D073). "" if none.
   convergence_read: string;
+  // GDELT media-attention momentum (D082): labeled aggregate color, not a cited fact. "" if none.
+  signal?: string;
   faithfulness_score: number | null;
   staleness_indicator: StalenessIndicator | null;
   items: BriefItem[];

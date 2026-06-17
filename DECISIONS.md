@@ -1982,3 +1982,28 @@ precision — we catch placements whose issuer name / clarification matches a pr
 v2 (deferred): an industry-filtered Form D pull (Reg D industryGroupType → desk) for fuller recall,
 rather than relying on full-text phrase matching. Distinct from the GDELT "Signal" color work
 (next): Form D adds *cited facts*; GDELT will add *labeled, attributed aggregate context* (D082).
+
+
+## D082 — GDELT media-attention "Signal" (complementary aggregate color)
+
+**Decision:** Briefs now carry an optional **Signal** line — labeled GDELT media-attention
+momentum (e.g. "SMRs +100%; gallium +40%") — rendered as a disclaimed, dashed block in the
+reader, separate from the fact and analysis layers. Engine: `engine/signal/gdelt.py` computes
+per-theme momentum (recent-window mean vs trailing baseline) from the keyless GDELT DOC 2.0
+`timelinevol` API; `compute_brief_signal(themes, fetcher)` caps the theme count and builds one
+line; `run_brief.py` computes it (best-effort, via `HttpFetcher`) from the desk's probe themes
+(`edgar.themes_for_desk`) and attaches `brief.signal`. Persisted to `briefs.signal` (migration
+`20260617000002`), serialized by `/v1/briefs`, rendered by `BriefReader`.
+
+**Why:** Correcting an earlier overstatement — GDELT's *own* aggregate volume/tone data is
+openly licensed; only the third-party article text it indexes is off-limits. So GDELT CAN add
+narrative color, as **labeled, attributed, aggregate momentum** — never a cited fact. The
+guardrails ARE the architecture: (1) its own column/render lane, never the provable-claim path;
+(2) computed, not LLM-generated, so no fabrication risk and no analysis-grounding-eval change;
+(3) explicit "aggregate momentum, not a verified fact" disclaimer in the string itself; (4)
+best-effort — any GDELT failure yields "" and the block simply doesn't render, so it can never
+fail a brief. Backend is DOC 2.0 now (no GCP); the momentum math + brief-side contract are
+backend-agnostic, so a richer **BigQuery GKG** backend (baseline-relative spikes, co-occurrence,
+GCAM → `entity_edges`) swaps in later for the convergence-graph moat — only the fetch layer
+changes. Complements D081 (Form D = new *cited* facts); together they thicken output from both
+the fact and the context sides.

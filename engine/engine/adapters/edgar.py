@@ -109,6 +109,12 @@ _PROBES: tuple[_Probe, ...] = (
 )
 
 
+def themes_for_desk(desk: str) -> list[str]:
+    """The convergence probe phrases serving a desk (D082) — reused as the GDELT
+    attention-signal themes so the Signal tracks the same vocabulary the desk is built on."""
+    return [p.query for p in _PROBES if desk in p.desks]
+
+
 def _sha256(data: dict) -> str:
     return hashlib.sha256(
         json.dumps(data, sort_keys=True, ensure_ascii=False).encode()

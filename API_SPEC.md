@@ -199,6 +199,7 @@ staleness indicator.
   "headline": "...",
   "bluf": "...",
   "convergence_read": "Cross-signal thesis tying the day's items together (D073); \"\" if none.",
+  "signal": "Signal · GDELT media attention (aggregate momentum, not a verified fact): ...; \"\" if none.",
   "faithfulness_score": 0.97,
   "staleness_indicator": null,
   "items": [

@@ -56,6 +56,8 @@ async def _assemble_brief(conn: asyncpg.Connection, brief: asyncpg.Record, stale
         "faithfulness_score": brief["faithfulness_score"],
         # Cross-signal analysis thesis (D071/D073); grounded gate applied at persist.
         "convergence_read": brief["convergence_read"],
+        # GDELT media-attention momentum (D082): labeled aggregate color, not a cited fact.
+        "signal": brief["signal"] if "signal" in brief else "",
         "staleness_indicator": staleness,
         "items": [
             {

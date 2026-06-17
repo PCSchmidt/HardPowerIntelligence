@@ -1,14 +1,18 @@
 """GDELT media-attention signal (D082) — pure compute, no network."""
 import pytest
-
 from engine.signal.gdelt import (
     ThemeSignal,
     build_signal_line,
+    compute_brief_signal,
     compute_momentum,
     fetch_theme_signal,
     parse_timeline,
     timeline_params,
 )
+
+_RISING = {"timeline": [{"series": "v", "data": [
+    {"date": f"d{i}", "value": v} for i, v in enumerate([1.0] * 21 + [2.0] * 7)
+]}]}
 
 
 class TestTimelineParse:
@@ -76,8 +80,10 @@ class _FakeFetcher:
     def __init__(self, payload=None, fail=False):
         self.payload = payload or {}
         self.fail = fail
+        self.calls = 0
 
     async def fetch_json(self, method, url, *, params=None, response_format="json", **kw):
+        self.calls += 1
         if self.fail:
             raise RuntimeError("gdelt down")
         return self.payload
@@ -98,3 +104,17 @@ class TestFetchThemeSignal:
     async def test_fetch_failure_is_silent(self):
         sig = await fetch_theme_signal("SMRs", _FakeFetcher(fail=True))
         assert sig.momentum.delta_pct is None    # decorative: never raises
+
+
+class TestComputeBriefSignal:
+    @pytest.mark.asyncio
+    async def test_caps_theme_count_and_builds_labeled_line(self):
+        fetcher = _FakeFetcher(_RISING)
+        line = await compute_brief_signal(list("abcdefgh"), fetcher, max_themes=3)
+        assert fetcher.calls == 3                 # capped, not all 8 themes
+        assert "not a verified fact" in line and "+100%" in line
+
+    @pytest.mark.asyncio
+    async def test_gdelt_unreachable_yields_empty_line(self):
+        line = await compute_brief_signal(["a", "b"], _FakeFetcher(fail=True))
+        assert line == ""                          # no signal block rendered
