@@ -180,3 +180,83 @@ class TestWidenedProbes:
         for q in ("grid-scale storage", "munitions production",
                   "large language model", "gallium"):
             assert q in queries
+
+
+class _FakeFetcher:
+    """Captures calls; returns a fixed body (or raises) for body enrichment (D078)."""
+
+    def __init__(self, body: str = "", fail: bool = False):
+        self.body = body
+        self.fail = fail
+        self.calls = 0
+
+    async def fetch_json(self, method, url, *, headers=None, response_format="json", **kw):
+        self.calls += 1
+        if self.fail:
+            raise RuntimeError("body fetch boom")
+        return self.body
+
+
+@pytest.fixture(autouse=True)
+def _no_sleep(monkeypatch):
+    async def _instant(_):
+        return None
+    monkeypatch.setattr("engine.adapters.edgar.asyncio.sleep", _instant)
+
+
+class TestEnrich:
+    """Body enrichment (D078). enrich() is best-effort and never drops a record."""
+
+    @pytest.mark.asyncio
+    async def test_enrich_folds_in_body_facts(self, efts_response):
+        adapter = EDGARFullTextAdapter()
+        records = adapter.parse(efts_response)
+        before = records[0].text_chunk
+        fetcher = _FakeFetcher(body="<p>Award of $5 million on May 7, 2026.</p>")
+        out = await adapter.enrich(records, fetcher)
+        assert out[0].structured_data["amount_usd"] == 5_000_000.0
+        assert out[0].text_chunk != before          # chunk rebuilt with facts
+        assert "$5M" in out[0].text_chunk
+
+    @pytest.mark.asyncio
+    async def test_enrich_disabled_skips_fetch(self, efts_response, monkeypatch):
+        monkeypatch.setattr("engine.adapters.edgar.settings.edgar_fetch_bodies", False)
+        adapter = EDGARFullTextAdapter()
+        records = adapter.parse(efts_response)
+        fetcher = _FakeFetcher(body="<p>$9 billion</p>")
+        out = await adapter.enrich(records, fetcher)
+        assert fetcher.calls == 0
+        assert "amount_usd" not in out[0].structured_data
+
+    @pytest.mark.asyncio
+    async def test_enrich_graceful_on_fetch_error(self, efts_response):
+        adapter = EDGARFullTextAdapter()
+        records = adapter.parse(efts_response)
+        out = await adapter.enrich(records, _FakeFetcher(fail=True))
+        assert len(out) == len(records)             # nothing dropped
+        assert "amount_usd" not in out[0].structured_data
+
+    @pytest.mark.asyncio
+    async def test_enrich_respects_cap(self, efts_response, monkeypatch):
+        monkeypatch.setattr("engine.adapters.edgar.settings.edgar_max_bodies_per_run", 1)
+        adapter = EDGARFullTextAdapter()
+        records = adapter.parse(efts_response)   # fixture has 2 records
+        fetcher = _FakeFetcher(body="<p>$1 million</p>")
+        await adapter.enrich(records, fetcher)
+        assert fetcher.calls == 1                    # capped at 1 body fetch
+
+    @pytest.mark.asyncio
+    async def test_enrich_skips_browse_edgar_fallback(self):
+        adapter = EDGARFullTextAdapter()
+        resp = {"hits": {"hits": [{
+            "_id": "x:y.htm",
+            "_source": {"display_names": ["Privateco LLC  (CIK 0000999)"],
+                        "adsh": "x", "form": "8-K", "file_date": "2026-06-01"},
+        }]}}
+        records = adapter.parse(resp)
+        # de-dashed accession yields a real Archives URL, so to hit the fallback we
+        # null the cik path: a record whose url contains browse-edgar is skipped.
+        records[0].url = "https://www.sec.gov/cgi-bin/browse-edgar"
+        fetcher = _FakeFetcher(body="<p>$1 million</p>")
+        await adapter.enrich(records, fetcher)
+        assert fetcher.calls == 0

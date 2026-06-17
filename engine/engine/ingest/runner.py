@@ -178,6 +178,10 @@ async def run_source(
                     **kwargs,
                 )
                 records = adapter.parse(response)
+                # Optional best-effort enrichment (e.g. EDGAR fetches filing bodies and
+                # mines facts, D078). Never drops records; failures keep the metadata.
+                if hasattr(adapter, "enrich"):
+                    records = await adapter.enrich(records, fetcher)
                 result.pages_fetched += 1
                 result.records_fetched += len(records)
 

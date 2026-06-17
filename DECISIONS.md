@@ -1899,3 +1899,25 @@ breadth comes from more probes; one phrase per probe preserves clean theme + des
 and is trivially editable by the operator (the probe list IS the convergence-thesis curation, the
 moat). More fact-dense filings per desk per day → more candidate facts → a reliable claim floor.
 This is the query-breadth half; D078 (filing bodies) adds extraction depth per filing.
+
+
+## D078 — EDGAR filing-body extraction (fact density)
+
+**Decision:** Added a best-effort body-enrichment pass to the EDGAR adapter
+(`engine/adapters/edgar_body.py` + `EDGARFullTextAdapter.enrich`). After `parse`, the runner
+calls an optional `adapter.enrich(records, fetcher)` hook; EDGAR fetches each hit's actual filing
+document, strips HTML with the stdlib `html.parser` (no new dependency), and mines it with regex for
+dollar amounts (normalized to USD, incl. "$1.5 billion" / "$3.2B"), percentages, and dates. It sets
+`structured_data['amount_usd']` to the largest figure, stores `body_amounts_usd` / `body_dates`, and
+rebuilds `text_chunk` as metadata + a compact key-figures line + a body excerpt centred on the first
+dollar amount. Bounded by `edgar_max_bodies_per_run=80` with a 0.15s inter-fetch courtesy delay; any
+fetch/parse failure logs `edgar_body_failed` and keeps the metadata record (never drops a record).
+
+**Why:** The publish gate counts *provable claims* — sentences whose cited source contains a checkable
+fact — and EFTS metadata ("Acme filed an 8-K") carries no numbers, so it can't produce them. The body
+is where the dates and dollar figures live. The biggest structural win is `amount_usd`: the materiality
+scorer (D035) magnitude-normalizes that field, which EFTS records never populated, so body-extracted
+contract/award figures now actually drive materiality, not just synthesis. This is the local-side regex
+extraction the operator asked for — robust pattern matching applied to filing text after fetch, which
+EFTS's phrase-only query layer cannot do. Pairs with D077 (more probes = more filings; D078 = more
+facts per filing). Future: enrich only post-dedup to avoid re-fetching unchanged filings.

@@ -120,5 +120,11 @@ class Settings(BaseSettings):
     ingest_max_pages: int = 10          # safety cap on pagination per run
     ingest_hot_window_days: int = 21    # retention window for normalized + raw records
 
+    # EDGAR filing-body extraction (D078). Fetch each hit's actual document and mine it
+    # for dollar amounts / dates / percentages so the publish gate has checkable facts.
+    edgar_fetch_bodies: bool = True
+    edgar_max_bodies_per_run: int = 80  # cap body fetches (cost/time + SEC courtesy)
+    edgar_body_excerpt_chars: int = 1200  # body excerpt folded into the embedded chunk
+
 
 settings = Settings()

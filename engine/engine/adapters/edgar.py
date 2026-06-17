@@ -13,15 +13,21 @@ capex (per-CIK), Form 4/13F ownership (XML), full-text body extraction, and
 sub-pagination (per-probe daily 8-K volume is low). Requires a descriptive
 User-Agent header (SEC policy) — supplied via ``headers`` and read by the runner.
 """
+import asyncio
 import hashlib
 import json
 import re
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta, timezone
 
+import structlog
+
 from engine.settings import settings
 
 from .base import NormalizedRecord
+from .edgar_body import build_enriched_chunk, extract_facts, strip_html
+
+log = structlog.get_logger()
 
 _SOURCE_ID = "edgar"
 _BASE_URL = "https://efts.sec.gov/LATEST/search-index"
@@ -192,6 +198,52 @@ class EDGARFullTextAdapter:
                 url=self._filing_url(cik, adsh, native_id),
                 fetched_at=datetime.now(timezone.utc),
             ))
+        return records
+
+    # ── body enrichment (D078) ─────────────────────────────────────────────────
+
+    async def enrich(self, records: list[NormalizedRecord], fetcher) -> list[NormalizedRecord]:
+        """Fetch each filing's document and fold its facts into the record (D078).
+
+        The runner calls this after :meth:`parse`, before persist. For each record we
+        GET the filing body, strip HTML, extract dollar amounts / dates / percentages,
+        set ``structured_data['amount_usd']`` (so the materiality scorer can magnitude-
+        rank it) and rebuild ``text_chunk`` with a substantive, citable excerpt. Bounded
+        by ``edgar_max_bodies_per_run``; any fetch/parse failure leaves the metadata
+        record intact (best-effort enrichment never drops a record)."""
+        if not settings.edgar_fetch_bodies:
+            return records
+
+        fetched = 0
+        for rec in records:
+            if fetched >= settings.edgar_max_bodies_per_run:
+                break
+            url = rec.url
+            if not url or "browse-edgar" in url:  # no resolvable document (no CIK)
+                continue
+            try:
+                raw = await fetcher.fetch_json(
+                    "GET", url, headers=self.headers, response_format="text"
+                )
+                body = strip_html(raw if isinstance(raw, str) else "")
+                if not body:
+                    continue
+                facts = extract_facts(body)
+                rec.text_chunk = build_enriched_chunk(
+                    rec.text_chunk, body, facts,
+                    excerpt_chars=settings.edgar_body_excerpt_chars,
+                )
+                rec.structured_data["body_amounts_usd"] = facts.amounts_usd[:25]
+                rec.structured_data["body_dates"] = facts.dates[:25]
+                if facts.max_amount_usd is not None:
+                    rec.structured_data["amount_usd"] = facts.max_amount_usd
+                fetched += 1
+                await asyncio.sleep(0.15)  # ~7/s — under SEC's 10 req/s courtesy limit
+            except Exception as exc:  # noqa: BLE001 — body is best-effort; keep metadata
+                log.warning("edgar_body_failed", url=url, error=str(exc)[:200])
+                continue
+
+        log.info("edgar_bodies_enriched", fetched=fetched, total=len(records))
         return records
 
     @staticmethod
