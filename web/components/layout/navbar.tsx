@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ChevronDown, Shield } from "lucide-react";
+import { ChevronDown, Menu, Shield, X } from "lucide-react";
 import type { User } from "@supabase/supabase-js";
 
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
@@ -20,6 +20,7 @@ export function NavBar() {
   const router = useRouter();
   const [user, setUser] = useState<User | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [navOpen, setNavOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -79,6 +80,19 @@ export function NavBar() {
         </nav>
 
         <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => {
+              setNavOpen((o) => !o);
+              setMenuOpen(false);
+            }}
+            className="rounded-md p-1.5 text-foreground hover:bg-muted lg:hidden"
+            aria-label="Toggle desk navigation"
+            aria-expanded={navOpen}
+          >
+            {navOpen ? <X size={20} /> : <Menu size={20} />}
+          </button>
+
           {user ? (
             <div className="relative" ref={menuRef}>
               <button
@@ -131,6 +145,30 @@ export function NavBar() {
           )}
         </div>
       </div>
+
+      {navOpen && (
+        <nav className="border-t border-border bg-background px-4 py-2 lg:hidden">
+          {DESKS.map((desk) =>
+            desk.active ? (
+              <Link
+                key={desk.label}
+                href={desk.href}
+                onClick={() => setNavOpen(false)}
+                className="block rounded-md px-3 py-2.5 text-ui-md font-medium text-foreground hover:bg-muted"
+              >
+                {desk.label}
+              </Link>
+            ) : (
+              <span
+                key={desk.label}
+                className="block cursor-default rounded-md px-3 py-2.5 text-ui-md text-muted-foreground/60"
+              >
+                {desk.label} (coming soon)
+              </span>
+            ),
+          )}
+        </nav>
+      )}
     </header>
   );
 }
