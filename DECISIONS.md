@@ -1921,3 +1921,21 @@ contract/award figures now actually drive materiality, not just synthesis. This 
 extraction the operator asked for — robust pattern matching applied to filing text after fetch, which
 EFTS's phrase-only query layer cannot do. Pairs with D077 (more probes = more filings; D078 = more
 facts per filing). Future: enrich only post-dedup to avoid re-fetching unchanged filings.
+
+
+## D079 — Ingest resilience: a transient single-source outage must not abort the daily job
+
+**Decision:** `scripts/run_ingest.py` now exits non-zero only on a *total* ingest failure (every
+source failed), via a tested `decide_exit_code(statuses)` helper, and prints an "Ingest summary:
+N ok, N skipped, N failed" line. Previously any single source with `status='failed'` set exit 1.
+
+**Why:** The 06-17 13:44 manual energy validation run failed in 27s — not on the brief, but on the
+*ingest* step: SEC EFTS returned repeated HTTP 500s (external/transient — it had worked 3 hours
+earlier, and the failure hit page 1 / an original probe, so not the D077 widening). The fetcher
+retried and gave up, `run_ingest.py` exited 1, and under the workflow's `bash -e` that aborted the
+whole job *before any brief ran* — even though arxiv + usaspending ingested fine and briefs could
+publish from existing DB data. This is the Gate-2 (D076) honest-failure principle applied to the
+ingest layer: a flaky upstream source should degrade input freshness, not take the product dark. Now
+EDGAR can 500 and the job still proceeds to publish; only a systemic failure (e.g. DB unreachable,
+all sources down) exits non-zero. The D077/D078 depth improvements still need EFTS up to be exercised
+on fresh data — re-validate on a run when SEC is healthy.

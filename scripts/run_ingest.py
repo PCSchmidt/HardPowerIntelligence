@@ -30,6 +30,19 @@ from engine.ingest.retention import prune_hot_window
 from engine.ingest.runner import run_source
 
 
+def decide_exit_code(statuses: list[str]) -> int:
+    """Non-zero only on a TOTAL ingest failure (D079).
+
+    A single source failing is usually transient and external — e.g. SEC EFTS
+    returning 500s — and must NOT abort the daily job: briefs still publish from data
+    already in the DB. So we exit non-zero only when *every* source failed (a likely
+    systemic problem, e.g. the database is unreachable). Partial failures are logged
+    and surfaced in the summary, but the pipeline proceeds to the brief step."""
+    if not statuses:
+        return 0
+    return 1 if all(s == "failed" for s in statuses) else 0
+
+
 async def main(source: str | None, embed: bool, prune: bool, reset_cursor: bool) -> None:
     pool = await create_pool()
     sources = [source] if source else registered_source_ids()
@@ -45,7 +58,7 @@ async def main(source: str | None, embed: bool, prune: bool, reset_cursor: bool)
             )
         print(f"Reset cursor for: {', '.join(sources)}")
 
-    exit_code = 0
+    statuses: list[str] = []
     try:
         async with httpx.AsyncClient() as client:
             fetcher = HttpFetcher(client)
@@ -58,8 +71,13 @@ async def main(source: str | None, embed: bool, prune: bool, reset_cursor: bool)
                     f"dup={result.records_duplicate} embedded={result.records_embedded}"
                     + (f" error={result.error}" if result.error else "")
                 )
-                if result.status == "failed":
-                    exit_code = 1
+                statuses.append(result.status)
+
+        ok = statuses.count("success")
+        failed = statuses.count("failed")
+        skipped = statuses.count("skipped")
+        print(f"Ingest summary: {ok} ok, {skipped} skipped, {failed} failed "
+              f"(of {len(statuses)}).")
 
         if prune:
             counts = await prune_hot_window(pool)
@@ -70,7 +88,7 @@ async def main(source: str | None, embed: bool, prune: bool, reset_cursor: bool)
     finally:
         await pool.close()
 
-    sys.exit(exit_code)
+    sys.exit(decide_exit_code(statuses))
 
 
 if __name__ == "__main__":
