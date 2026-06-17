@@ -277,3 +277,40 @@ Confirm a new published brief appears on the live site.
 - [ ] `ENVIRONMENT=production`, real `CORS_ALLOW_ORIGINS`, JWT secret ≥32 (if HS256)
 - [ ] First brief published and visible
 - [ ] CHANGELOG.md updated + tag `v1.0.0` when Gate 9 `GO` is given
+
+
+## 8. Custom domain cutover — hardpowerintel.com (D083)
+
+**No app code changes.** Every redirect is origin-relative (`checkout/route.ts` uses
+`new URL(request.url).origin`; signup/oauth use `window.location.origin`), so the switch is
+pure dashboard config. Do it BEFORE onboarding testers, so their magic links + sessions settle
+on the final domain once (changing it mid-test breaks active links).
+
+### 8.1 Vercel — add the domain
+- Vercel → the web project → Settings → Domains → add `hardpowerintel.com` and `www.hardpowerintel.com`.
+- Make the apex (`hardpowerintel.com`) primary; Vercel auto-redirects `www` → apex.
+- Vercel displays the exact DNS records to create — note them (apex A record, currently `76.76.21.21`; `www` CNAME `cname.vercel-dns.com`).
+
+### 8.2 Cloudflare — DNS (the one real gotcha)
+- Cloudflare → hardpowerintel.com → DNS → add the records Vercel showed (apex A → the shown IP, or CNAME-flatten apex to `cname.vercel-dns.com`; `www` CNAME → `cname.vercel-dns.com`).
+- **CRITICAL: set both records to "DNS only" (grey cloud), NOT proxied (orange).** Cloudflare's proxy breaks Vercel's automatic SSL issuance/verification; grey cloud lets Vercel terminate TLS directly.
+- Back in Vercel, wait for "Valid Configuration" + SSL issued (usually minutes).
+
+### 8.3 Supabase — Auth URL config (or magic links break)
+- Supabase → Authentication → URL Configuration:
+  - **Site URL** = `https://hardpowerintel.com`
+  - **Redirect URLs** allowlist: add `https://hardpowerintel.com/**` and `https://www.hardpowerintel.com/**`. Keep the existing `*.vercel.app/**` during transition (harmless; remove later).
+- Why: confirmation/magic-link emails use Site URL, and Supabase only honors redirects on the allowlist — without this, signup/login emails point to the old domain or are rejected.
+
+### 8.4 Lemon Squeezy — nothing required for redirects
+- The checkout return URL is passed per-checkout from the request origin (`product_options.redirect_url`), so it follows the domain automatically. The webhook stays `https://hpi-api.fly.dev/v1/webhooks/lemon-squeezy` (unchanged). Optional: update the store's cosmetic "website" field.
+
+### 8.5 API CORS (precautionary)
+- The web calls the API **server-side** (`apiFetch` is `server-only`), so browser-CORS likely doesn't apply. If any browser-side call ever hits the API directly, add the origin:
+  `fly secrets set CORS_ALLOW_ORIGINS=https://hardpowerintel.com --app hpi-api`
+
+### 8.6 Verify
+- [ ] `https://hardpowerintel.com` loads with valid SSL (padlock).
+- [ ] Fresh signup → the confirmation email link points to hardpowerintel.com and completes login.
+- [ ] Checkout (test mode) → returns to `https://hardpowerintel.com/subscribe/success`.
+- [ ] `/account` renders the correct tier.
