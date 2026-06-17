@@ -25,7 +25,12 @@ from engine.eval.citation_eval import CitationEvaluator
 from engine.settings import settings
 
 
-async def main(desk: str, brief_date: str) -> None:
+async def main(desk: str, brief_date: str) -> int:
+    """Generate one desk's brief. Returns an exit code the daily workflow reads (D076):
+    0 = published, 3 = generated but failed the publish gate (a clean 'thin desk' skip,
+    not an error), 1 = hard failure (provider outage / crash after retries). The
+    distinction lets the scheduled run report 'published X, skipped Y' and only alarm on
+    a genuine break instead of crying 'all jobs failed' when one sparse desk skips."""
     pool = await create_pool()   # hardened: retries transient DNS/connection failures (D057)
 
     print(f"Generating {desk.upper()} brief for {brief_date}...")
@@ -37,9 +42,11 @@ async def main(desk: str, brief_date: str) -> None:
         # attempt, else the best one seen.
         attempt = await generate_publishable_brief(desk=desk, pool=pool, evaluator=evaluator)
     except RuntimeError as e:
+        # Every attempt raised even after call-layer backoff (D076) — a real outage
+        # (provider down, key invalid), not a thin-data skip. Surface as a hard failure.
         print(f"Generation failed: {e}")
         await pool.close()
-        return
+        return 1
 
     brief = attempt.brief
     item_results = attempt.item_results
@@ -130,6 +137,8 @@ async def main(desk: str, brief_date: str) -> None:
     )
 
     await pool.close()
+    # 0 = published, 3 = generated but below the provable-claim floor (a clean skip).
+    return 0 if eval_passed else 3
 
 
 if __name__ == "__main__":
@@ -137,4 +146,4 @@ if __name__ == "__main__":
     parser.add_argument("--desk", default="defense")
     parser.add_argument("--date", default=date.today().isoformat())
     args = parser.parse_args()
-    asyncio.run(main(args.desk, args.date))
+    sys.exit(asyncio.run(main(args.desk, args.date)))

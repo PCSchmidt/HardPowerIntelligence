@@ -1869,3 +1869,12 @@ retried immediately and landed inside the same blocked window, so it couldn't cl
 call layer sleeps past the window and self-heals. Paired operator action: add paid OpenRouter credits
 (removes the free-tier upstream limit entirely); backoff covers transient blips regardless. Jitter
 de-syncs concurrent desk calls. This is reliability for unattended daily publishing, not a quality change.
+
+**Honest run reporting (same gate):** `scripts/run_brief.py` now exits with a code the daily
+workflow reads — `0` published, `3` generated-but-below-the-claim-floor (a clean "thin desk" skip,
+not an error), other = hard crash (a `RuntimeError` after backoff = real outage). `.github/workflows/
+daily-brief.yml` captures each desk's code, writes a `published / skipped / crashed` summary to
+`$GITHUB_STEP_SUMMARY`, spaces desks 15s apart to ease the rate budget, and exits non-zero (→ the
+"run failed" email) ONLY when a desk crashes or nothing published. A sparse desk skipping on a slow
+news day is now a normal green run, not a false "All jobs failed" alarm — the signal operators (and
+soon testers) watch is trustworthy.

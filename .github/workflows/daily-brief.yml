@@ -68,10 +68,40 @@ jobs:
           else
             DESKS="${{ inputs.desk || 'defense' }}"
           fi
-          fail=0
+          # run_brief.py exit codes (D076): 0=published, 3=clean skip (below the
+          # provable-claim floor on a thin day — not an error), other=hard crash.
+          published=""; skipped=""; crashed=""; first=1
           for d in $DESKS; do
+            # Space desks apart so we don't burst the provider rate budget (D076).
+            if [ "$first" = "0" ]; then sleep 15; fi
+            first=0
             echo "::group::brief $d"
-            uv run python scripts/run_brief.py --desk "$d" || fail=1
+            set +e
+            uv run python scripts/run_brief.py --desk "$d"
+            code=$?
+            set -e
             echo "::endgroup::"
+            case "$code" in
+              0) published="$published $d" ;;
+              3) skipped="$skipped $d" ;;
+              *) crashed="$crashed $d" ;;
+            esac
           done
-          exit $fail   # attempt all desks, then surface a failure if any desk failed
+          {
+            echo "## Daily Brief"
+            echo "- **published:**${published:- (none)}"
+            echo "- **skipped (below claim floor):**${skipped:- (none)}"
+            echo "- **crashed:**${crashed:- (none)}"
+          } >> "$GITHUB_STEP_SUMMARY"
+          echo "published:${published:- none} | skipped:${skipped:- none} | crashed:${crashed:- none}"
+          # Go red (→ email) only on a genuine break: a desk crashed, or nothing
+          # published at all. A sparse desk cleanly skipping is a normal green run.
+          if [ -n "$crashed" ]; then
+            echo "::error::brief desk(s) crashed:$crashed"
+            exit 1
+          fi
+          if [ -z "$published" ]; then
+            echo "::error::no desk published (all desks skipped or empty)"
+            exit 1
+          fi
+          exit 0
