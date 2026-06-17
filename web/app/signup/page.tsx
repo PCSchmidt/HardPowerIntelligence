@@ -3,7 +3,7 @@ import { Shield } from "lucide-react";
 import { SignupForm } from "@/components/auth/signup-form";
 
 export const metadata: Metadata = {
-  title: "Start Free Trial",
+  title: "Create your free account",
   robots: { index: false, follow: false },
 };
 
@@ -15,9 +15,9 @@ export default function SignupPage() {
           <Shield size={20} className="text-brand-secondary" />
           HPI
         </div>
-        <h1 className="font-display text-display-sm">Start your free trial</h1>
+        <h1 className="font-display text-display-sm">Create your free account</h1>
         <p className="mb-6 mt-1 text-ui-sm text-muted-foreground">
-          14 days Pro, then $19/month or $179/year. Cancel anytime.
+          The full daily brief, every day — free. Upgrade to Pro anytime.
         </p>
         <SignupForm />
       </div>

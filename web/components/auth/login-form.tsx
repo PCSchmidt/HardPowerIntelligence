@@ -65,7 +65,7 @@ export function LoginForm() {
       <p className="text-center text-ui-sm text-muted-foreground">
         Don&apos;t have an account?{" "}
         <Link href="/signup" className="font-medium text-primary hover:underline">
-          Start free trial
+          Create a free account
         </Link>
       </p>
     </div>

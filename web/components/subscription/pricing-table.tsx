@@ -1,5 +1,6 @@
 import { Check, Minus } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { paymentsConfigured } from "@/lib/payments";
 import { CheckoutButton } from "./checkout-button";
 
 const FEATURES: { label: string; free: boolean; pro: boolean }[] = [
@@ -18,8 +19,11 @@ function Cell({ on }: { on: boolean }) {
   );
 }
 
-// Free vs Pro comparison (used on marketing home and /subscribe).
+// Free vs Pro comparison (used on marketing home and /subscribe). Server Component —
+// reads paymentsConfigured() so the Pro CTA degrades to "Coming soon" while Lemon Squeezy
+// is dark (D088) and restores the trial checkout automatically once the env is set.
 export function PricingTable() {
+  const live = paymentsConfigured();
   return (
     <div className="grid gap-6 md:grid-cols-2">
       <div className="rounded-xl border border-border bg-card p-8 shadow-sm">
@@ -40,7 +44,7 @@ export function PricingTable() {
         <div className="flex items-center justify-between">
           <h3 className="font-display text-display-sm text-brand">Pro</h3>
           <span className="rounded-sm bg-brand-secondary px-2 py-0.5 text-ui-xs font-medium uppercase tracking-wide text-brand">
-            14-day trial
+            {live ? "14-day trial" : "Coming soon"}
           </span>
         </div>
         <p className="mt-1 text-ui-md text-muted-foreground">Archive, entity 360, PDF, follows.</p>
@@ -57,12 +61,20 @@ export function PricingTable() {
           ))}
         </ul>
         <div className="mt-8">
-          <CheckoutButton variant="monthly" className="w-full">
-            Start 14-day free trial
-          </CheckoutButton>
-          <p className="mt-2 text-ui-xs text-muted-foreground">
-            Credit card required. Cancel anytime. $19/month after trial.
-          </p>
+          {live ? (
+            <>
+              <CheckoutButton variant="monthly" className="w-full">
+                Start 14-day free trial
+              </CheckoutButton>
+              <p className="mt-2 text-ui-xs text-muted-foreground">
+                Credit card required. Cancel anytime. $19/month after trial.
+              </p>
+            </>
+          ) : (
+            <p className="rounded-md border border-dashed border-border bg-muted/40 px-4 py-3 text-center text-ui-sm text-muted-foreground">
+              Pro is coming soon. You already get the full daily brief — free.
+            </p>
+          )}
         </div>
       </div>
     </div>

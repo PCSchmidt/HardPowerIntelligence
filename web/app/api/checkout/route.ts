@@ -11,7 +11,7 @@ export async function POST(request: Request) {
   } = await supabase.auth.getUser();
 
   if (!user) {
-    return NextResponse.json({ error: "Please sign in to start a trial." }, { status: 401 });
+    return NextResponse.json({ error: "Please sign in to upgrade to Pro." }, { status: 401 });
   }
 
   const apiKey = process.env.LEMONSQUEEZY_API_KEY;
@@ -24,7 +24,7 @@ export async function POST(request: Request) {
 
   if (!apiKey || !storeId || !variantId) {
     return NextResponse.json(
-      { error: "Payments are not yet configured. Check back soon." },
+      { error: "Pro isn't available yet — you already get the full daily brief free." },
       { status: 503 },
     );
   }

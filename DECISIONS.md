@@ -2068,7 +2068,7 @@ the Jun-15 pre-layered brief. D076 backoff now covers those calls, but this hard
 structural gap so an analysis-layer hiccup can never again silently drop an already-publishable brief.
 Same best-effort principle as the GDELT signal (D082).
 
-## D087 � UX Tier 2 (frontend): type icons, inline magnitude bars, signal trend styling
+## D087 — UX Tier 2 (frontend): type icons, inline magnitude bars, signal trend styling
 
 **Decision:** The brief reader gains a data/glance layer with no backend change. (1) A consistent
 **type icon** per `item_type` (award/filing/policy/macro/signal), centralized in
@@ -2078,11 +2078,33 @@ the long read. (2) **Inline magnitude bars** on each item's key dollar figure, n
 brief's largest (reusing the D084 `amounts` parser), so a number reads "compared to what?" right at
 the item, not only in the ledger. (3) The GDELT **Signal** line (D082) rendered with a trend arrow +
 color per momentum delta (`web/lib/signal.ts` `splitSignal` + `SignalLine`), replacing the flat dashed
-text. All presentation-only � the cited facts and the signal's disclaimer text stay authoritative.
+text. All presentation-only — the cited facts and the signal's disclaimer text stay authoritative.
 
-**Why:** The competitive scan (FRONTEND_SPEC �9) flagged HPI as prose-heavy with an under-expressed
+**Why:** The competitive scan (FRONTEND_SPEC §9) flagged HPI as prose-heavy with an under-expressed
 data layer; Tier 1 (D084) added the at-a-glance ledger, Tier 2 carries that glanceability into the
 body and foregrounds the Signal's direction. Kept **frontend-only (no migration)** so it ships on push
 and degrades gracefully on older data. The *true numeric sparkline* is deferred to **Tier 2b** because
-it needs the GDELT volume series persisted � the `signal` field is currently only a prose string
+it needs the GDELT volume series persisted — the `signal` field is currently only a prose string
 (`build_signal_line`), so a real sparkline is a schema + generator + API change, not a render change.
+
+## D088 — Honest free-tier onboarding copy + Pro degradation while payments are dark
+
+**Decision:** Two coordinated changes so an invited *free* tester isn't told they must pay. (1)
+**Account-creation CTAs reframed** from "Start (14-day free) trial" to free-account language —
+"Get the free daily brief" (home hero + navbar), "Create your free account" (`/signup`), "Create a
+free account" (login link). Signing up creates a **free account**; the Pro 14-day trial begins on
+*upgrade* — so this is more accurate even at launch, and drops the "credit card required" deterrent at
+the front door. (2) A server-only **`paymentsConfigured()`** helper (`web/lib/payments.ts`, reads the
+`LEMONSQUEEZY_*` env) keys every Pro surface — `PricingTable`, the `/subscribe` hero, `ArchiveLock` —
+so they degrade to **"Pro is coming soon - you already get the full daily brief free"** while Lemon
+Squeezy is unset, and restore the trial/checkout automatically once the env is set. The checkout route's
+503 copy was softened to match ("Pro isn't available yet - you already get the full daily brief free").
+
+**Why:** A tester signed up on mobile and read the post-signup `/subscribe` paywall ("14-day trial,
+credit card required"; checkout "not configured") as "I have to pay" - confusing and off-putting for an
+account that already sees the full current-day brief on every desk. With the signup->`/desk/defense`
+redirect (`ccd393b`) and the mobile-nav hamburger (`92e725b`), this closes the onboarding-confusion
+theme before open testing. Degradation is **env-keyed**, so there's no flag to flip at launch - setting
+the Vercel env and redeploying flips the marketing surfaces to the trial CTA. Note: those pages are
+statically prerendered, so the switch lands on the redeploy that an env change triggers; the checkout
+API re-checks server-side at request time, so it's always the authoritative gate.

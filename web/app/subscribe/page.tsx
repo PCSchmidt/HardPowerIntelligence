@@ -1,10 +1,11 @@
 import type { Metadata } from "next";
 import { PricingTable } from "@/components/subscription/pricing-table";
+import { paymentsConfigured } from "@/lib/payments";
 
 export const metadata: Metadata = {
-  title: "Subscribe",
+  title: "Pro",
   description:
-    "14-day free trial. Daily cited defense intelligence briefs. Cancel anytime.",
+    "Hard Power Intelligence Pro — the 90-day archive, entity 360 pages, PDF export, and follows.",
   robots: { index: true, follow: true },
 };
 
@@ -28,13 +29,16 @@ const FAQ = [
 ];
 
 export default function SubscribePage() {
+  const live = paymentsConfigured();
   return (
     <div className="mx-auto max-w-page px-4 py-20 sm:px-6 lg:px-8">
       <h1 className="text-center font-display text-display-lg text-foreground">
-        Start your 14-day free trial
+        {live ? "Start your 14-day free trial" : "Pro is coming soon"}
       </h1>
       <p className="mx-auto mt-3 max-w-xl text-center text-body-lg text-muted-foreground">
-        Daily cited defense intelligence. Credit card required, cancel anytime.
+        {live
+          ? "Daily cited intelligence, plus the archive, entity 360, PDF, and follows. Credit card required, cancel anytime."
+          : "You already get the full daily brief — free. Pro adds the 90-day archive, entity 360, PDF export, and follows. Coming soon."}
       </p>
 
       <div className="mt-12">

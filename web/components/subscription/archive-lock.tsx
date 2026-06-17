@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Lock } from "lucide-react";
 import { buttonVariants } from "@/components/ui/button";
+import { paymentsConfigured } from "@/lib/payments";
 
 // Full-page Pro gate (D024) — shown for archived briefs / entity 360 to free users.
 export function ArchiveLock({
@@ -21,7 +22,7 @@ export function ArchiveLock({
         <p className="mt-2 text-ui-md text-muted-foreground">{body}</p>
         <div className="mt-6 flex justify-center">
           <Link href="/subscribe" className={buttonVariants({ size: "lg" })}>
-            Start 14-day free trial
+            {paymentsConfigured() ? "Start 14-day free trial" : "See Pro features →"}
           </Link>
         </div>
       </div>

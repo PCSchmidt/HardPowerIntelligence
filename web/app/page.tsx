@@ -38,7 +38,7 @@ export default function Home() {
           </p>
           <div className="mt-8 flex justify-center gap-3">
             <Link href="/signup" className={buttonVariants({ size: "lg" })}>
-              Start 14-day free trial
+              Get the free daily brief
             </Link>
             <Link
               href="/desk/defense"

@@ -139,7 +139,7 @@ export function NavBar() {
                 Sign in
               </Link>
               <Link href="/signup" className={buttonVariants({ size: "lg" })}>
-                Start free trial
+                Get the free brief
               </Link>
             </>
           )}
