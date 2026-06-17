@@ -575,7 +575,7 @@ differentiators; add glanceability; don't lose the calm reader. Target feel: *St
 excerpt · "View source ↗"); item-type color tokens (`--color-item-award|filing|policy|macro|signal`);
 inline `[CITE:N]` chips that open the drawer; the layered Convergence + Analysis disclosure cards.
 
-### Tier 1 — provenance visible + at-a-glance (this gate, no backend change)
+### Tier 1 — provenance visible + at-a-glance (DONE, D084 — no backend change)
 - **At-a-glance header** (`brief-glance.tsx`): a compact, scannable ledger above the long read — per
   item: type swatch + label, headline (anchor-links to the item), a normalized **magnitude bar** from
   the item's key dollar figure (parsed from headline, then body), and a **Sources (N)** count. A summary
@@ -584,9 +584,23 @@ inline `[CITE:N]` chips that open the drawer; the layered Convergence + Analysis
   inline chips) opening the existing drawer; prettify `source_id` → display name (SEC EDGAR,
   USASpending.gov, arXiv, GDELT…) in the drawer + glance.
 
-### Tier 2 — the data layer
-- **Magnitude bars** inline on dollar figures ("$55.9M" against the "$137M asset" → instant "compared
-  to what?"). **Signal sparkline + arrow** replacing the dashed text line. Consistent **type icons**.
+### Tier 2a — the data layer, frontend (DONE, D087 — no backend change)
+- **Type icons** — a consistent glyph per `item_type`, centralized in `web/lib/item-types.ts` (label +
+  color token + icon), replacing the bare dot in `brief-glance` and `brief-content`.
+- **Magnitude bars inline** on each item's key dollar figure (reusing the D084 `amounts` parser),
+  normalized to the brief max → "compared to what?" at the item, not just in the ledger.
+- **Signal trend styling** — `SignalLine` (`web/lib/signal.ts` `splitSignal`) renders a trend arrow +
+  color on each GDELT momentum delta, replacing the flat dashed text. Disclaimer text preserved.
+
+### Tier 2b — real signal sparkline (TODO — needs backend)
+- A true **sparkline** of the GDELT volume series (6w) behind the Signal line. Blocked on persisting the
+  numeric series: `briefs.signal` is currently only a prose string (`build_signal_line`), so this is a
+  schema + generator + API change, then a small client chart. Tier 2a's arrow is the interim.
+
+### Tier 3 — entity + convergence as first-class
+- **Entity chips** (company + ticker) linking to Entity 360 (`/entity/[id]`), teasing the Pro feature in
+  the free brief. **Convergence visualization** — a small entity/theme relationship graph of the day's
+  cross-desk links; the visual front-end for the `entity_edges` moat (D055).
 
 ### Tier 3 — entity + convergence as first-class
 - **Entity chips** (company + ticker) linking to Entity 360 (`/entity/[id]`), teasing the Pro feature in

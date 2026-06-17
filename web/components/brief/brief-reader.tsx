@@ -1,8 +1,9 @@
-import { Activity, AlertTriangle, Sparkles } from "lucide-react";
+import { AlertTriangle, Sparkles } from "lucide-react";
 import type { Brief } from "@/lib/types";
 import { BriefHeader } from "./brief-header";
 import { BriefGlance } from "./brief-glance";
 import { BriefContent } from "./brief-content";
+import { SignalLine } from "./signal-line";
 
 // Composes the full reader (Server Component): staleness strip (D013), header,
 // interactive content, and the metadata footer. Shared by the desk and archive pages.
@@ -27,12 +28,7 @@ export function BriefReader({ brief }: { brief: Brief }) {
         </section>
       )}
       <BriefContent items={brief.items} citations={brief.citations} />
-      {brief.signal && (
-        <section className="mt-8 flex items-start gap-2 rounded-md border border-dashed border-border bg-muted/30 px-4 py-3 text-ui-sm text-muted-foreground">
-          <Activity size={14} className="mt-0.5 shrink-0" />
-          <span>{brief.signal}</span>
-        </section>
-      )}
+      {brief.signal && <SignalLine signal={brief.signal} />}
       <footer className="mt-8 border-t border-border pt-4 text-ui-sm text-muted-foreground">
         {brief.model_waterfall.synthesis_model && (
           <span>Synthesis: {brief.model_waterfall.synthesis_model}</span>

@@ -170,6 +170,15 @@ interface SidebarProps {
 > with an "N items · ≈$X tracked · 100% cited" strip — plus a dashed **GDELT Signal** block. `BriefContent`
 > now also exposes a visible "Sources (N)" control per item (opening `CitationsDrawer`, which shows
 > prettified source names via `lib/sources.ts`).
+>
+> **As-built note (2026-06-17, D087 — UX Tier 2a):** per-item-type presentation is centralized in
+> **`lib/item-types.ts`** (`ITEM_LABEL`/`ITEM_BG`/`ITEM_TEXT`/`ITEM_ICON`), shared by `BriefGlance` and
+> `BriefContent` — the bare color dot is replaced by a **type icon** (award/filing/policy/macro/signal).
+> `BriefContent` adds an **inline magnitude bar** per item (key $ figure normalized to the brief max,
+> `lib/amounts.ts`). The Signal block is now **`SignalLine`** (`components/brief/signal-line.tsx`, Server)
+> which renders a trend arrow + color on each GDELT momentum delta via `lib/signal.ts` `splitSignal`
+> (presentation-only; the disclaimer text is preserved). A true numeric sparkline is deferred to Tier 2b
+> (needs the GDELT series persisted; `briefs.signal` is currently a prose string).
 
 ### `BriefHeader`
 

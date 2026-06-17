@@ -4,23 +4,9 @@ import { ChevronDown, FileText, Sparkles } from "lucide-react";
 import { useMemo, useState } from "react";
 import type { BriefItem, Citation } from "@/lib/types";
 import { cn } from "@/lib/utils";
+import { formatUsd, keyAmount } from "@/lib/amounts";
+import { ITEM_BG, ITEM_ICON, ITEM_LABEL, ITEM_TEXT } from "@/lib/item-types";
 import { CitationsDrawer } from "./citations-drawer";
-
-const ITEM_LABEL: Record<BriefItem["item_type"], string> = {
-  award: "Award",
-  filing: "Filing",
-  policy: "Policy",
-  macro: "Macro",
-  signal: "Signal",
-};
-
-const ITEM_DOT: Record<BriefItem["item_type"], string> = {
-  award: "bg-item-award",
-  filing: "bg-item-filing",
-  policy: "bg-item-policy",
-  macro: "bg-item-macro",
-  signal: "bg-item-signal",
-};
 
 // Splits a body string on [CITE:N] markers and renders each as a clickable chip.
 function CitedBody({ body, onCite }: { body: string; onCite: () => void }) {
@@ -102,6 +88,14 @@ export function BriefContent({
     [citations],
   );
 
+  // Inline magnitude bars (D087): each item's key dollar figure, normalized to the
+  // largest in the brief, so a number reads "compared to what?" right at the item.
+  const rows = useMemo(
+    () => items.map((item) => ({ item, amount: keyAmount(item.headline, item.body) })),
+    [items],
+  );
+  const maxAmount = Math.max(0, ...rows.map((r) => r.amount ?? 0));
+
   function openForItem(item: BriefItem) {
     const list = item.citation_ids
       .map((id) => citationById.get(id))
@@ -111,11 +105,26 @@ export function BriefContent({
 
   return (
     <div className="divide-y divide-border">
-      {items.map((item) => (
+      {rows.map(({ item, amount }) => {
+        const Icon = ITEM_ICON[item.item_type];
+        return (
         <article key={item.id} id={item.id} className="scroll-mt-20 space-y-3 py-8">
           <div className="flex items-center gap-2 text-ui-xs font-medium uppercase tracking-wide text-muted-foreground">
-            <span className={cn("size-2 rounded-full", ITEM_DOT[item.item_type])} />
+            <Icon size={14} className={cn("shrink-0", ITEM_TEXT[item.item_type])} />
             {ITEM_LABEL[item.item_type]}
+            {amount !== null && (
+              <span className="ml-auto flex items-center gap-2 normal-case tracking-normal">
+                <span className="hidden h-1.5 w-24 overflow-hidden rounded-full bg-muted sm:block">
+                  <span
+                    className={cn("block h-full rounded-full", ITEM_BG[item.item_type])}
+                    style={{ width: `${maxAmount ? (amount / maxAmount) * 100 : 0}%` }}
+                  />
+                </span>
+                <span className="font-medium tabular-nums text-foreground">
+                  {formatUsd(amount)}
+                </span>
+              </span>
+            )}
           </div>
           <h2 className="font-display text-display-sm text-foreground">{item.headline}</h2>
           <CitedBody body={item.body} onCite={() => openForItem(item)} />
@@ -133,7 +142,8 @@ export function BriefContent({
             </button>
           )}
         </article>
-      ))}
+        );
+      })}
       <CitationsDrawer citations={drawer} onClose={() => setDrawer(null)} />
     </div>
   );

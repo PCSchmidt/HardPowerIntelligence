@@ -20,7 +20,8 @@ live ingestion runner, with Supabase auth and Lemon Squeezy subscriptions. Built
   Signal as labeled aggregate color (D082); a strategic-significance gate that drops
   true-but-trivial items (D085); analysis grounding made best-effort so a grounding hiccup never
   loses a passed brief (D086); the `/account` page (tier + Pro badge + manage-subscription, D080);
-  and UX Tier 1 — the at-a-glance ledger + provenance discoverability (D084, FRONTEND_SPEC §9).
+  UX Tier 1 — the at-a-glance ledger + provenance discoverability (D084, FRONTEND_SPEC §9); and UX
+  Tier 2a — per-type icons, inline magnitude bars, and trend-styled GDELT Signal (D087, frontend-only).
 - **Data pipeline** (Gate 4): USAspending adapter + entity resolver
   (contractor → ticker/CIK/UEI), proven against golden fixtures.
 - **Brief engine** (Gate 5): brief generator + citation-faithfulness eval harness;

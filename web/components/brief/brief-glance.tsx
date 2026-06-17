@@ -1,26 +1,12 @@
 import type { BriefItem } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { formatUsd, keyAmount } from "@/lib/amounts";
+import { ITEM_BG, ITEM_ICON, ITEM_LABEL, ITEM_TEXT } from "@/lib/item-types";
 
 // "Today at a glance" (D084): a scannable ledger above the long read so a busy analyst
-// gets the day in ~10 seconds. Each row links to its item; a normalized magnitude bar
-// answers "compared to what?". Server Component — hash links scroll natively, no JS.
-
-const ITEM_LABEL: Record<BriefItem["item_type"], string> = {
-  award: "Award",
-  filing: "Filing",
-  policy: "Policy",
-  macro: "Macro",
-  signal: "Signal",
-};
-
-const ITEM_BG: Record<BriefItem["item_type"], string> = {
-  award: "bg-item-award",
-  filing: "bg-item-filing",
-  policy: "bg-item-policy",
-  macro: "bg-item-macro",
-  signal: "bg-item-signal",
-};
+// gets the day in ~10 seconds. Each row links to its item; a type icon (D087) and a
+// normalized magnitude bar answer "what kind?" and "compared to what?". Server
+// Component — hash links scroll natively, no JS.
 
 export function BriefGlance({ items }: { items: BriefItem[] }) {
   if (items.length === 0) return null;
@@ -39,13 +25,15 @@ export function BriefGlance({ items }: { items: BriefItem[] }) {
         </span>
       </div>
       <ul className="divide-y divide-border">
-        {rows.map(({ item, amount }) => (
+        {rows.map(({ item, amount }) => {
+          const Icon = ITEM_ICON[item.item_type];
+          return (
           <li key={item.id}>
             <a
               href={`#${item.id}`}
               className="group flex items-center gap-3 px-4 py-2.5 hover:bg-muted/50"
             >
-              <span className={cn("size-2 shrink-0 rounded-full", ITEM_BG[item.item_type])} />
+              <Icon size={14} className={cn("shrink-0", ITEM_TEXT[item.item_type])} />
               <span className="w-14 shrink-0 text-ui-xs uppercase tracking-wide text-muted-foreground">
                 {ITEM_LABEL[item.item_type]}
               </span>
@@ -70,7 +58,8 @@ export function BriefGlance({ items }: { items: BriefItem[] }) {
               </span>
             </a>
           </li>
-        ))}
+          );
+        })}
       </ul>
     </section>
   );

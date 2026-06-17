@@ -2067,3 +2067,22 @@ and crashed `run_brief` **before persist**, so AI never wrote that day's brief a
 the Jun-15 pre-layered brief. D076 backoff now covers those calls, but this hardening closes the
 structural gap so an analysis-layer hiccup can never again silently drop an already-publishable brief.
 Same best-effort principle as the GDELT signal (D082).
+
+## D087 — UX Tier 2 (frontend): type icons, inline magnitude bars, signal trend styling
+
+**Decision:** The brief reader gains a data/glance layer with no backend change. (1) A consistent
+**type icon** per `item_type` (award/filing/policy/macro/signal), centralized in
+`web/lib/item-types.ts` (label + color token + icon in one place, killing the duplication across
+`brief-glance` and `brief-content`), replacing the bare color dot in both the at-a-glance ledger and
+the long read. (2) **Inline magnitude bars** on each item's key dollar figure, normalized to the
+brief's largest (reusing the D084 `amounts` parser), so a number reads "compared to what?" right at
+the item, not only in the ledger. (3) The GDELT **Signal** line (D082) rendered with a trend arrow +
+color per momentum delta (`web/lib/signal.ts` `splitSignal` + `SignalLine`), replacing the flat dashed
+text. All presentation-only — the cited facts and the signal's disclaimer text stay authoritative.
+
+**Why:** The competitive scan (FRONTEND_SPEC §9) flagged HPI as prose-heavy with an under-expressed
+data layer; Tier 1 (D084) added the at-a-glance ledger, Tier 2 carries that glanceability into the
+body and foregrounds the Signal's direction. Kept **frontend-only (no migration)** so it ships on push
+and degrades gracefully on older data. The *true numeric sparkline* is deferred to **Tier 2b** because
+it needs the GDELT volume series persisted — the `signal` field is currently only a prose string
+(`build_signal_line`), so a real sparkline is a schema + generator + API change, not a render change.
