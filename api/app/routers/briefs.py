@@ -1,6 +1,7 @@
 """Brief endpoints: list, latest (with D013 staleness fallback), and by-id (tier-gated)."""
 from __future__ import annotations
 
+import json
 from datetime import date, timedelta
 from uuid import UUID
 
@@ -19,6 +20,21 @@ _ARCHIVE_DAYS = 90
 def _validate_desk(desk: str) -> None:
     if desk not in _VALID_DESKS:
         raise APIError(400, "bad_request", f"Unknown desk '{desk}'")
+
+
+def _parse_signal_series(brief: asyncpg.Record) -> dict | None:
+    """Brief Signal sparkline payload (D089). JSONB comes back from asyncpg as a JSON string
+    (no codec registered), so parse it; tolerate a dict too. Absent column (pre-migration) or
+    empty → None, so the reader simply renders no sparkline."""
+    raw = brief["signal_series"] if "signal_series" in brief else None
+    if not raw:
+        return None
+    if isinstance(raw, (dict, list)):
+        return raw
+    try:
+        return json.loads(raw)
+    except (TypeError, ValueError):
+        return None
 
 
 async def _assemble_brief(conn: asyncpg.Connection, brief: asyncpg.Record, staleness: dict | None = None) -> dict:
@@ -58,6 +74,8 @@ async def _assemble_brief(conn: asyncpg.Connection, brief: asyncpg.Record, stale
         "convergence_read": brief["convergence_read"],
         # GDELT media-attention momentum (D082): labeled aggregate color, not a cited fact.
         "signal": brief["signal"] if "signal" in brief else "",
+        # Lead-theme volume series for the Signal sparkline (D089); None if none.
+        "signal_series": _parse_signal_series(brief),
         "staleness_indicator": staleness,
         "items": [
             {

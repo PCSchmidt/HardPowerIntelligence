@@ -135,7 +135,9 @@ async def main(desk: str, brief_date: str) -> int:
     # GDELT media-attention signal (D082): labeled, disclaimed momentum color, computed
     # separately from the citable-fact path. Best-effort — never fails the brief.
     async with httpx.AsyncClient() as client:
-        brief.signal = await compute_brief_signal(themes_for_desk(desk), HttpFetcher(client))
+        gdelt_signal = await compute_brief_signal(themes_for_desk(desk), HttpFetcher(client))
+    brief.signal = gdelt_signal.line
+    brief.signal_series = gdelt_signal.series_json()   # lead-theme series for the sparkline (D089)
     if brief.signal:
         print(f"\nSIGNAL: {brief.signal}")
 

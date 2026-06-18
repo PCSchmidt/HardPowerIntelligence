@@ -37,6 +37,14 @@ export interface BriefItem {
   display_order: number;
 }
 
+// GDELT lead-theme volume series for the Signal sparkline (D089).
+export interface SignalSeries {
+  theme: string;
+  series: number[];
+  delta_pct: number | null;
+  direction: "up" | "down" | null;
+}
+
 export interface ModelWaterfall {
   synthesis_model: string | null;
   eval_model: string | null;
@@ -55,6 +63,8 @@ export interface Brief {
   convergence_read: string;
   // GDELT media-attention momentum (D082): labeled aggregate color, not a cited fact. "" if none.
   signal?: string;
+  // Lead-theme volume series for the Signal sparkline (D089); null/absent if none.
+  signal_series?: SignalSeries | null;
   faithfulness_score: number | null;
   staleness_indicator: StalenessIndicator | null;
   items: BriefItem[];

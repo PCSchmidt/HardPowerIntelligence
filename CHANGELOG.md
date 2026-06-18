@@ -23,8 +23,9 @@ live ingestion runner, with Supabase auth and Lemon Squeezy subscriptions. Built
   UX Tier 1 — the at-a-glance ledger + provenance discoverability (D084, FRONTEND_SPEC §9); UX
   Tier 2a — per-type icons, inline magnitude bars, and trend-styled GDELT Signal (D087, frontend-only);
   a mobile-nav hamburger so all three desks are reachable on phones; signup landing on the brief
-  (`/desk/defense`) instead of the upgrade page; and honest free-tier onboarding copy with Pro surfaces
-  degrading to "coming soon" while Lemon Squeezy is dark (D088).
+  (`/desk/defense`) instead of the upgrade page; honest free-tier onboarding copy with Pro surfaces
+  degrading to "coming soon" while Lemon Squeezy is dark (D088); and UX Tier 2b — a real GDELT Signal
+  sparkline from a persisted lead-theme volume series (D089, migration `20260618000001`).
 - **Data pipeline** (Gate 4): USAspending adapter + entity resolver
   (contractor → ticker/CIK/UEI), proven against golden fixtures.
 - **Brief engine** (Gate 5): brief generator + citation-faithfulness eval harness;

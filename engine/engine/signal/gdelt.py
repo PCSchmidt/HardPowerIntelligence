@@ -14,7 +14,7 @@ touching the brief-side Signal contract.
 """
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 GDELT_DOC_URL = "https://api.gdeltproject.org/api/v2/doc/doc"
 
@@ -78,6 +78,7 @@ def compute_momentum(
 class ThemeSignal:
     theme: str
     momentum: Momentum
+    series: list[float] = field(default_factory=list)
 
     def phrase(self) -> str | None:
         """A short human phrase for this theme's momentum, or None if not noteworthy."""
@@ -107,13 +108,54 @@ def build_signal_line(signals: list[ThemeSignal]) -> str:
     )
 
 
-async def compute_brief_signal(themes: list[str], fetcher, *, max_themes: int = 6) -> str:
-    """Fetch momentum for up to ``max_themes`` themes and build one labeled signal line.
+@dataclass
+class BriefSignal:
+    """A brief's GDELT signal (D082/D089): the labeled prose ``line`` plus the lead theme's
+    volume series for a sparkline. The series fields are the numeric layer — empty/None when
+    nothing moved or GDELT was unreachable, so the reader shows the line with no sparkline."""
+    line: str
+    lead_theme: str | None = None
+    series: list[float] = field(default_factory=list)
+    delta_pct: float | None = None
+    direction: str | None = None   # "up" | "down" | None
 
-    Capped to bound GDELT calls per brief; returns "" if nothing moved (or GDELT is
-    unreachable) — the brief simply renders no Signal block in that case."""
+    def series_json(self) -> dict | None:
+        """JSONB payload for ``briefs.signal_series``, or None when there's no sparkline."""
+        if not self.series or self.lead_theme is None:
+            return None
+        return {
+            "theme": self.lead_theme,
+            "series": self.series,
+            "delta_pct": self.delta_pct,
+            "direction": self.direction,
+        }
+
+
+async def compute_brief_signal(
+    themes: list[str], fetcher, *, max_themes: int = 6
+) -> BriefSignal:
+    """Fetch momentum for up to ``max_themes`` themes; return the labeled line plus the lead
+    theme's series for a sparkline.
+
+    Capped to bound GDELT calls per brief. The lead is the noteworthy theme with the largest
+    absolute move; if nothing moved (or GDELT is unreachable) ``line`` is "" and there is no
+    sparkline — the brief simply renders no Signal block."""
     signals = [await fetch_theme_signal(t, fetcher) for t in themes[:max_themes]]
-    return build_signal_line(signals)
+    line = build_signal_line(signals)
+    if not line:
+        return BriefSignal(line="")
+    noteworthy = [s for s in signals if s.phrase() is not None]
+    lead = max(noteworthy, key=lambda s: abs(s.momentum.delta_pct or 0.0))
+    direction = (
+        "up" if lead.momentum.is_rising else "down" if lead.momentum.is_falling else None
+    )
+    return BriefSignal(
+        line=line,
+        lead_theme=lead.theme,
+        series=lead.series,
+        delta_pct=lead.momentum.delta_pct,
+        direction=direction,
+    )
 
 
 async def fetch_theme_signal(theme: str, fetcher, *, timespan: str = "6w") -> ThemeSignal:
@@ -129,4 +171,4 @@ async def fetch_theme_signal(theme: str, fetcher, *, timespan: str = "6w") -> Th
         series = parse_timeline(payload if isinstance(payload, dict) else {})
     except Exception:  # noqa: BLE001 — decorative signal must not fail the brief
         series = []
-    return ThemeSignal(theme=theme, momentum=compute_momentum(series))
+    return ThemeSignal(theme=theme, momentum=compute_momentum(series), series=series)

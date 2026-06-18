@@ -1,6 +1,7 @@
 """GDELT media-attention signal (D082) — pure compute, no network."""
 import pytest
 from engine.signal.gdelt import (
+    BriefSignal,
     ThemeSignal,
     build_signal_line,
     compute_brief_signal,
@@ -104,17 +105,40 @@ class TestFetchThemeSignal:
     async def test_fetch_failure_is_silent(self):
         sig = await fetch_theme_signal("SMRs", _FakeFetcher(fail=True))
         assert sig.momentum.delta_pct is None    # decorative: never raises
+        assert sig.series == []                  # no series to sparkline
+
+    @pytest.mark.asyncio
+    async def test_fetch_carries_series(self):
+        payload = {"timeline": [{"series": "v", "data": [
+            {"date": f"2026050{i}T000000Z", "value": v} for i, v in enumerate([1.0, 2.0, 3.0])
+        ]}]}
+        sig = await fetch_theme_signal("SMRs", _FakeFetcher(payload))
+        assert sig.series == [1.0, 2.0, 3.0]     # raw series flows through for the sparkline
 
 
 class TestComputeBriefSignal:
     @pytest.mark.asyncio
     async def test_caps_theme_count_and_builds_labeled_line(self):
         fetcher = _FakeFetcher(_RISING)
-        line = await compute_brief_signal(list("abcdefgh"), fetcher, max_themes=3)
+        sig = await compute_brief_signal(list("abcdefgh"), fetcher, max_themes=3)
         assert fetcher.calls == 3                 # capped, not all 8 themes
-        assert "not a verified fact" in line and "+100%" in line
+        assert "not a verified fact" in sig.line and "+100%" in sig.line
+
+    @pytest.mark.asyncio
+    async def test_lead_theme_carries_series_for_sparkline(self):
+        sig = await compute_brief_signal(list("abc"), _FakeFetcher(_RISING), max_themes=3)
+        assert sig.lead_theme in {"a", "b", "c"}
+        assert len(sig.series) == 28               # the lead theme's 28-pt volume series
+        assert sig.direction == "up"
+        payload = sig.series_json()
+        assert payload is not None
+        assert payload["series"] == sig.series and payload["direction"] == "up"
 
     @pytest.mark.asyncio
     async def test_gdelt_unreachable_yields_empty_line(self):
-        line = await compute_brief_signal(["a", "b"], _FakeFetcher(fail=True))
-        assert line == ""                          # no signal block rendered
+        sig = await compute_brief_signal(["a", "b"], _FakeFetcher(fail=True))
+        assert sig.line == ""                       # no signal block rendered
+        assert sig.series_json() is None            # and no sparkline
+
+    def test_series_json_none_without_series(self):
+        assert BriefSignal(line="x").series_json() is None

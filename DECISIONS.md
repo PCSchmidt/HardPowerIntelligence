@@ -2108,3 +2108,22 @@ theme before open testing. Degradation is **env-keyed**, so there's no flag to f
 the Vercel env and redeploying flips the marketing surfaces to the trial CTA. Note: those pages are
 statically prerendered, so the switch lands on the redeploy that an env change triggers; the checkout
 API re-checks server-side at request time, so it's always the authoritative gate.
+
+## D089 — UX Tier 2b: real GDELT signal sparkline (persist the lead-theme series)
+
+**Decision:** Persist the numeric series behind the GDELT Signal so the reader draws a real sparkline,
+not just the D087 trend arrow. The GDELT layer already *fetched* the per-theme volume series and threw
+it away; now `fetch_theme_signal` keeps it (`ThemeSignal.series`), and `compute_brief_signal` returns a
+`BriefSignal` (the labeled prose `line` **plus** the lead theme's series/`delta_pct`/`direction` — lead
+= the noteworthy theme with the largest absolute move). `run_brief` stores `BriefSignal.series_json()`
+into a new nullable `briefs.signal_series JSONB` (migration `20260618000001`); the API parses it
+defensively (asyncpg returns JSONB as a string — no codec registered) and serializes it; the reader
+renders a dependency-free inline SVG `<polyline>` sparkline in `SignalLine`, colored by direction.
+
+**Why:** Tier 2a styled the prose; the data layer (FRONTEND_SPEC §9) wanted the curve — "Bloomberg
+glanceability." Kept honest and best-effort end to end: `signal_series` is **NULL** when nothing moved
+or GDELT was unreachable, it lives beside `signal` and out of the provable-claim path (it's aggregate
+attention color, never a cited fact), and the reader degrades to the line-only view (or pre-migration
+briefs) with no sparkline. Backward-compatible: the column is additive/nullable and every read guards
+on its presence. The richer BigQuery GKG backend can later replace the fetch layer without touching this
+brief-side contract. OPERATOR: `supabase db push` adds the column before the engine writes it.
