@@ -128,6 +128,11 @@ fixtures onto live data and became genuinely multi-desk:
   three desks publish from live data with the layered analyst voice (BLUF → at-a-glance ledger →
   convergence → cited facts → grounded analysis → GDELT signal). A strategic-significance gate
   (D085) drops true-but-trivial items so a desk skips cleanly rather than publishing filler.
+- **Entity-resolution graph (in progress, D091)** — the moat (the "transmission layer"): a
+  SEC-seeded reference entity set (~8k companies, de-duped by CIK) and a precision-first resolver
+  held to an accuracy eval gate (first run: precision 1.000, zero false links), being built toward
+  entity chips, Entity 360 pages, and a convergence view. Private/venture firms are minted from
+  authoritative ingest identifiers (UEI/CIK), not a curated list.
 
 Remaining before public launch: Lemon Squeezy go-live (the checkout/webhook code is built;
 needs account creds + variant IDs in Vercel/Fly — config, not engineering), a live-validation

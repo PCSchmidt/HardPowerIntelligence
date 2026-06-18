@@ -25,8 +25,11 @@ live ingestion runner, with Supabase auth and Lemon Squeezy subscriptions. Built
   a mobile-nav hamburger so all three desks are reachable on phones; signup landing on the brief
   (`/desk/defense`) instead of the upgrade page; honest free-tier onboarding copy with Pro surfaces
   degrading to "coming soon" while Lemon Squeezy is dark (D088); UX Tier 2b — a real GDELT Signal
-  sparkline from a persisted lead-theme volume series (D089, migration `20260618000001`); and a CI
-  migration-reconcile safeguard so a schema change merged to `main` can't dark the daily brief (D090).
+  sparkline from a persisted lead-theme volume series (D089, migration `20260618000001`); a CI
+  migration-reconcile safeguard so a schema change merged to `main` can't dark the daily brief (D090);
+  and the first two gates of the **entity-resolution graph** (the moat, D091) — a SEC-seeded reference
+  entity set (`scripts/seed_entities.py`, ~8k companies de-duped by CIK) and a precision-first resolver
+  with an accuracy eval gate (`scripts/eval_resolver.py`; first run: precision 1.000 / false-link 0.000).
 - **Data pipeline** (Gate 4): USAspending adapter + entity resolver
   (contractor → ticker/CIK/UEI), proven against golden fixtures.
 - **Brief engine** (Gate 5): brief generator + citation-faithfulness eval harness;

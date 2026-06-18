@@ -90,6 +90,19 @@ supabase db diff           # should report NO schema differences (local == cloud
 Or in the dashboard (Table editor) confirm the 16 tables exist and RLS is **on** for
 `briefs`, `subscriptions`, `user_profiles`, etc.
 
+### 1.3 Seed the entity-resolution reference set (T3.1/T3.2, D091)
+The entity graph (the moat) resolves brief mentions to investable entities. Seed the public
+universe and verify the resolver's accuracy before relying on it:
+```bash
+uv run python scripts/seed_entities.py     # ~8k public companies from SEC (idempotent; re-run to resume)
+uv run python scripts/eval_resolver.py     # accuracy gate vs tests/fixtures/entity_golden.json
+```
+`eval_resolver.py` must report **PASS** (precision ≥ `entity_resolver_min_precision`, default 0.95) —
+a wrong ticker corrupts the provenance trust model, so resolved entities don't render until this passes.
+It prints per-miss diagnostics (status / confidence / top trigram candidates) to guide tuning. Seed is
+idempotent (de-duped by CIK, NOT EXISTS guard), so it's safe to re-run after a connection drop. Private /
+venture entities are minted later from ingest identifiers (UEI/CIK), not seeded here.
+
 ### 1.3 Seed initial data (so there's something to brief)
 `run_brief.py` reads `normalized_records`; on a fresh DB that table is empty and brief
 generation will no-op. Seed the golden fixture once:
