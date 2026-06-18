@@ -31,15 +31,17 @@ def pad_cik(cik: object) -> str:
 
 
 def parse_company_tickers(payload: dict) -> list[CompanyRef]:
-    """Parse the SEC company_tickers.json object into de-duped CompanyRefs.
+    """Parse the SEC company_tickers.json object into one CompanyRef per company.
 
     The file is a JSON object keyed by row index: ``{"0": {"cik_str": 320193, "ticker":
     "AAPL", "title": "Apple Inc."}, ...}``. Rows missing a ticker or title are skipped (we
-    can't resolve to or label a company without both). De-duped on (ticker, cik) so a repeated
-    listing doesn't create duplicate identifiers.
+    can't resolve to or label a company without both). **De-duped on CIK** — one entity per
+    company, keeping the first ticker seen. Multiple share classes (e.g. GOOGL + GOOG) share a
+    CIK, so they collapse to a single entity (the CIK identifier is unique per company); the
+    secondary class ticker is dropped for v1 since mentions resolve by name, not by ticker.
     """
     out: list[CompanyRef] = []
-    seen: set[tuple[str, str]] = set()
+    seen_cik: set[str] = set()
     for row in (payload or {}).values():
         if not isinstance(row, dict):
             continue
@@ -49,10 +51,9 @@ def parse_company_tickers(payload: dict) -> list[CompanyRef]:
         if not ticker or not title or cik_raw is None:
             continue
         cik = pad_cik(cik_raw)
-        key = (ticker, cik)
-        if key in seen:
+        if cik in seen_cik:
             continue
-        seen.add(key)
+        seen_cik.add(cik)
         out.append(
             CompanyRef(
                 cik=cik,

@@ -6,7 +6,9 @@ _PAYLOAD = {
     "1": {"cik_str": 936468, "ticker": "LMT", "title": "Lockheed Martin Corp"},
     "2": {"cik_str": 1234, "ticker": "", "title": "No Ticker Co"},          # skipped: no ticker
     "3": {"cik_str": None, "ticker": "NOCIK", "title": "No CIK Inc"},       # skipped: no cik
-    "4": {"cik_str": 936468, "ticker": "LMT", "title": "Lockheed Martin Corp"},  # duplicate
+    "4": {"cik_str": 936468, "ticker": "LMT", "title": "Lockheed Martin Corp"},  # exact duplicate
+    "5": {"cik_str": 1652044, "ticker": "GOOGL", "title": "Alphabet Inc."},
+    "6": {"cik_str": 1652044, "ticker": "GOOG", "title": "Alphabet Inc."},  # share class, same CIK
 }
 
 
@@ -26,8 +28,14 @@ class TestParseCompanyTickers:
         assert "No Ticker Co" not in {r.name for r in refs}
         assert all(r.ticker and r.cik for r in refs)
 
-    def test_dedupes_on_ticker_cik(self):
-        assert len([r for r in parse_company_tickers(_PAYLOAD) if r.ticker == "LMT"]) == 1
+    def test_dedupes_on_cik(self):
+        # one entity per company; a repeated CIK (exact dup or share class) collapses to one ref
+        assert len([r for r in parse_company_tickers(_PAYLOAD) if r.cik == "0000936468"]) == 1
+
+    def test_collapses_share_classes_keeping_first_ticker(self):
+        alphabet = [r for r in parse_company_tickers(_PAYLOAD) if r.cik == "0001652044"]
+        assert len(alphabet) == 1
+        assert alphabet[0].ticker == "GOOGL"   # first ticker seen for the CIK wins
 
     def test_empty_payload(self):
         assert parse_company_tickers({}) == []
