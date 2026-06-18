@@ -408,8 +408,8 @@ async def persist_brief(
                 INSERT INTO briefs (
                     id, desk, date, status, headline, bluf, convergence_read,
                     faithfulness_score, eval_passed, published_at,
-                    synthesis_model, model_waterfall_metadata, signal, signal_series
-                ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
+                    synthesis_model, model_waterfall_metadata, signal
+                ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
                 """,
                 brief_id, desk, brief_date, status,
                 brief.headline, brief.bluf, brief.convergence_read,
@@ -417,7 +417,6 @@ async def persist_brief(
                 brief.synthesis_model,
                 json.dumps(brief.model_waterfall_metadata),
                 brief.signal,
-                json.dumps(brief.signal_series) if brief.signal_series is not None else None,
             )
 
             for i, item in enumerate(surviving_items):
@@ -456,6 +455,20 @@ async def persist_brief(
                         passage.source_id, passage.url, passage.fetched_at,
                         passage.native_id, "public_domain",
                     )
+
+        # Best-effort, AFTER the brief commits: the GDELT sparkline series (D082/D089) is
+        # decorative and must never dark a brief. Writing it outside the transaction means a
+        # missing column (e.g. migration 20260618000001 not yet applied) or any write error
+        # is logged and skipped — the cited brief is already safely persisted. Same principle
+        # as the signal line (D082) and best-effort analysis grounding (D086).
+        if brief.signal_series is not None:
+            try:
+                await conn.execute(
+                    "UPDATE briefs SET signal_series = $1 WHERE id = $2",
+                    json.dumps(brief.signal_series), brief_id,
+                )
+            except Exception as exc:  # noqa: BLE001 — decorative; never fail the brief
+                log.warning("signal_series_write_skipped", brief_id=brief_id, error=str(exc))
 
     log.info("brief_persisted", brief_id=brief_id, status=status, desk=desk)
     return brief_id

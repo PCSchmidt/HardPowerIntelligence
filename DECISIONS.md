@@ -2126,4 +2126,13 @@ or GDELT was unreachable, it lives beside `signal` and out of the provable-claim
 attention color, never a cited fact), and the reader degrades to the line-only view (or pre-migration
 briefs) with no sparkline. Backward-compatible: the column is additive/nullable and every read guards
 on its presence. The richer BigQuery GKG backend can later replace the fetch layer without touching this
-brief-side contract. OPERATOR: `supabase db push` adds the column before the engine writes it.
+brief-side contract.
+
+**Reliability:** the series is written **best-effort, after the brief commits** — a separate `UPDATE`
+*outside* the persist transaction (`generator.persist_brief`), wrapped in try/except. So a missing
+column (migration not yet applied) or any write error is logged (`signal_series_write_skipped`) and
+skipped, never rolling back or darking the already-persisted cited brief. This deliberately removes the
+migration-before-deploy hazard for this decorative column: the daily cron runs latest `main`, so putting
+`signal_series` in the critical INSERT would have failed the whole brief until `supabase db push` ran —
+unacceptable for paid subscribers. OPERATOR: `supabase db push` *enables* the sparkline, but is no
+longer a prerequisite for publishing.
