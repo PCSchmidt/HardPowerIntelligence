@@ -2153,3 +2153,32 @@ migrations in CI, before any spend on ingest/LLM. Kept non-fatal so the safeguar
 brief. **Caveat:** `db push` takes a session advisory lock the **transaction-mode pooler doesn't
 support** — if `DATABASE_URL` is the pooler the step warns instead of applying; remedy is a
 direct-connection secret for the reconcile step (DEPLOY_RUNBOOK §6). Verify via the first run's logs.
+
+## D091 — Build the full entity-resolution graph for Tier 3 (not chips-lite)
+
+**Decision:** Build the real entity-resolution graph — seed a reference entity set, a production resolver,
+populate `entity_edges`, add entity endpoints, the Entity 360 page, and (last) the convergence
+visualization — rather than the LLM-extracted "chips-lite" shortcut. Today none of this substrate exists:
+`entities`/`entity_edges` are empty, `brief_items.entity_ids` is hardcoded `[]` (generator.py), and
+`resolver.py` is scoring primitives only (no DB-backed resolver, no endpoints, no `/entity` route).
+
+**Alternatives considered:** (a) **chips-lite** — the synthesis LLM already names entities, so emit a
+per-item `entities:[{name,ticker?}]`, store in an additive `brief_items.entities` JSONB, render chips +
+intra-brief co-occurrence; ~1 gate, no resolution infra, forward-compatible, but tickers are
+LLM-asserted/best-effort. (b) **defer Tier 3** until a tester actually asks to click a company.
+
+**Reason for choice:** the entity-resolution graph is the product's stated **moat** (README "transmission
+layer"; the Defense∩AI∩Energy convergence north-star). The operator judges that real entity depth is what
+makes the product worth $19.99 and separates it from prose-only competitors — worth building deliberately
+now rather than shipping a shortcut that gets redone.
+
+**critical-thinker pushback + outcome:** pushed toward **chips-lite-first** (cheaper, validates the want,
+forward-compatible, defers the resolution swamp). Operator chose the full graph anyway — accepted as a
+deliberate moat investment. **Non-negotiable guardrail carried from the pushback:** the resolver MUST
+ship with an **accuracy eval gate** (a golden mention→entity set + a false-link-rate threshold) before
+any resolved entity is rendered — a wrong ticker/link directly corrupts the provenance trust model that
+is the product's core value, exactly the risk the citation-faithfulness gate exists to prevent. Also
+deferred from v1: the d3-style relationship graph (low utility at a few entities/day) — the cross-desk
+"convergence" signal ships first as a chip tag ("appears across Defense + AI"). Build sequence (one gate
+each): reference set → resolver + eval gate → populate `entity_ids`/`entity_edges` → API → chips →
+Entity 360 → (optional) viz.
