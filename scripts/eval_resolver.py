@@ -16,7 +16,8 @@ from pathlib import Path
 
 from engine.db import create_pool
 from engine.entity.eval import evaluate
-from engine.entity.resolution import resolve_mention
+from engine.entity.resolution import find_candidates, resolve_mention
+from engine.entity.resolver import normalize_mention
 from engine.settings import settings
 
 _GOLDEN = Path(__file__).resolve().parents[1] / "tests" / "fixtures" / "entity_golden.json"
@@ -37,11 +38,22 @@ async def main() -> int:
     golden = json.loads(_GOLDEN.read_text())
     pool = await create_pool()
     predictions: dict[str, str | None] = {}
+    diagnostics: dict[str, str] = {}
     try:
         async with pool.acquire() as conn:
-            for mention in golden:
+            for mention, expected in golden.items():
                 result = await resolve_mention(conn, mention)
-                predictions[mention] = await _ticker_for(conn, result.entity_id)
+                got = await _ticker_for(conn, result.entity_id)
+                predictions[mention] = got
+                if got != expected:
+                    cands = await find_candidates(conn, normalize_mention(mention))
+                    top = ", ".join(
+                        f"{c.canonical_name!r}~{c.similarity:.2f}" for c in cands[:3]
+                    ) or "(no candidates)"
+                    diagnostics[mention] = (
+                        f"status={result.status.value} conf={result.confidence:.2f} "
+                        f"norm={normalize_mention(mention)!r} | top: {top}"
+                    )
     finally:
         await pool.close()
 
@@ -50,6 +62,8 @@ async def main() -> int:
     for mention, expected in golden.items():
         got = predictions.get(mention)
         print(f"  {'ok' if got == expected else 'XX'} {mention!r}: expected={expected} got={got}")
+        if mention in diagnostics:
+            print(f"       └ {diagnostics[mention]}")
 
     # A resolver that links nothing has vacuous precision 1.0 — don't let that read as a pass
     # (usually means the reference set isn't seeded, or matching is broken).
