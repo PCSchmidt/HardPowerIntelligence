@@ -37,6 +37,16 @@ class TestNormalizeMention:
     def test_preserves_acronyms(self):
         assert normalize_mention("BAE Systems") == "BAE SYSTEMS"
 
+    def test_removes_inc_suffix_with_period(self):
+        # SEC titles end "Inc." — the trailing period must not block suffix stripping (T3.2).
+        assert normalize_mention("Apple Inc.") == "APPLE"
+
+    def test_removes_comma_inc_suffix(self):
+        assert normalize_mention("Palantir Technologies, Inc.") == "PALANTIR TECHNOLOGIES"
+
+    def test_internal_periods_normalized_consistently(self):
+        assert normalize_mention("A.O. Smith Corp") == "A O SMITH"
+
     def test_empty_string(self):
         assert normalize_mention("") == ""
 

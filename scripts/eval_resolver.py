@@ -1,0 +1,63 @@
+"""Resolver accuracy gate (T3.2, D091) — operator-run against the seeded DB.
+
+The non-negotiable from the /critical-thinker pass: resolved entities must not render until the
+resolver clears an accuracy bar, because a wrong ticker corrupts the provenance trust model. This
+resolves each golden mention, maps the resolved entity back to its ticker, compares to the expected
+ticker, and FAILS (exit 1) if precision < ``entity_resolver_min_precision``.
+
+Run after seeding (``scripts/seed_entities.py``):
+
+    uv run python scripts/eval_resolver.py
+"""
+import asyncio
+import json
+import sys
+from pathlib import Path
+
+from engine.db import create_pool
+from engine.entity.eval import evaluate
+from engine.entity.resolution import resolve_mention
+from engine.settings import settings
+
+_GOLDEN = Path(__file__).resolve().parents[1] / "tests" / "fixtures" / "entity_golden.json"
+
+
+async def _ticker_for(conn, entity_id: str | None) -> str | None:
+    if entity_id is None:
+        return None
+    row = await conn.fetchrow(
+        "SELECT id_value FROM entity_identifiers "
+        "WHERE entity_id = $1::uuid AND id_type = 'ticker' AND valid_to IS NULL LIMIT 1",
+        entity_id,
+    )
+    return row["id_value"] if row else None
+
+
+async def main() -> int:
+    golden = json.loads(_GOLDEN.read_text())
+    pool = await create_pool()
+    predictions: dict[str, str | None] = {}
+    try:
+        async with pool.acquire() as conn:
+            for mention in golden:
+                result = await resolve_mention(conn, mention)
+                predictions[mention] = await _ticker_for(conn, result.entity_id)
+    finally:
+        await pool.close()
+
+    metrics = evaluate(predictions, golden)
+    print(metrics.summary())
+    for mention, expected in golden.items():
+        got = predictions.get(mention)
+        print(f"  {'ok' if got == expected else 'XX'} {mention!r}: expected={expected} got={got}")
+
+    threshold = settings.entity_resolver_min_precision
+    if metrics.precision < threshold:
+        print(f"FAIL: precision {metrics.precision:.3f} < {threshold} (resolver not trustworthy yet)")
+        return 1
+    print(f"PASS: precision {metrics.precision:.3f} >= {threshold}")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(asyncio.run(main()))

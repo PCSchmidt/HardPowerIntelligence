@@ -1,3 +1,4 @@
+import re
 from dataclasses import dataclass
 from enum import Enum
 
@@ -34,6 +35,11 @@ class ResolutionResult:
 
 def normalize_mention(mention: str) -> str:
     upper = mention.upper().strip()
+    # Drop punctuation (periods/commas) and collapse whitespace so "Apple Inc." and
+    # "Palantir, Inc" normalize like "Apple Inc" / "Palantir Inc" — otherwise a trailing
+    # "." blocks suffix stripping and tanks trigram recall (SEC titles almost all end this way).
+    upper = re.sub(r"[.,]", " ", upper)
+    upper = re.sub(r"\s+", " ", upper).strip()
     for suffix in _SUFFIXES:
         if upper.endswith(suffix):
             upper = upper[: -len(suffix)].strip()

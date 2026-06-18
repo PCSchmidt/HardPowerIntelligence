@@ -51,6 +51,9 @@ class Settings(BaseSettings):
     entity_resolution_high_threshold: float = 0.92
     entity_resolution_medium_threshold: float = 0.70
     entity_resolution_low_threshold: float = 0.55
+    # Resolver accuracy gate (T3.2/D091): minimum precision (1 - false-link rate) on the
+    # golden mention set before resolved entities may render. A wrong ticker corrupts trust.
+    entity_resolver_min_precision: float = 0.95
 
     # Eval gate (D016)
     brief_faithfulness_threshold: float = 0.95
