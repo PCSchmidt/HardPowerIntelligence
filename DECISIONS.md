@@ -2136,3 +2136,20 @@ migration-before-deploy hazard for this decorative column: the daily cron runs l
 `signal_series` in the critical INSERT would have failed the whole brief until `supabase db push` ran —
 unacceptable for paid subscribers. OPERATOR: `supabase db push` *enables* the sparkline, but is no
 longer a prerequisite for publishing.
+
+## D090 — CI reconciles DB migrations before the daily brief (non-fatal)
+
+**Decision:** `daily-brief.yml` runs `supabase db push --db-url "$DATABASE_URL"` *before* ingest/brief,
+so any migration merged to `main` is applied to the remote DB before code that references it runs. The
+cron runs latest `main`, so without this, code and schema can desync and dark a brief. The step is
+**non-fatal** (`continue-on-error` + warn-and-proceed): the app schema is migration-tolerant (decorative
+columns are best-effort, D089), so a reconcile hiccup must never become a *new* way to block publishing.
+It reuses `DATABASE_URL` — no project link/login, no new secret.
+
+**Why:** A tester-flagged churn risk — D089's `signal_series` in the critical INSERT would have darked
+the brief until the operator manually migrated. The durable answer is two layers of defense: (1) make
+decorative schema best-effort so it can't dark a brief (D089), and (2) auto-reconcile *required*
+migrations in CI, before any spend on ingest/LLM. Kept non-fatal so the safeguard can't itself fail the
+brief. **Caveat:** `db push` takes a session advisory lock the **transaction-mode pooler doesn't
+support** — if `DATABASE_URL` is the pooler the step warns instead of applying; remedy is a
+direct-connection secret for the reconcile step (DEPLOY_RUNBOOK §6). Verify via the first run's logs.

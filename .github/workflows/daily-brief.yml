@@ -47,6 +47,32 @@ jobs:
       - name: Sync workspace
         run: uv sync --all-packages --all-extras
 
+      - name: Install Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Reconcile DB migrations (safeguard)
+        # Apply any migrations on `main` the remote DB doesn't have yet, BEFORE we ingest or
+        # spend on LLM calls — so code that references new schema can't dark the brief.
+        # Non-fatal by design: app columns are written defensively (e.g. signal_series is
+        # best-effort, D089), so a reconcile hiccup must never block publishing — it warns and
+        # proceeds. Uses DATABASE_URL directly (no project link/login). NOTE: `db push` needs a
+        # *direct* connection to take its advisory lock; if DATABASE_URL is the transaction-mode
+        # pooler this step will warn rather than apply — then add a direct-connection secret for
+        # migrations (DEPLOY_RUNBOOK §6).
+        continue-on-error: true
+        timeout-minutes: 5
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: |
+          echo "Reconciling migrations against the remote DB before ingest/brief…"
+          if printf 'y\n' | supabase db push --db-url "$DATABASE_URL"; then
+            echo "Migrations reconciled (or already up to date)."
+          else
+            echo "::warning::supabase db push did not complete — proceeding (app schema is migration-tolerant). Run 'supabase db push' manually if a required column is missing."
+          fi
+
       - name: Ingest fresh source data
         if: ${{ inputs.skip_ingest != true }}
         env:

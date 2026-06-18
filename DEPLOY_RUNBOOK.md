@@ -251,6 +251,18 @@ gh run watch
 ```
 Confirm a new published brief appears on the live site.
 
+**Migration reconcile (safeguard).** The workflow runs `supabase db push --db-url "$DATABASE_URL"`
+*before* ingest/brief, so a schema migration merged to `main` is applied to the remote DB before any
+code that references it runs — the cron runs latest `main`, so without this, code + schema could desync
+and dark a brief. The step is **non-fatal**: app columns are written defensively (e.g. `signal_series`
+is best-effort, D089), so a reconcile hiccup warns and proceeds rather than blocking publishing. It
+reuses `DATABASE_URL` (no project link/login needed). **Caveat:** `db push` takes a session advisory
+lock, which the **transaction-mode pooler doesn't support** — if `DATABASE_URL` is the pooler, the step
+will *warn* instead of applying. If that happens, add a direct-connection secret (e.g.
+`gh secret set SUPABASE_DB_URL_DIRECT --body '<direct 5432 URL>'`) and point the reconcile step at it.
+Check the first scheduled run's "Reconcile DB migrations" step logs for `Migrations reconciled` vs the
+warning to know which case you're in. You can still run `supabase db push` manually anytime.
+
 > **Why GitHub Actions for the bridge, not Fly?** It's the lowest-ops option for a solo
 > operator — no extra image or app to maintain, full cron control, logs and on/off in one
 > place. The durable Fly worker is the eventual home once ingestion needs retries and
