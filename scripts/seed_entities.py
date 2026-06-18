@@ -10,7 +10,6 @@ canonical_name / alias_normalized, so entity_aliases.embedding stays NULL for no
 """
 import asyncio
 import sys
-from datetime import datetime, timezone
 
 import httpx
 
@@ -29,12 +28,12 @@ WITH e AS (
 ),
 ids AS (
     INSERT INTO entity_identifiers (entity_id, id_type, id_value, source, valid_from)
-    SELECT id, 'ticker', $2, 'sec_company_tickers', $5 FROM e
+    SELECT id, 'ticker', $2, 'sec_company_tickers', now() FROM e
     UNION ALL
-    SELECT id, 'cik', $3, 'sec_company_tickers', $5 FROM e
+    SELECT id, 'cik', $3, 'sec_company_tickers', now() FROM e
 )
 INSERT INTO entity_aliases (entity_id, alias, alias_normalized, source)
-SELECT id, $4, $6, 'sec_company_tickers' FROM e
+SELECT id, $4, $5, 'sec_company_tickers' FROM e
 """
 
 
@@ -51,7 +50,6 @@ async def main() -> int:
         print("No companies parsed — aborting (SEC payload shape may have changed).")
         return 1
 
-    now = datetime.now(timezone.utc)
     pool = await create_pool()
     inserted = skipped = 0
     try:
@@ -70,7 +68,7 @@ async def main() -> int:
                         continue
                     await conn.execute(
                         _SEED_SQL,
-                        ref.name, ref.ticker, ref.cik, ref.name, now, ref.name_normalized,
+                        ref.name, ref.ticker, ref.cik, ref.name, ref.name_normalized,
                     )
                     inserted += 1
         print(f"Done: inserted={inserted}, skipped(existing ticker)={skipped}")

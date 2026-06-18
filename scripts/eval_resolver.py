@@ -51,11 +51,17 @@ async def main() -> int:
         got = predictions.get(mention)
         print(f"  {'ok' if got == expected else 'XX'} {mention!r}: expected={expected} got={got}")
 
+    # A resolver that links nothing has vacuous precision 1.0 — don't let that read as a pass
+    # (usually means the reference set isn't seeded, or matching is broken).
+    if metrics.resolvable > 0 and metrics.resolved == 0:
+        print("FAIL: resolver linked nothing — is the reference set seeded? (run scripts/seed_entities.py)")
+        return 1
+
     threshold = settings.entity_resolver_min_precision
     if metrics.precision < threshold:
         print(f"FAIL: precision {metrics.precision:.3f} < {threshold} (resolver not trustworthy yet)")
         return 1
-    print(f"PASS: precision {metrics.precision:.3f} >= {threshold}")
+    print(f"PASS: precision {metrics.precision:.3f} >= {threshold} (recall {metrics.recall:.3f})")
     return 0
 
 
