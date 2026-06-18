@@ -2182,3 +2182,14 @@ deferred from v1: the d3-style relationship graph (low utility at a few entities
 "convergence" signal ships first as a chip tag ("appears across Defense + AI"). Build sequence (one gate
 each): reference set → resolver + eval gate → populate `entity_ids`/`entity_edges` → API → chips →
 Entity 360 → (optional) viz.
+
+**Private / venture-backed entities (operator question, 2026-06-18):** the product also cares about
+closely-held / pre-IPO firms (Anduril, SpaceX, venture-backed SMR startups) — they move public comps and
+signal future listings. The schema already supports them: `entity_type='company'` needs no ticker, and
+`entity_identifiers` carries `uei`/`cik`/`duns`/`lei`/`sam_uei`. Population is **two-pronged**: (1) seed
+the **public** universe from SEC `company_tickers.json` now (T3.1); (2) **mint private/venture/gov
+entities from our own authoritative ingest identifiers** during resolution (T3.2–T3.3) — USAspending
+recipient **UEI** (private defense contractors) and EDGAR **Form D** issuers (D081 — venture private
+placements) and EDGAR **CIK**. Minting on an *exact* identifier keeps precision high (no fuzzy guess), so
+coverage grows organically from what we actually ingest rather than a curated VC list. Private chips
+render as name + "private" tag (no ticker).
