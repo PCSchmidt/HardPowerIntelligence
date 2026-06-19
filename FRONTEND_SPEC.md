@@ -597,15 +597,17 @@ inline `[CITE:N]` chips that open the drawer; the layered Convergence + Analysis
   numeric series: `briefs.signal` is currently only a prose string (`build_signal_line`), so this is a
   schema + generator + API change, then a small client chart. Tier 2a's arrow is the interim.
 
-### Tier 3 — entity + convergence as first-class
-- **Entity chips** (company + ticker) linking to Entity 360 (`/entity/[id]`), teasing the Pro feature in
-  the free brief. **Convergence visualization** — a small entity/theme relationship graph of the day's
-  cross-desk links; the visual front-end for the `entity_edges` moat (D055).
-
-### Tier 3 — entity + convergence as first-class
-- **Entity chips** (company + ticker) linking to Entity 360 (`/entity/[id]`), teasing the Pro feature in
-  the free brief. **Convergence visualization** — a small entity/theme relationship graph of the day's
-  cross-desk links; the visual front-end for the `entity_edges` moat (D055).
+### Tier 3 — entity + convergence as first-class (D091/D092)
+- **Entity chips (DONE, T3.5)** — each brief item shows the resolved entities it's about: public
+  companies as name + ticker, closely-held/venture firms as a name-only "private" chip (minted from
+  a CIK/UEI during resolution, D092). Backed by the resolution graph (the moat), not LLM-asserted —
+  resolved entities only render because the resolver cleared its accuracy eval gate (D091).
+  All-caps SEC titles are title-cased for display (`web/lib/entities.ts`).
+- **Entity 360 (TODO, T3.6)** — chips link to `/entity/[id]` (identifiers, the desks an entity
+  spans, recent appearances); the API is built (`GET /entities/{id}`), Pro-teaser gating lands here.
+- **Cross-desk convergence tag (TODO, T3.7)** — flag an entity that appears on ≥2 desks (derived
+  from shared `entity_ids`, the API already returns a `convergence` flag). A full entity/theme
+  relationship graph (the `entity_edges` visual) stays deferred until a consumer needs it (D092).
 
 ### Tier 4 — information architecture (later)
 - A cross-desk **front page / feed** and **archive search** — the app-like step (cf. The Information).

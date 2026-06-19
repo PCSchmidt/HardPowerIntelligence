@@ -41,7 +41,10 @@ live ingestion runner, with Supabase auth and Lemon Squeezy subscriptions. Built
   `entity_ids`, not edges). T3.4 surfaces the graph through the API: brief payloads carry a
   batched `entities` array (chip summaries — name/ticker/`is_private`) so the reader maps
   `item.entity_ids` → chips without an N+1, and `GET /entities/{id}` returns the Entity 360 core
-  (identifiers, the desks an entity spans + a `convergence` flag, recent appearances).
+  (identifiers, the desks an entity spans + a `convergence` flag, recent appearances). T3.5 renders
+  **entity chips** on each brief item — public companies as name + ticker, closely-held/venture firms
+  as a name-only "private" chip — backed by the resolution graph (the moat), not LLM-asserted.
+  Verified end-to-end on a live defense brief (5/5 items linked correctly, zero false positives).
 - **Data pipeline** (Gate 4): USAspending adapter + entity resolver
   (contractor → ticker/CIK/UEI), proven against golden fixtures.
 - **Brief engine** (Gate 5): brief generator + citation-faithfulness eval harness;

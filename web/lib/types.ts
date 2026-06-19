@@ -37,6 +37,16 @@ export interface BriefItem {
   display_order: number;
 }
 
+// Resolved entity chip summary (T3.4, D091). is_private = no current ticker (a closely-held /
+// venture firm minted from a CIK/UEI during resolution, D092) — rendered as a name-only chip.
+export interface EntitySummary {
+  id: string;
+  name: string;
+  type: string;
+  ticker: string | null;
+  is_private: boolean;
+}
+
 // GDELT lead-theme volume series for the Signal sparkline (D089).
 export interface SignalSeries {
   theme: string;
@@ -67,6 +77,8 @@ export interface Brief {
   signal_series?: SignalSeries | null;
   faithfulness_score: number | null;
   staleness_indicator: StalenessIndicator | null;
+  // Resolved entities referenced by the items (T3.4, D091); reader maps item.entity_ids → these.
+  entities: EntitySummary[];
   items: BriefItem[];
   citations: Citation[];
   sources_missing: string[];

@@ -2,11 +2,12 @@
 
 import { ChevronDown, FileText, Sparkles } from "lucide-react";
 import { useMemo, useState } from "react";
-import type { BriefItem, Citation } from "@/lib/types";
+import type { BriefItem, Citation, EntitySummary } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { formatUsd, keyAmount } from "@/lib/amounts";
 import { ITEM_BG, ITEM_ICON, ITEM_LABEL, ITEM_TEXT } from "@/lib/item-types";
 import { CitationsDrawer } from "./citations-drawer";
+import { EntityChips } from "./entity-chips";
 
 // Splits a body string on [CITE:N] markers and renders each as a clickable chip.
 function CitedBody({ body, onCite }: { body: string; onCite: () => void }) {
@@ -78,14 +79,20 @@ function AnalysisDisclosure({ read, watch }: { read: string; watch: string }) {
 export function BriefContent({
   items,
   citations,
+  entities,
 }: {
   items: BriefItem[];
   citations: Citation[];
+  entities: EntitySummary[];
 }) {
   const [drawer, setDrawer] = useState<Citation[] | null>(null);
   const citationById = useMemo(
     () => new Map(citations.map((c) => [c.id, c])),
     [citations],
+  );
+  const entityById = useMemo(
+    () => new Map(entities.map((e) => [e.id, e])),
+    [entities],
   );
 
   // Inline magnitude bars (D087): each item's key dollar figure, normalized to the
@@ -127,6 +134,7 @@ export function BriefContent({
             )}
           </div>
           <h2 className="font-display text-display-sm text-foreground">{item.headline}</h2>
+          <EntityChips entityIds={item.entity_ids} entities={entityById} />
           <CitedBody body={item.body} onCite={() => openForItem(item)} />
           {(item.read || item.watch) && (
             <AnalysisDisclosure read={item.read} watch={item.watch} />

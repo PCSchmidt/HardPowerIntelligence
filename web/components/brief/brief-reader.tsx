@@ -27,7 +27,7 @@ export function BriefReader({ brief }: { brief: Brief }) {
           <p className="prose-brief text-foreground">{brief.convergence_read}</p>
         </section>
       )}
-      <BriefContent items={brief.items} citations={brief.citations} />
+      <BriefContent items={brief.items} citations={brief.citations} entities={brief.entities} />
       {brief.signal && <SignalLine signal={brief.signal} series={brief.signal_series} />}
       <footer className="mt-8 border-t border-border pt-4 text-ui-sm text-muted-foreground">
         {brief.model_waterfall.synthesis_model && (
