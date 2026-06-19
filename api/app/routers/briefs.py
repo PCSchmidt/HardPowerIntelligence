@@ -10,6 +10,7 @@ from fastapi import APIRouter, Depends, Query
 
 from app.deps import Principal, get_pool, get_principal
 from app.errors import APIError
+from app.routers.entities import entities_for_ids
 
 router = APIRouter()
 
@@ -61,6 +62,12 @@ async def _assemble_brief(conn: asyncpg.Connection, brief: asyncpg.Record, stale
         if c["brief_item_id"] is not None:
             cit_ids_by_item.setdefault(str(c["brief_item_id"]), []).append(str(c["id"]))
 
+    # Entity chips (T3.4, D091): resolve every entity_id referenced by the items to a display
+    # summary in one batched query, so the reader renders chips without an N+1. Empty when the
+    # graph isn't populated yet — the reader simply shows no chips.
+    entity_ids = list({e for it in items for e in (it["entity_ids"] or [])})
+    entities = await entities_for_ids(conn, entity_ids)
+
     return {
         "id": str(brief["id"]),
         "desk": brief["desk"],
@@ -77,6 +84,8 @@ async def _assemble_brief(conn: asyncpg.Connection, brief: asyncpg.Record, stale
         # Lead-theme volume series for the Signal sparkline (D089); None if none.
         "signal_series": _parse_signal_series(brief),
         "staleness_indicator": staleness,
+        # Resolved entity chips keyed by id (T3.4, D091); reader maps item.entity_ids → these.
+        "entities": entities,
         "items": [
             {
                 "id": str(it["id"]),

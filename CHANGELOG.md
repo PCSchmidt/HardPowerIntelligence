@@ -38,7 +38,10 @@ live ingestion runner, with Supabase auth and Lemon Squeezy subscriptions. Built
   resolving each item's source records (`engine/entity/linker.py`), and private/venture/gov
   entities are minted from authoritative identifiers (USAspending UEI, EDGAR CIK) — best-effort,
   so it never darks a brief; co-occurrence edges deferred (convergence derives from shared
-  `entity_ids`, not edges).
+  `entity_ids`, not edges). T3.4 surfaces the graph through the API: brief payloads carry a
+  batched `entities` array (chip summaries — name/ticker/`is_private`) so the reader maps
+  `item.entity_ids` → chips without an N+1, and `GET /entities/{id}` returns the Entity 360 core
+  (identifiers, the desks an entity spans + a `convergence` flag, recent appearances).
 - **Data pipeline** (Gate 4): USAspending adapter + entity resolver
   (contractor → ticker/CIK/UEI), proven against golden fixtures.
 - **Brief engine** (Gate 5): brief generator + citation-faithfulness eval harness;
