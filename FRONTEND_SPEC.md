@@ -603,8 +603,11 @@ inline `[CITE:N]` chips that open the drawer; the layered Convergence + Analysis
   a CIK/UEI during resolution, D092). Backed by the resolution graph (the moat), not LLM-asserted —
   resolved entities only render because the resolver cleared its accuracy eval gate (D091).
   All-caps SEC titles are title-cased for display (`web/lib/entities.ts`).
-- **Entity 360 (TODO, T3.6)** — chips link to `/entity/[id]` (identifiers, the desks an entity
-  spans, recent appearances); the API is built (`GET /entities/{id}`), Pro-teaser gating lands here.
+- **Entity 360 (DONE, T3.6)** — chips link to `/entity/[id]` (`web/app/entity/[id]/page.tsx` →
+  `Entity360`): identity card with identifiers, a convergence line (the desks an entity spans), and
+  recent appearances linking back to their briefs. noindex. Hard Pro-gating deferred while payments
+  are dark (D088) — any signed-in reader sees it; deeper history (filings/awards/supply-chain) is
+  framed as on the way.
 - **Cross-desk convergence tag (TODO, T3.7)** — flag an entity that appears on ≥2 desks (derived
   from shared `entity_ids`, the API already returns a `convergence` flag). A full entity/theme
   relationship graph (the `entity_edges` visual) stays deferred until a consumer needs it (D092).

@@ -47,6 +47,28 @@ export interface EntitySummary {
   is_private: boolean;
 }
 
+// Entity 360 payload from GET /entities/{id} (T3.6, D091).
+export interface EntityAppearance {
+  brief_id: string;
+  desk: string;
+  date: string;
+  headline: string;
+  item_type: ItemType;
+}
+
+export interface EntityDetail {
+  id: string;
+  name: string;
+  type: string;
+  ticker: string | null;
+  is_private: boolean;
+  identifiers: { type: string; value: string }[];
+  // Distinct desks the entity appears on; convergence = spans ≥2 desks (T3.7).
+  desks: string[];
+  convergence: boolean;
+  appearances: EntityAppearance[];
+}
+
 // GDELT lead-theme volume series for the Signal sparkline (D089).
 export interface SignalSeries {
   theme: string;

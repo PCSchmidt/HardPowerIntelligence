@@ -45,6 +45,9 @@ live ingestion runner, with Supabase auth and Lemon Squeezy subscriptions. Built
   **entity chips** on each brief item — public companies as name + ticker, closely-held/venture firms
   as a name-only "private" chip — backed by the resolution graph (the moat), not LLM-asserted.
   Verified end-to-end on a live defense brief (5/5 items linked correctly, zero false positives).
+  T3.6 adds the **Entity 360 page** (`/entity/[id]`, noindex): the chips link into an identity card
+  with identifiers, the desks the entity spans (a convergence line when ≥2), and recent appearances
+  linking back to their briefs.
 - **Data pipeline** (Gate 4): USAspending adapter + entity resolver
   (contractor → ticker/CIK/UEI), proven against golden fixtures.
 - **Brief engine** (Gate 5): brief generator + citation-faithfulness eval harness;

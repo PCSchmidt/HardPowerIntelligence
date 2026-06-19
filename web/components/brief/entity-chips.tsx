@@ -1,3 +1,4 @@
+import Link from "next/link";
 import type { EntitySummary } from "@/lib/types";
 import { entityDisplayName } from "@/lib/entities";
 
@@ -21,16 +22,18 @@ export function EntityChips({
   return (
     <ul className="flex flex-wrap gap-1.5" aria-label="Entities">
       {resolved.map((entity) => (
-        <li
-          key={entity.id}
-          className="inline-flex items-center gap-1.5 rounded-full border border-border bg-muted/60 px-2.5 py-1 text-ui-xs text-foreground"
-        >
-          <span className="font-medium">{entityDisplayName(entity.name)}</span>
-          {entity.ticker ? (
-            <span className="font-mono text-[0.7rem] font-semibold text-primary">{entity.ticker}</span>
-          ) : (
-            <span className="text-[0.7rem] uppercase tracking-wide text-muted-foreground">private</span>
-          )}
+        <li key={entity.id}>
+          <Link
+            href={`/entity/${entity.id}`}
+            className="inline-flex items-center gap-1.5 rounded-full border border-border bg-muted/60 px-2.5 py-1 text-ui-xs text-foreground transition-colors hover:border-primary/40 hover:bg-muted"
+          >
+            <span className="font-medium">{entityDisplayName(entity.name)}</span>
+            {entity.ticker ? (
+              <span className="font-mono text-[0.7rem] font-semibold text-primary">{entity.ticker}</span>
+            ) : (
+              <span className="text-[0.7rem] uppercase tracking-wide text-muted-foreground">private</span>
+            )}
+          </Link>
         </li>
       ))}
     </ul>
