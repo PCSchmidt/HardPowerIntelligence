@@ -35,6 +35,12 @@ class ResolutionResult:
 
 def normalize_mention(mention: str) -> str:
     upper = mention.upper().strip()
+    # SEC titles carry a state-of-incorporation tag like "NORTHROP GRUMMAN CORP /DE/". Strip the
+    # slash-delimited jurisdiction code: left in, it pollutes the trigram match AND blocks the
+    # suffix strip below, dropping a clean mention ("Northrop Grumman") into the medium band where
+    # v1 leaves it unresolved (T3.2 recall fix). The lookbehind avoids mangling an internal slash
+    # in a real name (e.g. "AC/DC") — SEC tags are always space-delimited.
+    upper = re.sub(r"(?<![A-Z0-9])/[A-Z]{2,5}/?", " ", upper)
     # Drop punctuation (periods/commas) and collapse whitespace so "Apple Inc." and
     # "Palantir, Inc" normalize like "Apple Inc" / "Palantir Inc" — otherwise a trailing
     # "." blocks suffix stripping and tanks trigram recall (SEC titles almost all end this way).

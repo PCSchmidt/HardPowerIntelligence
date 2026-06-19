@@ -30,6 +30,9 @@ live ingestion runner, with Supabase auth and Lemon Squeezy subscriptions. Built
   and the first two gates of the **entity-resolution graph** (the moat, D091) — a SEC-seeded reference
   entity set (`scripts/seed_entities.py`, ~8k companies de-duped by CIK) and a precision-first resolver
   with an accuracy eval gate (`scripts/eval_resolver.py`; first run: precision 1.000 / false-link 0.000).
+  Resolver recall fix: `normalize_mention` now strips the SEC state-of-incorporation tag (`/DE/`)
+  that was dropping clean mentions like "Northrop Grumman" into the unresolved medium band, plus
+  `scripts/renormalize_aliases.py` to backfill aliases already seeded under the old normalization.
 - **Data pipeline** (Gate 4): USAspending adapter + entity resolver
   (contractor → ticker/CIK/UEI), proven against golden fixtures.
 - **Brief engine** (Gate 5): brief generator + citation-faithfulness eval harness;

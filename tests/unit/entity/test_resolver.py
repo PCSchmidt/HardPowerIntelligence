@@ -47,6 +47,18 @@ class TestNormalizeMention:
     def test_internal_periods_normalized_consistently(self):
         assert normalize_mention("A.O. Smith Corp") == "A O SMITH"
 
+    def test_strips_sec_state_of_incorporation_tag(self):
+        # SEC titles end with a jurisdiction tag that must not block the suffix strip or pollute
+        # the trigram match (T3.2 recall fix — this is the Northrop Grumman miss).
+        assert normalize_mention("NORTHROP GRUMMAN CORP /DE/") == "NORTHROP GRUMMAN"
+
+    def test_strips_jurisdiction_tag_without_trailing_slash(self):
+        assert normalize_mention("SOME COMPANY INC /MD") == "SOME COMPANY"
+
+    def test_preserves_internal_slash_in_name(self):
+        # The lookbehind keeps a real internal slash (not a space-delimited SEC tag) intact.
+        assert normalize_mention("AC/DC") == "AC/DC"
+
     def test_empty_string(self):
         assert normalize_mention("") == ""
 
