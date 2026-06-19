@@ -13,6 +13,9 @@ live ingestion runner, with Supabase auth and Lemon Squeezy subscriptions. Built
 (Gates 1–8 closed).
 
 ### Added
+- **License** (2026-06-19): the project is now explicitly **source-available under the PolyForm
+  Noncommercial License 1.0.0** (`LICENSE`) — read/study/fork for noncommercial use; commercial use
+  reserved to the author. Replaces the prior implicit all-rights-reserved (no-license) default.
 - **Reliability + quality hardening** (post-Gate-8, D076–D086): LLM call-layer backoff for
   transient 429/5xx (D076); honest daily-run reporting + ingest resilience so a flaky source
   doesn't take the pipeline dark (D076/D079); EDGAR widened 8→40 probes (D077) + filing-body

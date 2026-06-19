@@ -178,6 +178,15 @@ own research.
 
 ---
 
+## License
+
+Source-available under the [PolyForm Noncommercial License 1.0.0](LICENSE). You're welcome
+to read, study, fork, and build on this code for any **noncommercial** purpose. **Commercial
+use requires a separate license** from the author — please get in touch. This is not an
+OSI "open source" license; commercial rights are reserved.
+
+---
+
 ## Author
 
 **Paul Christopher Schmidt** — [@PCSchmidt](https://github.com/PCSchmidt)
