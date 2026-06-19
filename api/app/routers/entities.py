@@ -25,27 +25,39 @@ router = APIRouter()
 _APPEARANCE_LIMIT = 25
 
 # One ticker per entity (the seed keeps a single ticker; share classes collapse by CIK, D091).
+# The desks lateral computes the cross-desk convergence signal (T3.7): the distinct published-brief
+# desks each entity has appeared on. An entity on ≥2 desks is the Defense∩AI∩Energy convergence the
+# product is built around. The `entity_ids @>` containment is GIN-indexed (brief_items_entity_ids_gin).
 _SUMMARY_SQL = """
-SELECT e.id::text AS id, e.canonical_name AS name, e.entity_type AS type, t.id_value AS ticker
+SELECT e.id::text AS id, e.canonical_name AS name, e.entity_type AS type, t.id_value AS ticker,
+       d.desks AS desks
 FROM entities e
 LEFT JOIN LATERAL (
     SELECT id_value FROM entity_identifiers
     WHERE entity_id = e.id AND id_type = 'ticker' AND valid_to IS NULL
     LIMIT 1
 ) t ON true
+LEFT JOIN LATERAL (
+    SELECT array_agg(DISTINCT b.desk) AS desks
+    FROM brief_items bi JOIN briefs b ON b.id = bi.brief_id
+    WHERE bi.entity_ids @> ARRAY[e.id] AND b.status = 'published'
+) d ON true
 WHERE e.id = ANY($1::uuid[]) AND e.is_active
 """
 
 
 def entity_summary(row: asyncpg.Record | dict) -> dict:
-    """Pure: a brief-item chip summary. ``is_private`` = no current ticker (minted/closely-held)."""
+    """Pure: a brief-item chip summary. ``is_private`` = no current ticker (minted/closely-held);
+    ``convergence`` = the entity has appeared on ≥2 desks (the cross-desk signal, T3.7)."""
     ticker = row["ticker"]
+    desks = set(row["desks"] or [])
     return {
         "id": row["id"],
         "name": row["name"],
         "type": row["type"],
         "ticker": ticker,
         "is_private": ticker is None,
+        "convergence": len(desks) >= 2,
     }
 
 

@@ -45,6 +45,8 @@ export interface EntitySummary {
   type: string;
   ticker: string | null;
   is_private: boolean;
+  // True when the entity has appeared on ≥2 desks — the cross-desk convergence signal (T3.7).
+  convergence: boolean;
 }
 
 // Entity 360 payload from GET /entities/{id} (T3.6, D091).

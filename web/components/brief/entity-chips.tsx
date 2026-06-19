@@ -1,5 +1,7 @@
 import Link from "next/link";
+import { Sparkles } from "lucide-react";
 import type { EntitySummary } from "@/lib/types";
+import { cn } from "@/lib/utils";
 import { entityDisplayName } from "@/lib/entities";
 
 // Chips for the entities an item is about (T3.5, D091). Public companies show their ticker; a
@@ -25,8 +27,17 @@ export function EntityChips({
         <li key={entity.id}>
           <Link
             href={`/entity/${entity.id}`}
-            className="inline-flex items-center gap-1.5 rounded-full border border-border bg-muted/60 px-2.5 py-1 text-ui-xs text-foreground transition-colors hover:border-primary/40 hover:bg-muted"
+            className={cn(
+              "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-ui-xs text-foreground transition-colors",
+              entity.convergence
+                ? "border-brand-secondary/40 bg-brand-secondary/10 hover:bg-brand-secondary/20"
+                : "border-border bg-muted/60 hover:border-primary/40 hover:bg-muted",
+            )}
+            title={entity.convergence ? "Appears across multiple desks (convergence)" : undefined}
           >
+            {entity.convergence && (
+              <Sparkles size={11} className="shrink-0 text-brand-secondary" aria-label="convergence" />
+            )}
             <span className="font-medium">{entityDisplayName(entity.name)}</span>
             {entity.ticker ? (
               <span className="font-mono text-[0.7rem] font-semibold text-primary">{entity.ticker}</span>

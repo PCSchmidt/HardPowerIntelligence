@@ -295,8 +295,8 @@ first generation. Response is streamed.
 > date, headline, item_type}] }`. `is_private` is true when the entity has no current ticker
 > (minted from a CIK/UEI during resolution, D092); `desks`/`convergence` are the cross-desk signal
 > derived from where the entity appears (T3.7). Brief payloads also carry a batched `entities: [...]`
-> array (the chip summaries: `{id, name, type, ticker, is_private}`) so the reader maps
-> `item.entity_ids` → chips without an N+1. The endpoint requires auth (full Pro-gating / the
+> array (the chip summaries: `{id, name, type, ticker, is_private, convergence}`, where `convergence`
+> = the entity has appeared on ≥2 desks, T3.7) so the reader maps `item.entity_ids` → chips without an N+1. The endpoint requires auth (full Pro-gating / the
 > teaser split lands with the Entity 360 page, T3.6). **Not yet implemented:** `GET /entities/search`,
 > and the rich `recent_awards`/`recent_filings`/`recent_insider_transactions`/`related_programs`/
 > `edges` blocks below — those depend on semantic edges (deferred, D092) and insider/program

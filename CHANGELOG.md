@@ -47,7 +47,12 @@ live ingestion runner, with Supabase auth and Lemon Squeezy subscriptions. Built
   Verified end-to-end on a live defense brief (5/5 items linked correctly, zero false positives).
   T3.6 adds the **Entity 360 page** (`/entity/[id]`, noindex): the chips link into an identity card
   with identifiers, the desks the entity spans (a convergence line when ≥2), and recent appearances
-  linking back to their briefs.
+  linking back to their briefs. T3.7 completes the sequence with the **cross-desk convergence tag** —
+  the brief chip summary now carries a `convergence` flag (an entity that has appeared on ≥2 desks,
+  the Defense∩AI∩Energy signal the product is built around), rendered as a highlighted chip; a GIN
+  index on `brief_items.entity_ids` (migration `20260619000001`) backs the containment queries.
+  **The entity-resolution graph (the moat) is now live end-to-end: reference set → eval-gated
+  resolver → in-brief linking + private/venture minting → API → chips → Entity 360 → convergence.**
 - **Data pipeline** (Gate 4): USAspending adapter + entity resolver
   (contractor → ticker/CIK/UEI), proven against golden fixtures.
 - **Brief engine** (Gate 5): brief generator + citation-faithfulness eval harness;

@@ -15,14 +15,35 @@ from app.routers.entities import entity_detail, entity_summary
 
 class TestEntitySummary:
     def test_public_company_has_ticker_and_not_private(self):
-        out = entity_summary({"id": "e1", "name": "Lockheed Martin", "type": "company", "ticker": "LMT"})
+        out = entity_summary(
+            {"id": "e1", "name": "Lockheed Martin", "type": "company", "ticker": "LMT", "desks": ["defense"]}
+        )
         assert out == {"id": "e1", "name": "Lockheed Martin", "type": "company",
-                       "ticker": "LMT", "is_private": False}
+                       "ticker": "LMT", "is_private": False, "convergence": False}
 
     def test_minted_entity_without_ticker_is_private(self):
-        out = entity_summary({"id": "e2", "name": "Anduril Industries", "type": "company", "ticker": None})
+        out = entity_summary(
+            {"id": "e2", "name": "Anduril Industries", "type": "company", "ticker": None, "desks": ["defense"]}
+        )
         assert out["ticker"] is None
         assert out["is_private"] is True
+
+    def test_convergence_when_entity_spans_multiple_desks(self):
+        out = entity_summary(
+            {"id": "e3", "name": "Constellation Energy", "type": "company", "ticker": "CEG",
+             "desks": ["energy", "ai"]}
+        )
+        assert out["convergence"] is True
+
+    def test_no_convergence_on_single_desk_or_none(self):
+        single = entity_summary(
+            {"id": "e4", "name": "Boeing", "type": "company", "ticker": "BA", "desks": ["defense"]}
+        )
+        assert single["convergence"] is False
+        empty = entity_summary(
+            {"id": "e5", "name": "X", "type": "company", "ticker": "X", "desks": None}
+        )
+        assert empty["convergence"] is False
 
 
 class TestEntityDetail:

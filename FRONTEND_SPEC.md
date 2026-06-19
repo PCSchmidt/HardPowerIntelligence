@@ -608,9 +608,11 @@ inline `[CITE:N]` chips that open the drawer; the layered Convergence + Analysis
   recent appearances linking back to their briefs. noindex. Hard Pro-gating deferred while payments
   are dark (D088) — any signed-in reader sees it; deeper history (filings/awards/supply-chain) is
   framed as on the way.
-- **Cross-desk convergence tag (TODO, T3.7)** — flag an entity that appears on ≥2 desks (derived
-  from shared `entity_ids`, the API already returns a `convergence` flag). A full entity/theme
-  relationship graph (the `entity_edges` visual) stays deferred until a consumer needs it (D092).
+- **Cross-desk convergence tag (DONE, T3.7)** — an entity that has appeared on ≥2 desks renders as a
+  highlighted chip (Sparkles + brand-secondary tint, `EntityChips`). The brief chip summary carries a
+  `convergence` flag computed at assemble time (distinct published-brief desks per entity), so no extra
+  fetch is needed. A full entity/theme relationship graph (the `entity_edges` visual) stays deferred
+  until a consumer needs it (D092).
 
 ### Tier 4 — information architecture (later)
 - A cross-desk **front page / feed** and **archive search** — the app-like step (cf. The Information).

@@ -134,8 +134,9 @@ fixtures onto live data and became genuinely multi-desk:
   set). Each brief item is resolved to the investable entities behind it and rendered as **entity
   chips** (ticker for public companies; a "private" chip for closely-held/venture firms, which are
   minted from authoritative ingest identifiers (UEI/CIK), not a curated list). Verified end-to-end
-  on a live brief (every link correct, zero false positives). Still building: clickable Entity 360
-  pages and the cross-desk convergence tag.
+  on a live brief (every link correct, zero false positives). Chips click through to **Entity 360**
+  pages (`/entity/[id]` — identifiers, the desks an entity spans, recent appearances), and an entity
+  seen on ≥2 desks is flagged as a **cross-desk convergence** signal — the moat, live end-to-end.
 
 Remaining before public launch: Lemon Squeezy go-live (the checkout/webhook code is built;
 needs account creds + variant IDs in Vercel/Fly — config, not engineering), a live-validation
