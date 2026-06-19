@@ -2193,3 +2193,35 @@ recipient **UEI** (private defense contractors) and EDGAR **Form D** issuers (D0
 placements) and EDGAR **CIK**. Minting on an *exact* identifier keeps precision high (no fuzzy guess), so
 coverage grows organically from what we actually ingest rather than a curated VC list. Private chips
 render as name + "private" tag (no ticker).
+
+## D092 — T3.3: wire resolution into briefs (entity_ids), mint private/venture, defer co-occurrence edges
+
+**Decision:** Populate `brief_items.entity_ids` at brief-persist time by resolving each item's source
+records, and **mint** private/venture/gov entities from authoritative identifiers — but **defer the
+co-occurrence `entity_edges`** that the D091 sequence listed for this gate. The resolver miss that blocked
+this (Northrop `/DE/`, recall 0.889→1.000) was fixed first; the eval gate now passes on real seeded data,
+so rendering is unblocked.
+
+**How it works:** `engine/entity/linker.py` maps each `normalized_records` row to `(name, identifiers)`
+inputs — EDGAR contributes ticker+padded-CIK off the mention, USAspending contributes the recipient UEI
+off `structured_data` — then calls the precision-first `resolve_mention`. An item's source records are
+reached via its `[CITE:N]` indices → passage `raw_record_id`. Resolution runs on its own connection
+**before** the brief transaction and is wrapped in try/except (logs `entity_resolution_skipped`), so an
+unseeded graph or any error falls back to empty `entity_ids` and never darks a cited brief — the same
+best-effort principle as the signal series (D089) and analysis grounding (D086). Minting only fires when
+`resolve_mention` finds no match AND a *mintable* identifier (CIK or UEI — globally unique/authoritative;
+a non-seeded ticker is deliberately excluded as suspect) is present, so a private recipient like Anduril
+becomes a real entity keyed by UEI and resolves idempotently on later runs.
+
+**Edges deferred — alternatives + reason:** the listed `entity_edges` was *co-occurrence* (two entities in
+one item). (a) **co-occurrence now** needs a schema migration — `entity_edges.edge_type` has a fixed CHECK
+list with no co-occurrence type — and adds a weak, graph-cluttering signal with no consumer until the (also
+deferred) d3 viz. (b) **authoritative semantic edges** (AWARDED/SUPPLIES from the award payload) are far
+more valuable and already in the CHECK list, but deserve their own gate. (c) **defer all edges** until a
+consumer exists. Chose (c): the only near-term edge consumer is the cross-desk **convergence** chip (T3.7),
+which is "the *same* entity_id appears on ≥2 desks" — derivable directly from `entity_ids`, no edges
+required. So `entity_ids` delivers chips (T3.5) and convergence (T3.7) with zero edge infrastructure; edges
+return as a dedicated gate (semantic, not co-occurrence) when a graph/supply-chain view needs them.
+
+**Verification:** pure input-shaping unit-tested (`tests/unit/test_entity_linker.py`); the DB resolve/mint
+path is best-effort and confirmed by the next brief run's `entities_linked` log (items_with_entities count).

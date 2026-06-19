@@ -16,6 +16,7 @@ from engine.brief.rag import (
 )
 from engine.brief.significance import filter_significant
 from engine.db import transient_retry
+from engine.entity.linker import resolve_item_entities
 from engine.eval.citation_eval import extract_citation_indices, strip_uncited_sentences
 from engine.llm.client import llm_client, parse_json
 from engine.settings import settings
@@ -374,6 +375,12 @@ async def generate_brief(desk: str, pool: asyncpg.Pool) -> GeneratedBrief:
     )
 
 
+def _item_raw_record_ids(item: dict, passages: list[PassageContext]) -> list[str]:
+    """The source raw_record ids behind a brief item, via its [CITE:N] passage indices."""
+    cited = set(item.get("citation_indices", []))
+    return [p.raw_record_id for p in passages if p.index in cited and p.raw_record_id]
+
+
 @transient_retry()
 async def persist_brief(
     brief: GeneratedBrief,
@@ -394,6 +401,21 @@ async def persist_brief(
         item for item in brief.items
         if item.get("_item_id") not in excluded_item_ids
     ]
+
+    # Entity linking (T3.3, D091) — best-effort, BEFORE the brief transaction. Resolving (and
+    # minting private/venture) entities is the moat, but it must never roll back or dark a cited
+    # brief, so it runs on its own connection and any failure falls back to empty entity_ids.
+    item_entity_ids: list[list[str]] = [[] for _ in surviving_items]
+    try:
+        async with pool.acquire() as conn:
+            for i, item in enumerate(surviving_items):
+                rrids = _item_raw_record_ids(item, brief.passages)
+                item_entity_ids[i] = await resolve_item_entities(conn, rrids)
+        linked = sum(1 for ids in item_entity_ids if ids)
+        log.info("entities_linked", desk=desk, items=len(surviving_items), items_with_entities=linked)
+    except Exception as exc:  # noqa: BLE001 — moat enrichment must never dark a brief
+        log.warning("entity_resolution_skipped", desk=desk, error=str(exc))
+        item_entity_ids = [[] for _ in surviving_items]
 
     async with pool.acquire() as conn:
         async with conn.transaction():
@@ -426,7 +448,7 @@ async def persist_brief(
                     INSERT INTO brief_items (
                         id, brief_id, item_type, headline, body, read, watch,
                         entity_ids, display_order
-                    ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
+                    ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8::uuid[],$9)
                     """,
                     item_id, brief_id,
                     item.get("item_type", "signal"),
@@ -434,7 +456,7 @@ async def persist_brief(
                     item.get("body", ""),
                     item.get("read", ""),    # analysis layer, grounded gate applied (D073)
                     item.get("watch", ""),
-                    [],   # entity_ids resolved in Gate 6 after entity graph is seeded
+                    item_entity_ids[i],   # resolved + minted entities (T3.3, D091); [] on best-effort miss
                     i,
                 )
 

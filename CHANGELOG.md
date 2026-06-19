@@ -32,7 +32,13 @@ live ingestion runner, with Supabase auth and Lemon Squeezy subscriptions. Built
   with an accuracy eval gate (`scripts/eval_resolver.py`; first run: precision 1.000 / false-link 0.000).
   Resolver recall fix: `normalize_mention` now strips the SEC state-of-incorporation tag (`/DE/`)
   that was dropping clean mentions like "Northrop Grumman" into the unresolved medium band, plus
-  `scripts/renormalize_aliases.py` to backfill aliases already seeded under the old normalization.
+  `scripts/renormalize_aliases.py` to backfill aliases already seeded under the old normalization
+  (eval gate then passed on real data: precision 1.000 / recall 1.000 / false-link 0.000). T3.3
+  (D092) wires resolution into brief generation: `brief_items.entity_ids` is now populated by
+  resolving each item's source records (`engine/entity/linker.py`), and private/venture/gov
+  entities are minted from authoritative identifiers (USAspending UEI, EDGAR CIK) — best-effort,
+  so it never darks a brief; co-occurrence edges deferred (convergence derives from shared
+  `entity_ids`, not edges).
 - **Data pipeline** (Gate 4): USAspending adapter + entity resolver
   (contractor → ticker/CIK/UEI), proven against golden fixtures.
 - **Brief engine** (Gate 5): brief generator + citation-faithfulness eval harness;
