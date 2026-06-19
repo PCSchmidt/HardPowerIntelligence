@@ -188,6 +188,21 @@ class TestWidenedProbes:
         assert "munitions production" not in energy      # defense-only probe
         assert "gallium" in themes_for_desk("defense")   # trilateral probe
 
+    def test_tangential_energy_probes_are_energy_only(self):
+        # Curation Step 2 (D085 desk identity): energy-primary probes whose only AI link was
+        # demand-side ("compute needs power") were demoted to energy-only, so generic energy
+        # project finance stops diluting the AI desk. Genuinely compute-coupled power keeps AI.
+        from engine.adapters.edgar import _PROBES
+        desks_by_query = {p.query: set(p.desks) for p in _PROBES}
+        for q in ("grid-scale storage", "transmission interconnection",
+                  "power purchase agreement", "solid-state battery", "geothermal"):
+            assert desks_by_query[q] == {"energy"}, f"{q} should be energy-only, got {desks_by_query[q]}"
+        # genuinely compute-coupled power probes keep their AI tag
+        assert desks_by_query["small modular reactor"] == {"energy", "ai"}
+        assert "ai" in desks_by_query["hyperscale data center"]
+        assert "ai" in desks_by_query["liquid cooling"]
+        assert "ai" in desks_by_query["graphics processing unit"]
+
 
 class _FakeFetcher:
     """Captures calls; returns a fixed body (or raises) for body enrichment (D078)."""

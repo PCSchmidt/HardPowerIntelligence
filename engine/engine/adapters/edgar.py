@@ -71,15 +71,20 @@ _PROBES: tuple[_Probe, ...] = (
     _Probe("autonomous weapon", ("defense", "ai")),          # Defense∩AI
     _Probe("rare earth", ("defense", "ai", "energy")),       # trilateral chokepoint
     # ── Energy depth ─────────────────────────────────────────────────────────────
-    _Probe("grid-scale storage", ("energy", "ai")),          # AI load ↔ storage
+    # Tightened (curation Step 2, D085 desk identity): these are energy-PRIMARY. Their AI link
+    # was only demand-side ("compute needs power"), which diluted the AI desk with generic energy
+    # project finance (a solar+storage farm, a PPA, a wind buy landing on "AI Infrastructure").
+    # So the `ai` tag is dropped here. Genuinely compute-coupled power probes keep AI elsewhere:
+    # hyperscale data center, liquid cooling, GPU (below), and SMR (data-center nuclear, above).
+    _Probe("grid-scale storage", ("energy",)),
     _Probe("battery energy storage", ("energy",)),
-    _Probe("transmission interconnection", ("energy", "ai")),# the data-center queue
-    _Probe("power purchase agreement", ("energy", "ai")),    # hyperscaler PPAs
+    _Probe("transmission interconnection", ("energy",)),
+    _Probe("power purchase agreement", ("energy",)),
     _Probe("liquefied natural gas", ("energy",)),
     _Probe("uranium enrichment", ("energy", "defense")),     # fuel ↔ naval/defense
     _Probe("nuclear fuel", ("energy", "defense")),
-    _Probe("solid-state battery", ("energy", "ai")),
-    _Probe("geothermal", ("energy", "ai")),                  # firm power for compute
+    _Probe("solid-state battery", ("energy",)),
+    _Probe("geothermal", ("energy",)),
     _Probe("microgrid", ("energy", "defense")),              # base/installation resilience
     # ── Defense depth ────────────────────────────────────────────────────────────
     _Probe("munitions production", ("defense",)),

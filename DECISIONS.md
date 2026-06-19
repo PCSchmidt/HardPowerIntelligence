@@ -2065,8 +2065,21 @@ No logic/threshold change — prompt only. Added a curation eval to make this me
 `tests/fixtures/significance_golden.json` (labeled keep/drop cases incl. the non-binding discriminator
 pair) + `scripts/eval_significance.py` (operator-run, advisory — LLM judgment varies). First run:
 **12/12, froth 7/7 dropped, signal 5/5 kept**, scores cleanly separated (froth 0.05–0.30, signal
-0.80–0.95) around the 0.45 threshold. Curation Steps 2 (dial back the D060 convergence boost) and 3
+0.80–0.95) around the 0.45 threshold. Curation Steps 2 (desk-identity tagging) and 3
 (cross-desk de-dup) follow separately.
+
+**Refinement (2026-06-19, curation Step 2) — desk-identity tagging.** Phase B also found the AI desk
+diluted by generic energy project finance (a solar+storage farm, a wind acquisition, a PPA landing on
+"AI Infrastructure"). Root cause: the EDGAR convergence probes (D060) tag energy-power phrases as *also*
+AI on a demand-side rationale ("compute needs power"). Operator chose (over a blunt convergence-boost
+dial-back or status-quo) to **tighten the tags to compute-proper**: demoted `grid-scale storage`,
+`transmission interconnection`, `power purchase agreement`, `solid-state battery`, and `geothermal` from
+`(energy, ai)` → `(energy)`. **Kept** as genuine AI∩Energy convergence: `hyperscale data center`, `liquid
+cooling`, `graphics processing unit`, and `small modular reactor` (data-center nuclear). This makes the
+AI desk "AI infrastructure proper" while preserving convergence where the cross-desk link is intrinsic,
+not merely demand-side. Probe *order* is unchanged (pinned positions intact); only desk tags changed, so
+the convergence boost (`materiality_cross_sector_weight` 0.15) and the cross-desk convergence chip (T3.7)
+now fire on genuinely cross-sector items. Locked by `test_tangential_energy_probes_are_energy_only`.
 
 ## D086 — Analysis grounding is best-effort (never lose a passed brief)
 

@@ -19,6 +19,11 @@ live ingestion runner, with Supabase auth and Lemon Squeezy subscriptions. Built
   substantive non-binding deals (e.g., a HALEU supply LOI). Prompt-only change, plus a durable curation
   eval (`scripts/eval_significance.py` + `tests/fixtures/significance_golden.json`); first run 12/12
   (froth 7/7 dropped, signal 5/5 kept).
+- **Curation tuning, Step 2** (2026-06-19, desk identity): tightened the EDGAR convergence probes so the
+  AI desk stops getting diluted by generic energy project finance. Demoted `grid-scale storage`,
+  `transmission interconnection`, `power purchase agreement`, `solid-state battery`, and `geothermal`
+  from `(energy, ai)` → `(energy)` — their AI link was only demand-side. Kept genuine AI∩Energy probes
+  (hyperscale data center, liquid cooling, GPU, small modular reactor). Probe order unchanged.
 - **License** (2026-06-19): the project is now explicitly **source-available under the PolyForm
   Noncommercial License 1.0.0** (`LICENSE`) — read/study/fork for noncommercial use; commercial use
   reserved to the author. Replaces the prior implicit all-rights-reserved (no-license) default.
