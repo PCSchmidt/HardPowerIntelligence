@@ -179,6 +179,15 @@ interface SidebarProps {
 > which renders a trend arrow + color on each GDELT momentum delta via `lib/signal.ts` `splitSignal`
 > (presentation-only; the disclaimer text is preserved). A true numeric sparkline is deferred to Tier 2b
 > (needs the GDELT series persisted; `briefs.signal` is currently a prose string).
+>
+> **As-built note (2026-06-19, D091/D092 — UX Tier 3, entity chips):** `BriefContent` renders
+> **`EntityChips`** (`components/brief/entity-chips.tsx`) per item below the headline — the resolved
+> entities the item is about, mapped from `item.entity_ids` against the brief's `entities` summary array
+> (served by the API, T3.4). Public companies show name + ticker; closely-held/venture firms (no ticker,
+> minted from a CIK/UEI during resolution) show a muted "private" chip. `lib/entities.ts` `entityDisplayName`
+> title-cases all-caps SEC titles for display. Backed by the resolution graph (the moat), not LLM-asserted —
+> resolved entities render only because the resolver cleared its eval gate (D091). Chips are static; linking
+> them to the Entity 360 page (`/entity/[id]`) is T3.6.
 
 ### `BriefHeader`
 
