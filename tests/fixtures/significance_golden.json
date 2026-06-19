@@ -1,0 +1,77 @@
+{
+  "_doc": "Curation golden set for the strategic-significance gate (D085 tuning, Step 1). Each item is a realistic text_chunk with the desk it was a candidate for and the expected action: 'keep' (strategically significant for a sophisticated investor) or 'drop' (speculative-vehicle froth or trivial). The discriminating pair is 5 vs 3: both are non-binding, but Centrus/Oklo HALEU is substantive (keep) while the VisionWave shell-to-operator term sheet is froth (drop) — substance over vehicle.",
+  "items": [
+    {
+      "desk": "ai",
+      "expected": "drop",
+      "note": "de-SPAC, pre-revenue target — speculative vehicle",
+      "text": "SEC 8-K filing by Silicon Valley Acquisition Corp (SVAQ): announced a definitive business combination agreement with EigenQ, a pre-revenue quantum company, valuing the combined company at approximately $3 billion pro forma enterprise value, with about $215 million held in the SPAC trust account before shareholder redemptions."
+    },
+    {
+      "desk": "ai",
+      "expected": "drop",
+      "note": "shell recapitalization / brand pivot — no operating substance",
+      "text": "SEC 8-K filing by Smartbird Inc (formerly Allbirds Inc): completed the sale of the Allbirds footwear brand and increased a convertible financing facility from $50 million to $100 million to fund a pivot toward an AI infrastructure strategy, and appointed a new chief executive."
+    },
+    {
+      "desk": "ai",
+      "expected": "drop",
+      "note": "non-binding term sheet, cash-shell becoming an operator — vehicle, not substance",
+      "text": "SEC 8-K filing by VisionWave Holdings (VWAV): entered into a non-binding term sheet to form a joint company for a proposed Tier IV data center campus in Israel, with approximately $40 million in share-based consideration, subject to due diligence, definitive agreements, and SEC and Nasdaq approvals."
+    },
+    {
+      "desk": "energy",
+      "expected": "keep",
+      "note": "binding, closed M&A with real generating capacity",
+      "text": "SEC 8-K filing by Talen Energy Corp: consummated the $3.8 billion acquisition of the Freedom and Guernsey natural gas-fired combined-cycle generation plants, totaling 1,836 MW in the PJM market, completing related financing with unsecured notes."
+    },
+    {
+      "desk": "energy",
+      "expected": "keep",
+      "note": "non-binding LOI but materially substantive HALEU supply-chain; operating company",
+      "text": "SEC 8-K filing by Centrus Energy Corp (LEU): signed a non-binding letter of intent with Oklo to supply high-assay low-enriched uranium (HALEU) for Oklo's Meta-backed reactor campus buildout, leveraging the previously announced $900 million Department of Energy HALEU task order and private capital."
+    },
+    {
+      "desk": "defense",
+      "expected": "keep",
+      "note": "major federal award, strategically relevant program",
+      "text": "USAspending federal award: a $1.1 billion contract to Lockheed Martin for Long Range Anti-Ship Missile (LRASM) production for the U.S. Navy, awarded by Naval Air Systems Command."
+    },
+    {
+      "desk": "defense",
+      "expected": "drop",
+      "note": "routine commodity telecom procurement",
+      "text": "USAspending federal award: a $4.2 million indefinite-delivery contract for commercial cellular wireless service and mobile device management for an administrative office."
+    },
+    {
+      "desk": "defense",
+      "expected": "drop",
+      "note": "routine facilities / janitorial services",
+      "text": "USAspending federal award: a $0.8 million contract for janitorial and grounds-maintenance services at a regional government office building."
+    },
+    {
+      "desk": "ai",
+      "expected": "keep",
+      "note": "genuine technology milestone from an operating company",
+      "text": "SEC 8-K filing by D-Wave Quantum Inc (QBTS): announced a gate-model quantum computing simulator with error-aware programming built on its dual-rail technology, alongside new developer access bundles for the simulator and systems."
+    },
+    {
+      "desk": "energy",
+      "expected": "drop",
+      "note": "content-free administrative filing, no material event",
+      "text": "SEC 8-K filing by an energy company: amended its corporate bylaws to update advance-notice procedures for stockholder proposals and ratified the appointment of its independent registered public accounting firm for the fiscal year."
+    },
+    {
+      "desk": "defense",
+      "expected": "drop",
+      "note": "stale / years-old action resurfacing, no new event",
+      "text": "SEC periodic report restating that a contract originally awarded in 2019 remains in effect, disclosing no new award, modification, or material development in the current period."
+    },
+    {
+      "desk": "defense",
+      "expected": "keep",
+      "note": "critical-mineral / supply-chain development",
+      "text": "USAspending federal award: a $310 million award to a critical-minerals firm to establish domestic rare-earth separation capacity supporting defense and energy supply chains."
+    }
+  ]
+}

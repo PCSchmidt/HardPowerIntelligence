@@ -13,6 +13,12 @@ live ingestion runner, with Supabase auth and Lemon Squeezy subscriptions. Built
 (Gates 1–8 closed).
 
 ### Added
+- **Curation tuning, Step 1** (2026-06-19, refines D085): the strategic-significance gate now demotes
+  *speculative financial vehicles* — SPAC/de-SPAC/blank-check combinations, cash-shell recapitalizations
+  and rebrands, and vehicle-only term sheets — that were padding the AI desk, while still keeping
+  substantive non-binding deals (e.g., a HALEU supply LOI). Prompt-only change, plus a durable curation
+  eval (`scripts/eval_significance.py` + `tests/fixtures/significance_golden.json`); first run 12/12
+  (froth 7/7 dropped, signal 5/5 kept).
 - **License** (2026-06-19): the project is now explicitly **source-available under the PolyForm
   Noncommercial License 1.0.0** (`LICENSE`) — read/study/fork for noncommercial use; commercial use
   reserved to the author. Replaces the prior implicit all-rights-reserved (no-license) default.

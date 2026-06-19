@@ -2053,6 +2053,21 @@ news now skips cleanly (better than filler) — which also surfaces, honestly, w
 sources. Intentional consequence: thin desks may skip more often pre-launch; that's the correct
 quality trade while iterating, and it points the sourcing roadmap.
 
+**Refinement (2026-06-19, curation Step 1) — substance over vehicle.** A Phase B quality pass on the
+live AI desk found the gate let *speculative financial vehicles* through: a $3B quantum **SPAC**, a
+shoe-company-turned-AI **shell**, and a **non-binding term sheet** all scored HIGH because the prior
+prompt rated "M&A and major financings" as significant without distinguishing operating substance from
+deal-vehicle mechanics. Reworked the triage prompt to demote SPAC/de-SPAC/blank-check combinations
+(esp. pre-revenue targets), cash-shell recapitalizations/pivots/rebrands, and vehicle-only term sheets
+into the LOW band — while explicitly **keeping** a non-binding LOI when the underlying development is
+materially strategic and the parties are operating companies (e.g., the Centrus/Oklo HALEU supply LOI).
+No logic/threshold change — prompt only. Added a curation eval to make this measurable and durable:
+`tests/fixtures/significance_golden.json` (labeled keep/drop cases incl. the non-binding discriminator
+pair) + `scripts/eval_significance.py` (operator-run, advisory — LLM judgment varies). First run:
+**12/12, froth 7/7 dropped, signal 5/5 kept**, scores cleanly separated (froth 0.05–0.30, signal
+0.80–0.95) around the 0.45 threshold. Curation Steps 2 (dial back the D060 convergence boost) and 3
+(cross-desk de-dup) follow separately.
+
 ## D086 — Analysis grounding is best-effort (never lose a passed brief)
 
 **Decision:** `run_brief.py` now wraps the D073 analysis-grounding step in try/except: if grounding
