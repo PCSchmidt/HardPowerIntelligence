@@ -79,11 +79,32 @@ class TestParse:
         records = NRCAdapter().parse(nrc_response)
         assert "amount_usd" not in records[0].structured_data
 
-    def test_v1_emits_no_entity_mentions(self, nrc_response):
-        # NRC docs carry no ticker/CIK/UEI; name-only resolution is a deferred follow-on (D095).
+    def test_links_allowlisted_company_via_ticker(self, nrc_response):
+        # Precision-first linking (D096): a named public nuclear company yields a ticker-bearing
+        # mention the linker resolves via the exact-identifier path. The Oklo notice → OKLO.
         records = NRCAdapter().parse(nrc_response)
-        for r in records:
-            assert r.entity_mentions == []
+        oklo = records[0]
+        assert len(oklo.entity_mentions) == 1
+        m = oklo.entity_mentions[0]
+        assert m["mention"] == "Oklo"
+        assert m["ticker"] == "OKLO"
+        assert m["entity_type"] == "company"
+
+    def test_no_mention_when_no_allowlisted_company_named(self, nrc_response):
+        # The HALEU rulemaking names no allowlisted company → no mention (no false link).
+        records = NRCAdapter().parse(nrc_response)
+        assert records[1].entity_mentions == []
+
+    def test_mention_match_is_word_bounded(self):
+        # "Vistra" matches; an incidental substring must not.
+        adapter = NRCAdapter()
+        resp = {"results": [{
+            "document_number": "x", "title": "Vistra Comanche Peak License Renewal",
+            "type": "Notice", "abstract": "", "html_url": "", "publication_date": "2026-06-20",
+            "agencies": [{"name": "Nuclear Regulatory Commission"}],
+        }]}
+        tickers = {m["ticker"] for m in adapter.parse(resp)[0].entity_mentions}
+        assert tickers == {"VST"}
 
     def test_text_chunk_reads_as_policy(self, nrc_response):
         chunk = NRCAdapter().parse(nrc_response)[0].text_chunk

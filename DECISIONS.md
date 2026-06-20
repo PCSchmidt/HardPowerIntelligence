@@ -2341,3 +2341,35 @@ non-obvious calls are the two scope cuts above, both recorded.
 **Verification:** 24 adapter unit tests against an inline golden fixture (`tests/unit/adapters/test_nrc_adapter.py`);
 full backend suite 392 green. Live `fetched>0` confirmation happens on the next cron (or an operator
 `run_ingest.py --source nrc` after `supabase db push`).
+
+## D096 — NRC entity-linking via a curated ticker allowlist (completes D095's deferral)
+
+**Decision:** Wire NRC documents into the entity-resolution graph so an NRC notice about Oklo or Centrus
+produces an entity chip and feeds cross-desk convergence, like an EDGAR filing or USAspending award. This
+completes the scope cut deferred in D095 (#1: "no entity mentions").
+
+**The mechanism choice — exact ticker, not name trigram.** NRC documents carry no ticker/CIK/UEI, so the
+obvious route is name-only trigram resolution. But that's fragile precisely for the names we care about:
+short company tokens ("Oklo", "Vistra", "Centrus") have few trigrams, so `similarity("OKLO","OKLO INC")`
+falls below the resolver's 0.92 auto-link gate — a *correct* match would be recorded unresolved (recall ≈ 0),
+or worse, a loose gate would risk false links against the precision-gated graph (D091). Instead we attach a
+**known ticker** for thesis-relevant public nuclear/fuel-cycle companies named in a document and resolve via
+the resolver's **exact-identifier path** (`find_by_identifier`, confidence 1.0, false-link-proof). A curated
+allowlist (Oklo, NuScale, Centrus, BWXT, Constellation, Vistra, Nano Nuclear, Energy Fuels, Uranium Energy,
+Cameco, Lightbridge, GE Vernova), matched word-bounded against title + abstract; a name not on the list yields
+no mention (no false link), and an attached ticker that happens not to be seeded simply fails to resolve.
+
+**Why a hardcoded allowlist is acceptable here:** the convergence signal only fires when the *same* entity
+appears on ≥2 desks — and the entities that appear in NRC docs AND elsewhere are exactly the public nuclear
+players, a small, well-known, slow-changing set. A name not on the list has no cross-desk presence to surface
+anyway, so the list captures essentially all the convergence value at full precision. Extending it is one line.
+
+**No linker/resolver/generator change.** `extract_resolution_inputs` already reads `mention.get("ticker")`
+and `resolve_mention` already does exact-identifier-wins — so emitting ticker-bearing mentions from the adapter
+was the entire change. Alternatives rejected: name-only trigram (fragile/false-link risk, above); LLM NER
+(per-doc cost + a new eval surface, deferred); a DB reverse-lookup of "any seeded entity named in this text"
+(needs new resolver machinery for marginal extra coverage). **Reversibility:** high — additive to one adapter.
+
+**Verification:** +2 adapter unit tests (allowlisted company → ticker mention; word-bounded match; non-match →
+no mention); full suite 394 green. Live linking confirmation rides the next cron with an NRC item naming an
+allowlisted company → `inspect_brief_entities.py`.

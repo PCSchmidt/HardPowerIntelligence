@@ -13,6 +13,14 @@ live ingestion runner, with Supabase auth and Lemon Squeezy subscriptions. Built
 (Gates 1–8 closed).
 
 ### Added
+- **NRC entity-linking** (2026-06-20, D096, completes D095's deferral): NRC documents now feed the
+  entity-resolution graph — an NRC notice about Oklo or Centrus produces an entity chip and cross-desk
+  convergence, the same as an EDGAR filing or a USAspending award. Since NRC docs carry no ticker/CIK/UEI
+  (and short-name trigram matching is fragile), the adapter attaches a *known ticker* for thesis-relevant
+  public nuclear/fuel-cycle companies named in a document and resolves via the resolver's exact-identifier
+  path (false-link-proof). A curated allowlist (Oklo, NuScale, Centrus, BWXT, Constellation, Vistra, …);
+  a name not on it produces no mention, so precision holds. No linker/resolver change was needed — the
+  existing machinery already resolves a ticker-bearing mention. +2 adapter tests; suite 394 green.
 - **NRC source breadth for the Energy desk** (2026-06-20, D095): the Energy desk was consistently the
   thinnest (Phase B) because every desk ran on the same capital-flow sources — no *regulatory* signal.
   Added a fourth adapter, **NRC via the Federal Register API** (free, no key, public-domain): five on-thesis

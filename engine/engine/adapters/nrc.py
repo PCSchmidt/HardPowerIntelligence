@@ -14,17 +14,21 @@ on **source authority + novelty** rather than magnitude (``source_weights['nrc']
 the NRC is the authoritative nuclear regulator), which clears the materiality floor comfortably.
 The synthesis model classifies these as ``policy`` items from the text.
 
-Two deliberate scope choices for v1:
-  * **No entity mentions.** NRC documents carry no ticker/CIK/UEI, so resolution would need
-    name-only trigram matching (a linker change with false-link risk). Records clear materiality
-    without mentions (``entity_type`` defaults to ``company``), so we ship the regulatory signal
-    now and defer NRC entity-linking to a focused follow-on gate.
+Two deliberate design choices:
+  * **Entity linking via a curated ticker allowlist (D096).** NRC documents carry no ticker/CIK/UEI,
+    and name-only trigram matching is fragile for short names (``"Oklo"`` scores below the resolver's
+    0.92 gate). So instead we attach a KNOWN ticker when a thesis-relevant public nuclear/fuel-cycle
+    company is named, and resolve via the exact-identifier path — the resolver's strongest,
+    false-link-proof route. A name not on the allowlist simply produces no mention (no false link).
+    This is what lets an NRC notice about Oklo or Centrus produce an entity chip and feed cross-desk
+    convergence, the same way an EDGAR filing or a USAspending award does.
   * **Fixed rolling lookback, not a forward watermark.** Federal Register publication dates don't
     lag, but a forward-advancing watermark is the trap that silently zeroed USAspending (Phase B);
     a fixed lookback + content-hash dedup is the robust pattern, so we use it here too.
 """
 import hashlib
 import json
+import re
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta, timezone
 
@@ -48,6 +52,60 @@ _FIELDS = [
 class _Probe:
     term: str                # Federal Register full-text search term (within NRC docs)
     desks: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class _NuclearEntity:
+    display: str             # clean mention/display name
+    ticker: str              # exact identifier used to resolve (must be seeded to link)
+    aliases: tuple[str, ...]  # lowercase forms matched word-bounded in title + abstract
+
+
+# Curated public nuclear / fuel-cycle entities for precision-first linking (D096). We resolve via the
+# EXACT-ticker path (false-link-proof) rather than fuzzy name trigram, so only clearly-named public
+# players whose cross-desk presence makes convergence meaningful are listed; a name not here yields no
+# mention. An attached ticker that isn't seeded simply fails to resolve (no false link). Extend freely.
+_NUCLEAR_ENTITIES: tuple[_NuclearEntity, ...] = (
+    _NuclearEntity("Oklo", "OKLO", ("oklo",)),
+    _NuclearEntity("NuScale Power", "SMR", ("nuscale",)),
+    _NuclearEntity("Centrus Energy", "LEU", ("centrus",)),
+    _NuclearEntity("BWX Technologies", "BWXT", ("bwx technologies", "bwxt")),
+    _NuclearEntity("Constellation Energy", "CEG", ("constellation energy", "constellation")),
+    _NuclearEntity("Vistra", "VST", ("vistra",)),
+    _NuclearEntity("Nano Nuclear Energy", "NNE", ("nano nuclear",)),
+    _NuclearEntity("Energy Fuels", "UUUU", ("energy fuels",)),
+    _NuclearEntity("Uranium Energy", "UEC", ("uranium energy",)),
+    _NuclearEntity("Cameco", "CCJ", ("cameco",)),
+    _NuclearEntity("Lightbridge", "LTBR", ("lightbridge",)),
+    _NuclearEntity("GE Vernova", "GEV", ("ge vernova",)),
+)
+
+
+def _extract_nuclear_mentions(text: str) -> list[dict]:
+    """Best-effort, precision-first entity mentions from a document's text (title + abstract).
+
+    Each allowlisted company named in the text yields one mention carrying its ticker, which the
+    linker (``extract_resolution_inputs``) resolves via the exact-identifier path. At most one mention
+    per ticker per record. Shape mirrors the other adapters' mention dicts.
+    """
+    low = text.lower()
+    mentions: list[dict] = []
+    seen: set[str] = set()
+    for ent in _NUCLEAR_ENTITIES:
+        if ent.ticker in seen:
+            continue
+        if any(re.search(rf"\b{re.escape(alias)}\b", low) for alias in ent.aliases):
+            mentions.append({
+                "mention": ent.display,
+                "normalized": ent.display.upper(),
+                "ticker": ent.ticker,
+                "entity_id": None,
+                "confidence": None,
+                "resolved_by": None,
+                "entity_type": "company",
+            })
+            seen.add(ent.ticker)
+    return mentions
 
 
 # On-thesis nuclear-development probes. Each is a substantive regulatory event class — not routine
@@ -140,7 +198,9 @@ class NRCAdapter:
                 source_id=_SOURCE_ID,
                 record_type="regulatory_document",
                 desk=desks,
-                entity_mentions=[],   # v1: no ticker/CIK/UEI to resolve on (see module docstring)
+                # Precision-first linking (D096): allowlisted public nuclear companies named in the
+                # title/abstract, carrying a ticker the linker resolves via the exact-identifier path.
+                entity_mentions=_extract_nuclear_mentions(f"{title} {abstract}"),
                 structured_data=structured,
                 text_chunk=self._build_text_chunk(doc_type, title, agency, publication_date, abstract),
                 content_hash=content_hash,
