@@ -13,6 +13,12 @@ live ingestion runner, with Supabase auth and Lemon Squeezy subscriptions. Built
 (Gates 1–8 closed).
 
 ### Added
+- **Quiet-day reader UX** (2026-06-20): on a day a desk cleanly skips (no significant news, D085) or
+  before the morning cron runs, the reader served the last published brief with *yesterday's date and no
+  context* — which reads as stale/broken. The API now attaches a neutral `latest_available` indicator when
+  the served brief isn't today's (distinct from the D013 pending/failed staleness), and the reader renders
+  it as a calm informational note ("You're viewing the most recent brief…") rather than an amber warning.
+  Turns "we don't pad on a quiet day" into a trust signal instead of a confusing stale date.
 - **USAspending fetched-zero fix** (2026-06-20, Phase 1, refines D057): federal awards weren't reaching
   any brief — the source silently fetched 0 every run because its forward-advancing date watermark shrank
   the query window to ~1 day, and USAspending awards lag (they appear in the API weeks after their action

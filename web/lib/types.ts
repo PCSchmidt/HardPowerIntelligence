@@ -6,8 +6,10 @@ export type Desk = "defense" | "energy" | "ai";
 export type ItemType = "award" | "filing" | "policy" | "macro" | "signal";
 
 export interface StalenessIndicator {
-  last_updated: string;
-  current_status: "pending" | "failed";
+  last_updated: string | null;
+  // pending/failed = D013 generation issue (alarming, amber). latest_available = a quiet day or
+  // pre-cron load where the served brief simply isn't today's (neutral, informational).
+  current_status: "pending" | "failed" | "latest_available";
   message: string;
 }
 

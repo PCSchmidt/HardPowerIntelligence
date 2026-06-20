@@ -1,5 +1,6 @@
-import { AlertTriangle, Sparkles } from "lucide-react";
+import { AlertTriangle, Clock, Sparkles } from "lucide-react";
 import type { Brief } from "@/lib/types";
+import { cn } from "@/lib/utils";
 import { BriefHeader } from "./brief-header";
 import { BriefGlance } from "./brief-glance";
 import { BriefContent } from "./brief-content";
@@ -10,12 +11,23 @@ import { SignalLine } from "./signal-line";
 export function BriefReader({ brief }: { brief: Brief }) {
   return (
     <div className="mx-auto max-w-content px-4 py-10 sm:px-6">
-      {brief.staleness_indicator && (
-        <div className="mb-6 flex items-start gap-2 rounded-md bg-warning/10 px-4 py-3 text-ui-sm text-warning">
-          <AlertTriangle size={16} className="mt-0.5 shrink-0" />
-          <span>{brief.staleness_indicator.message}</span>
-        </div>
-      )}
+      {brief.staleness_indicator && (() => {
+        // A quiet day / pre-cron load (latest_available) is informational, not an error — render
+        // it neutrally so it reassures rather than alarms; pending/failed stays amber (D013).
+        const info = brief.staleness_indicator.current_status === "latest_available";
+        const Icon = info ? Clock : AlertTriangle;
+        return (
+          <div
+            className={cn(
+              "mb-6 flex items-start gap-2 rounded-md px-4 py-3 text-ui-sm",
+              info ? "bg-muted text-muted-foreground" : "bg-warning/10 text-warning",
+            )}
+          >
+            <Icon size={16} className="mt-0.5 shrink-0" />
+            <span>{brief.staleness_indicator.message}</span>
+          </div>
+        );
+      })()}
       <BriefHeader brief={brief} />
       <BriefGlance items={brief.items} />
       {brief.convergence_read && (

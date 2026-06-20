@@ -38,6 +38,21 @@ def _parse_signal_series(brief: asyncpg.Record) -> dict | None:
         return None
 
 
+def _latest_available_indicator(brief: asyncpg.Record | dict, today: date) -> dict | None:
+    """A neutral "this is the latest available brief, not necessarily today's" note for a quiet
+    day (a desk cleanly skipped, D085) or a pre-cron page load. Distinct from the D013
+    pending/failed staleness, which is an alarming "generation broke" case — here nothing is
+    wrong, the day was just quiet, so the reader shouldn't see yesterday's date with no context.
+    Returns None when the served brief IS today's, so a normal day shows no banner."""
+    if brief["date"] >= today:
+        return None
+    return {
+        "current_status": "latest_available",
+        "last_updated": brief["published_at"],
+        "message": "You're viewing the most recent brief — a fresh brief publishes each weekday morning.",
+    }
+
+
 async def _assemble_brief(conn: asyncpg.Connection, brief: asyncpg.Record, staleness: dict | None = None) -> dict:
     items = await conn.fetch(
         """
@@ -175,7 +190,7 @@ async def latest_brief(
             desk,
         )
         if newest is not None and newest["status"] == "published":
-            return await _assemble_brief(conn, newest)
+            return await _assemble_brief(conn, newest, _latest_available_indicator(newest, date.today()))
 
         # D013 fallback: newest is pending/failed (or none) — serve last published + staleness
         last_published = await conn.fetchrow(
