@@ -13,6 +13,13 @@ live ingestion runner, with Supabase auth and Lemon Squeezy subscriptions. Built
 (Gates 1–8 closed).
 
 ### Added
+- **Frontend test infrastructure** (2026-06-20, D094): the web app had no test runner — only `next build`
+  typechecked it, nothing exercised its growing client-side logic. Added **Vitest 4 + Testing Library
+  (jsdom)** with a first suite (16 tests) over the amount-parsing helpers (`lib/amounts.ts`), SEC-title
+  casing (`lib/entities.ts`), and the D093 onboarding component's localStorage/dismiss behavior. Run with
+  `npm test`. Deliberately skips `@vitejs/plugin-react` (its Babel chain conflicts with the modified Next's
+  pinned `@babel/core`) — Vitest's built-in oxc transform handles React 19 JSX with no plugin. Test files
+  stay in the root `tsconfig` so `next build` typechecks them too. See DECISIONS.md D094.
 - **First-run reader orientation** (2026-06-20, D093, tester-readiness): the brief reader is dense — a
   cited at-a-glance ledger, an expandable analysis layer, citation superscripts, and convergence chips —
   and a first-time tester got no orientation. Added a one-time, dismissible "New here?" legend at the top

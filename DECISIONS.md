@@ -2266,3 +2266,33 @@ return as a dedicated gate (semantic, not co-occurrence) when a graph/supply-cha
 
 **Verification:** pure input-shaping unit-tested (`tests/unit/test_entity_linker.py`); the DB resolve/mint
 path is best-effort and confirmed by the next brief run's `entities_linked` log (items_with_entities count).
+
+## D094 — Frontend test infrastructure: Vitest + Testing Library (jsdom)
+
+**Decision:** Stand up a frontend test runner — **Vitest 4 + @testing-library/react + jsdom** — so web
+logic (pure helpers and client-component behavior) can be tested, closing the long-standing gap where only
+the backend (`pytest`) had a test suite. First suite covers `lib/amounts.ts`, `lib/entities.ts`, and the
+D093 `ReaderOnboarding` localStorage/dismiss behavior (16 tests). `npm test` → `vitest run`.
+
+**Why now:** the reader has accumulated real client-side logic (the D093 onboarding gating, amount parsing
+for the D084 magnitude bars, SEC-title casing) that `next build` only typechecks, never *exercises*. A
+regression in any of it would ship silently. This is the "Vitest frontend test infra" meantime item — done
+while the brief pipeline soaks.
+
+**Two choices worth recording:**
+1. **No `@vitejs/plugin-react`.** Its transitive Babel chain (`@rolldown/plugin-babel` → `@babel/core
+   8.0.0-rc.4`) conflicts with the modified Next's pinned Babel and fails `npm install`. Vitest 4's built-in
+   **oxc** transform handles the React 19 automatic JSX runtime with no plugin, so we dropped it entirely —
+   fewer deps, no peer-conflict surface, and a test runner needs none of the plugin's fast-refresh anyway.
+2. **Test files stay in the root `tsconfig` include** (not split into a separate test tsconfig). This lets
+   `next build` typecheck `*.test.tsx` and the setup file for free — a second safety net — at the cost of
+   the build resolving vitest/jest-dom types (already dev-installed). Verified: build stays green with the
+   tests present.
+
+**Alternatives considered:** Jest (heavier, needs its own Babel/SWC transform config against modified Next —
+the exact conflict we're avoiding); Playwright/E2E (valuable later, but a different layer — this gate is
+unit/component, fast, no server). **Reversibility:** high — it's additive dev-only tooling; removing it is
+deleting config + tests. Critical-thinker: no pushback, infra is contained and the babel-conflict workaround
+is the only non-obvious part (recorded above).
+
+**Verification:** `npm test` → 3 files / 16 tests pass; `npm run build` stays green (test files typecheck).
