@@ -13,6 +13,12 @@ live ingestion runner, with Supabase auth and Lemon Squeezy subscriptions. Built
 (Gates 1–8 closed).
 
 ### Added
+- **USAspending fetched-zero fix** (2026-06-20, Phase 1, refines D057): federal awards weren't reaching
+  any brief — the source silently fetched 0 every run because its forward-advancing date watermark shrank
+  the query window to ~1 day, and USAspending awards lag (they appear in the API weeks after their action
+  date). Switched to a fixed 45-day rolling lookback with content-hash dedup. This restores defense-desk
+  awards and unblocks entity minting (private contractors via UEI). Added `scripts/brief_quality_report.py`
+  (read-only) to measure per-desk item/source/entity mix over a window.
 - **Curation tuning, Step 1** (2026-06-19, refines D085): the strategic-significance gate now demotes
   *speculative financial vehicles* — SPAC/de-SPAC/blank-check combinations, cash-shell recapitalizations
   and rebrands, and vehicle-only term sheets — that were padding the AI desk, while still keeping

@@ -118,18 +118,25 @@ class TestContentHash:
 
 
 class TestCursor:
-    def test_build_request_payload_uses_date_range(self):
+    def test_build_request_payload_ignores_cursor_date_uses_rolling_lookback(self):
+        # USAspending awards lag (action date appears in the API weeks later), so the window is a
+        # FIXED rolling lookback every run, not a forward watermark — a stale cursor date that
+        # shrank the window to ~1 day caused the source to silently fetch 0 (Phase B fix).
+        from datetime import date, timedelta
+        from engine.adapters.usaspending import _LOOKBACK_DAYS
+
         adapter = USASpendingAdapter()
-        cursor = {"last_date": "2026-01-01"}
-        payload = adapter.build_request_payload(cursor, page=1)
-        assert "filters" in payload
-        time_periods = payload["filters"]["time_period"]
-        assert any(tp["start_date"] == "2026-01-01" for tp in time_periods)
+        payload = adapter.build_request_payload({"last_date": "2026-01-01"}, page=1)
+        tp = payload["filters"]["time_period"][0]
+        expected_start = (date.today() - timedelta(days=_LOOKBACK_DAYS)).isoformat()
+        assert tp["start_date"] == expected_start      # rolling lookback, not the cursor date
+        assert tp["start_date"] != "2026-01-01"        # stale watermark is ignored
+        assert tp["end_date"] == date.today().isoformat()
 
     def test_build_request_payload_default_cursor(self):
         adapter = USASpendingAdapter()
         payload = adapter.build_request_payload(cursor=None, page=1)
-        # Without cursor, should use a reasonable lookback window
+        # Without cursor, should use the same rolling lookback window
         assert "filters" in payload
         assert "time_period" in payload["filters"]
 

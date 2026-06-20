@@ -1393,6 +1393,19 @@ is provable). And the run crashed on persist because a failed brief already held
 `(desk, date)` slot — idempotency was a known D055 gap, now closed. Validated by 9 new unit
 tests (sentence-stripping, temperature plumbing, delete-before-insert) and a live re-run.
 
+**Refinement (2026-06-20, Phase 1) — per-source cadence: USAspending uses a rolling lookback, not a
+forward watermark.** Phase 1 investigation found USAspending silently fetching **0 records** every run
+(`status=success fetched=0`) — which is why no federal awards reached the briefs and entity *minting*
+never fired. Root cause: the runner's forward-advancing date cursor (`next_cursor → {last_date: today}`)
+works for EDGAR (filings appear same-day) but not for USAspending — awards are filtered by **action
+date**, and an award shows up in the API weeks *after* its action date (reporting lag). The watermark
+shrank the window to ~1 day, which is reliably empty. Fix: `build_request_payload` now ignores the date
+watermark and always queries a **fixed rolling lookback** (`_LOOKBACK_DAYS = 45`); content-hash dedup
+(D057) absorbs the repeats. The cursor still walks probe pages; only the date window changed. General
+principle recorded: **a lagging source needs a rolling re-query window + dedup, not a forward
+watermark.** Also added `scripts/brief_quality_report.py` (read-only) to measure per-desk item/source/
+entity mix over a window so this kind of gap surfaces as data, not anecdote.
+
 ---
 
 ## D059 — Desks are scoped by technology theme, not agency *(added 2026-06-14)*

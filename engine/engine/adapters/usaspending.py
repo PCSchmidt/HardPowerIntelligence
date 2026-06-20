@@ -7,7 +7,11 @@ from .base import NormalizedRecord
 
 _SOURCE_ID = "usaspending"
 _BASE_URL = "https://api.usaspending.gov/api/v2/search/spending_by_award/"
-_DEFAULT_LOOKBACK_DAYS = 14  # grant-funded research/buildout is lower-velocity; widen window
+# USAspending filters by award ACTION date, but an award appears in the API weeks after that
+# date (reporting lag). So we always query a FIXED ROLLING LOOKBACK (not a forward watermark that
+# would shrink to ~1 day and return nothing) wide enough to cover the lag; content-hash dedup
+# (D057) drops the repeats. 45 days balances catching lagged awards against page volume.
+_LOOKBACK_DAYS = 45
 
 # award_type_codes are segregated by group in spending_by_award (you cannot mix contract
 # and assistance types in one query). Defense capital is procurement *contracts* (A–D);
@@ -171,15 +175,14 @@ class USASpendingAdapter:
     # ── cursor / request building ──────────────────────────────────────────────
 
     def build_request_payload(self, cursor: dict | None, page: int = 1) -> dict:
-        # page (1-based) selects the probe; the persisted cursor holds the date watermark.
+        # page (1-based) selects the probe; the cursor carries ONLY the probe page, not a date
+        # watermark. The window is always a fixed rolling lookback (see _LOOKBACK_DAYS) because
+        # USAspending awards lag — a forward-advancing watermark shrank this to ~1 day and the
+        # source silently fetched 0 (Phase B finding, 2026-06-19). Dedup absorbs the repeats.
         probe = _PROBES[(page - 1) % len(_PROBES)]
         self._active_probe = probe
 
-        if cursor and "last_date" in cursor:
-            start_date = cursor["last_date"]
-        else:
-            lookback = date.today() - timedelta(days=_DEFAULT_LOOKBACK_DAYS)
-            start_date = lookback.isoformat()
+        start_date = (date.today() - timedelta(days=_LOOKBACK_DAYS)).isoformat()
 
         return {
             "filters": {
