@@ -188,6 +188,13 @@ interface SidebarProps {
 > title-cases all-caps SEC titles for display. Backed by the resolution graph (the moat), not LLM-asserted —
 > resolved entities render only because the resolver cleared its eval gate (D091). Chips are static; linking
 > them to the Entity 360 page (`/entity/[id]`) is T3.6.
+>
+> **As-built note (2026-06-20, D093 — tester-readiness):** `BriefReader` renders **`ReaderOnboarding`**
+> (`components/brief/reader-onboarding.tsx`, Client) at the very top — a one-time, dismissible "New here?"
+> legend orienting a first-time reader to the three core affordances (cited claims → `Sources`/superscripts;
+> the `Analysis — HPI interpretation` disclosure kept separate from facts; convergence chips). It uses the
+> real UI marks as the legend (teach-by-recognition). Dismissal persists in `localStorage`
+> (`hpi.reader.oriented`); mount-gated render avoids a hydration flash for returning readers.
 
 ### `BriefHeader`
 

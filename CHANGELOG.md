@@ -13,6 +13,13 @@ live ingestion runner, with Supabase auth and Lemon Squeezy subscriptions. Built
 (Gates 1–8 closed).
 
 ### Added
+- **First-run reader orientation** (2026-06-20, D093, tester-readiness): the brief reader is dense — a
+  cited at-a-glance ledger, an expandable analysis layer, citation superscripts, and convergence chips —
+  and a first-time tester got no orientation. Added a one-time, dismissible "New here?" legend at the top
+  of the reader that points at the three affordances a reader most needs (every claim is cited; analysis is
+  kept separate from facts; convergence chips flag cross-desk companies), using the *real* UI marks as the
+  legend so it teaches by recognition. Dismissal persists per-browser in `localStorage`; client-only and
+  mount-gated so a returning reader never sees a flash. Frontend-only (`web/components/brief/reader-onboarding.tsx`).
 - **Quiet-day reader UX** (2026-06-20): on a day a desk cleanly skips (no significant news, D085) or
   before the morning cron runs, the reader served the last published brief with *yesterday's date and no
   context* — which reads as stale/broken. The API now attaches a neutral `latest_available` indicator when
