@@ -120,9 +120,11 @@ fixtures onto live data and became genuinely multi-desk:
   fabricating — depth that keeps the trust model. Reliability + freshness gates make daily
   publishing trustworthy: provable-claim publish floor (D070), regenerate-on-failure (D072),
   and a novelty/anti-rehash gate so tomorrow isn't a re-summary of today (D074).
-- **Two live adapters** — **USAspending** (defense-tech awards, thematically scoped cross-agency
-  not DoD-only, D059) and **SEC EDGAR** (full-text search, the first cross-desk source — one
-  adapter feeds all three desks, D061).
+- **Four live adapters** — **USAspending** (defense-tech awards, thematically scoped cross-agency
+  not DoD-only, D059), **SEC EDGAR** (full-text search, the first cross-desk source — one adapter
+  feeds all three desks, D061), **arXiv** (the technology-advancement leg, D066), and **NRC** (via
+  the Federal Register API — the Energy desk's regulatory leg: nuclear/SMR licensing and HALEU
+  fuel events, D095).
 - **Convergence-aware, multi-desk briefs** — generation is desk-scoped across Defense / AI /
   Energy (D062); a record touching ≥2 desks is boosted as the convergence signal (D060). All
   three desks publish from live data with the layered analyst voice (BLUF → at-a-glance ledger →

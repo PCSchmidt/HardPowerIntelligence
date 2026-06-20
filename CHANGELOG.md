@@ -13,6 +13,17 @@ live ingestion runner, with Supabase auth and Lemon Squeezy subscriptions. Built
 (Gates 1–8 closed).
 
 ### Added
+- **NRC source breadth for the Energy desk** (2026-06-20, D095): the Energy desk was consistently the
+  thinnest (Phase B) because every desk ran on the same capital-flow sources — no *regulatory* signal.
+  Added a fourth adapter, **NRC via the Federal Register API** (free, no key, public-domain): five on-thesis
+  probes (small modular reactor, advanced reactor, HALEU, combined license, uranium enrichment) pull
+  nuclear/SMR licensing events that lead the money by months. Regulatory documents have no dollar amount, so
+  they score on source authority (`source_weights['nrc']=0.85`) + novelty like arXiv, and the synthesis model
+  classifies them as `policy` items. The source self-activates in the daily pipeline (the cron's `supabase db
+  push` seeds the registry row, `run_ingest.py` reads all registered sources). v1 emits no entity mentions —
+  NRC docs carry no ticker/CIK/UEI, so name-only resolution is a deliberate follow-on. Chose NRC over the EIA
+  macro API (which needs an operator-provisioned key and is monthly/slow). 24 adapter tests; suite 392 green.
+  See DECISIONS.md D095.
 - **Frontend test infrastructure** (2026-06-20, D094): the web app had no test runner — only `next build`
   typechecked it, nothing exercised its growing client-side logic. Added **Vitest 4 + Testing Library
   (jsdom)** with a first suite (16 tests) over the amount-parsing helpers (`lib/amounts.ts`), SEC-title

@@ -2296,3 +2296,48 @@ deleting config + tests. Critical-thinker: no pushback, infra is contained and t
 is the only non-obvious part (recorded above).
 
 **Verification:** `npm test` → 3 files / 16 tests pass; `npm run build` stays green (test files typecheck).
+
+## D095 — Energy-desk source breadth: NRC via the Federal Register API
+
+**Decision:** Add a fourth ingestion adapter — **NRC documents pulled from the Federal Register API** —
+as the Energy desk's regulatory leg. Phase B found Energy consistently the thinnest desk because all three
+desks ran on the same capital-flow sources (USAspending grants, EDGAR filings) + arXiv; none carried
+*regulatory* signal, where the nuclear/SMR convergence thesis actually becomes enforceable events (combined-
+license applications, advanced-reactor rules, HALEU fuel decisions) months ahead of the money or the 8-K.
+
+**Why NRC-via-Federal-Register over EIA (the source fork, operator-decided 2026-06-20):** the two candidate
+energy sources have materially different shapes. **EIA** is authoritative *macro* data (generation, storage,
+capacity) but (a) needs a free operator-provisioned API key, (b) is monthly/slow so it emits items
+infrequently — only a partial fix for *daily* thinness — and (c) is numeric series that need delta/threshold
+logic to become "items". **NRC via the Federal Register API** is key-free, public-domain, event-shaped
+(daily-ish), squarely on the nuclear/SMR/HALEU convergence thesis, and buildable + live-verifiable end-to-end
+with no operator dependency. Chose NRC first; EIA remains a clean follow-on once a key is provisioned.
+
+**How it works:** mirrors the EDGAR/USAspending/arXiv probe model — five on-thesis search terms (small
+modular reactor, advanced reactor, high-assay low-enriched uranium, combined license, uranium enrichment),
+each filtered to the NRC agency, walked one-probe-per-page by the runner. The term pre-filter is the curation
+(keeps signal high) so the significance gate (D085) isn't spending LLM calls on routine license-amendment /
+meeting minutiae. A regulatory document has no dollar amount, so it scores on **authority + novelty** like
+arXiv — `source_weights['nrc']=0.85` (the NRC is the authoritative nuclear regulator) puts a new record at
+≈0.66, comfortably above the materiality floor — and the synthesis model classifies it as a `policy` item
+from the text. **Self-activates** in the autonomous pipeline: the daily cron's `supabase db push` seeds the
+`source_registry` row (migration `20260620000001`) and `run_ingest.py` reads all `registered_source_ids()`,
+so no code path hardcodes the source list.
+
+**Two deliberate v1 scope cuts:**
+1. **No entity mentions.** NRC documents carry no ticker/CIK/UEI, so resolution would need name-only trigram
+   matching — a linker change (the linker special-cases EDGAR identifiers + USAspending UEI) with false-link
+   risk against the precision-gated graph (D091). Records clear materiality without mentions (`entity_type`
+   defaults to `company`), so we ship the regulatory *signal* now and defer NRC entity-linking to a focused
+   follow-on gate. Cost: NRC items don't yet produce entity chips / convergence.
+2. **Fixed rolling lookback, not a forward watermark.** Federal Register pub dates don't lag, but the
+   forward-watermark trap is exactly what silently zeroed USAspending (Phase B) — so a 7-day fixed lookback +
+   content-hash dedup is the robust default, applied here too.
+
+**Reversibility:** high — additive (one adapter file, one registry line, one weight, one migration). **Critical
+-thinker:** no pushback on the source choice (the operator picked it with the EIA tradeoff in hand); the only
+non-obvious calls are the two scope cuts above, both recorded.
+
+**Verification:** 24 adapter unit tests against an inline golden fixture (`tests/unit/adapters/test_nrc_adapter.py`);
+full backend suite 392 green. Live `fetched>0` confirmation happens on the next cron (or an operator
+`run_ingest.py --source nrc` after `supabase db push`).

@@ -11,6 +11,7 @@ from __future__ import annotations
 
 from engine.adapters.arxiv import ArxivAdapter
 from engine.adapters.edgar import EDGARFullTextAdapter
+from engine.adapters.nrc import NRCAdapter
 from engine.adapters.usaspending import USASpendingAdapter
 
 # source_id → zero-arg adapter factory. New sources register one line here.
@@ -18,6 +19,7 @@ _ADAPTERS: dict[str, type] = {
     USASpendingAdapter.source_id: USASpendingAdapter,
     EDGARFullTextAdapter.source_id: EDGARFullTextAdapter,
     ArxivAdapter.source_id: ArxivAdapter,
+    NRCAdapter.source_id: NRCAdapter,
 }
 
 
