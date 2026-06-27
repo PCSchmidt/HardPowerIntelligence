@@ -49,6 +49,21 @@ async def _get_window_start(pool: asyncpg.Pool) -> datetime:
     return datetime.now(timezone.utc) - fallback
 
 
+def _is_home_desk(row: dict, desk: str) -> bool:
+    """True when ``desk`` is this record's PRIMARY (home) desk.
+
+    A record's ``desk`` array is ordered by primacy (the EDGAR/adapter probes list
+    the home desk first, e.g. "hyperscale data center" → (ai, energy) = AI-home),
+    so the home desk is ``desk[0]``. Primary-desk routing: a cross-desk record
+    surfaces on its home desk ONLY; its other desk tags become a convergence marker
+    (the ``desk_count`` materiality boost and the entity-graph chip), never a
+    duplicate item on every tagged desk. This is the desk-bleed fix — without it a
+    record tagged (ai, energy) printed on both the AI and Energy briefs, making each
+    read like an everything-desk."""
+    desks = row.get("desk") or []
+    return bool(desks) and desks[0] == desk
+
+
 async def _score_candidates(
     pool: asyncpg.Pool,
     since: datetime,
@@ -74,6 +89,11 @@ async def _score_candidates(
             JOIN raw_records rr ON rr.id = nr.raw_record_id
             WHERE nr.created_at >= $1
               AND $2 = ANY(nr.desk)
+            -- Intentionally ANY, not home-desk-only: the full cross-desk
+            -- neighborhood feeds corroboration counting and the amount-window
+            -- below. Output is narrowed to the home desk via _is_home_desk
+            -- after scoring, so a convergence record still corroborates and
+            -- still earns its boost without printing on every tagged desk.
             """,
             since,
             desk,
@@ -142,7 +162,10 @@ async def _score_candidates(
             corroboration_count=corroboration,
             desk_count=desk_count,
         )
-        if scorer.is_material(score):
+        # Primary-desk routing: score using the full cross-desk neighborhood
+        # (corroboration, desk_count boost) but only surface the record on its
+        # home desk, so cross-desk relevance is a convergence marker not a dup.
+        if scorer.is_material(score) and _is_home_desk(row, desk):
             scored.append((dict(row), score))
 
     return sorted(scored, key=lambda x: x[1], reverse=True)

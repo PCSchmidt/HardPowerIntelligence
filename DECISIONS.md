@@ -2373,3 +2373,32 @@ was the entire change. Alternatives rejected: name-only trigram (fragile/false-l
 **Verification:** +2 adapter unit tests (allowlisted company → ticker mention; word-bounded match; non-match →
 no mention); full suite 394 green. Live linking confirmation rides the next cron with an NRC item naming an
 allowlisted company → `inspect_brief_entities.py`.
+
+## D097 — Primary-desk routing: a cross-desk record surfaces only on its home desk (desk-bleed fix)
+
+**Problem (operator, reading every desk daily 2026-06-27):** each desk read like an everything-desk. A
+record tagged for multiple desks (probes emit a `desk` array, e.g. "hyperscale data center" -> (ai, energy))
+was pulled into EVERY tagged desk's brief by `_score_candidates`' `$2 = ANY(nr.desk)` filter, then the D060
+convergence boost amplified it. So an Energy project-finance item printed on the AI desk, an autonomous-UAV
+arXiv paper printed on AI, etc. — desk identity dissolved.
+
+**Decision:** Route each record to ONE home desk — the first element of its primacy-ordered `desk` array
+(`desk[0]`; the EDGAR/adapter probes already list the home desk first, D059). Cross-desk relevance is no
+longer a duplicate item; it survives as the convergence *marker* it always should have been — the `desk_count`
+materiality boost and the entity-graph chip (D091/D092).
+
+**Mechanism — narrow the OUTPUT, not the fetch.** `_score_candidates` still SELECTs the full cross-desk
+neighborhood (`ANY(nr.desk)`) so corroboration counting (D036) and the 90-day amount-normalization window
+(D035) keep seeing every related record; only the final material set is filtered to home-desk items via a
+pure `_is_home_desk(row, desk)` helper. So a convergence record still corroborates its neighbors and still
+earns its boost — it just stops printing on every desk. This keeps the behavior change isolated and testable
+(the routing is a pure predicate, not buried in SQL).
+
+**Alternatives rejected:** (a) filter in SQL with `nr.desk[1] = $2` — equivalent output but would also shrink
+the corroboration/amount populations and hide the rule inside a query string (harder to unit-test, tautological
+test only); (b) dial back the D060 convergence boost — treats the symptom (over-promotion) not the cause
+(duplication), and weakens genuine convergence signal. **Reversibility:** high — one predicate, additive.
+
+**Verification:** +4 unit tests pin the predicate (home = `desk[0]`; secondary desk is not home; single-desk
+routes to its only desk; empty/missing/None desk routes nowhere); full backend suite 398 green. This is P0
+phase 1 (desk demarcation); the widen-the-net epistemic-framing layer is the next gate.

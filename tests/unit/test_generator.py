@@ -4,7 +4,7 @@ Spec: persisting a brief for (desk, date) first DELETEs any existing brief for
 that day (cascades to items + citations), then inserts — so re-runs replace
 instead of raising UniqueViolation, and a passing brief can supersede a failed one.
 """
-from engine.brief.generator import GeneratedBrief, persist_brief
+from engine.brief.generator import GeneratedBrief, _is_home_desk, persist_brief
 
 
 class _Txn:
@@ -74,6 +74,32 @@ async def test_persist_failed_brief_also_replaces():
         pool=FakePool(conn),
     )
     assert any("DELETE FROM briefs" in s for s in conn.executed)
+
+
+class TestPrimaryDeskRouting:
+    """Primary-desk routing (desk-bleed fix): a cross-desk record surfaces only on
+    its home desk — the first element of its ordered ``desk`` array — so it stops
+    duplicating onto every tagged desk. Cross-desk relevance survives as the
+    convergence marker (desk_count boost / entity chip), not a duplicate item."""
+
+    def test_home_desk_is_first_array_element(self):
+        # "hyperscale data center" → (ai, energy): AI is home, Energy is convergence.
+        row = {"desk": ["ai", "energy"]}
+        assert _is_home_desk(row, "ai") is True
+
+    def test_secondary_desk_is_not_home(self):
+        # Same record must NOT surface on Energy — that was the bleed.
+        row = {"desk": ["ai", "energy"]}
+        assert _is_home_desk(row, "energy") is False
+
+    def test_single_desk_record_routes_to_its_only_desk(self):
+        row = {"desk": ["defense"]}
+        assert _is_home_desk(row, "defense") is True
+
+    def test_empty_or_missing_desk_routes_nowhere(self):
+        assert _is_home_desk({"desk": []}, "ai") is False
+        assert _is_home_desk({}, "ai") is False
+        assert _is_home_desk({"desk": None}, "ai") is False
 
 
 async def test_persist_writes_layered_fields():

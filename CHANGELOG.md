@@ -13,6 +13,14 @@ live ingestion runner, with Supabase auth and Lemon Squeezy subscriptions. Built
 (Gates 1–8 closed).
 
 ### Added
+- **Primary-desk routing — desk-bleed fix** (2026-06-27, D097): each item now appears on ONE home desk
+  (the first, primary entry of its desk array) instead of duplicating onto every desk it touches. A
+  cross-desk record — an AI∩Energy data-center filing, a Defense∩AI autonomy paper — used to print on
+  both briefs, so each desk read like an everything-desk. Cross-desk relevance survives as the convergence
+  signal it should be (the materiality boost + entity chip), not a duplicate item. Scoring still sees the
+  full cross-desk neighborhood (corroboration and amount-normalization unchanged); only the surfaced set is
+  narrowed, via a pure `_is_home_desk` predicate. +4 unit tests; suite 398 green. P0 phase 1 (desk
+  demarcation); widen-the-net epistemic-framing layer is next.
 - **NRC entity-linking** (2026-06-20, D096, completes D095's deferral): NRC documents now feed the
   entity-resolution graph — an NRC notice about Oklo or Centrus produces an entity chip and cross-desk
   convergence, the same as an EDGAR filing or a USAspending award. Since NRC docs carry no ticker/CIK/UEI
