@@ -2402,3 +2402,37 @@ test only); (b) dial back the D060 convergence boost — treats the symptom (ove
 **Verification:** +4 unit tests pin the predicate (home = `desk[0]`; secondary desk is not home; single-desk
 routes to its only desk; empty/missing/None desk routes nowhere); full backend suite 398 green. This is P0
 phase 1 (desk demarcation); the widen-the-net epistemic-framing layer is the next gate.
+
+## D098 — Epistemic-framing layer: confidence + attribution on every item (widen-the-net keystone)
+
+**Why:** The operator retired (2026-06-27, stated firmly) the doctrine that had been HPI's spine —
+*"every claim cites the public record."* As an admission **gate** it excluded vast amounts of important
+signal (reported-not-yet-confirmed, inference, weak signals) for very small benefit and belittled the
+reader. Replacement principle: **honesty over exclusion** — cast the net wide, then *grade and attribute
+every item transparently* so the **basis and confidence** are visible (estimative language, like real
+intelligence analysis). Grounding stays as transparency; it is never again an admission filter. The only
+hard line: don't fabricate.
+
+**This gate (P0 phase 2, foundational slice):** introduce the deterministic taxonomy that the rest of the
+layer builds on — `engine/engine/brief/epistemics.py`. A single ordered ladder of decreasing certainty,
+`Attribution`: CONFIRMED (primary record, citation-supported) → REPORTED (attributed third-party reporting,
+not primary) → ANALYSIS (HPI synthesis/inference) → SPECULATIVE (early/weak signal). `classify_item` derives
+an item's tier from signals already in the pipeline — the source's evidence class and whether the claim was
+citation-supported — with **no LLM call and no new fabrication surface**.
+
+**Key derivation choices:** (a) a `primary` source with a claim that is NOT citation-supported → ANALYSIS,
+not dropped — this is the literal suppress→label flip the philosophy demands (the old D069 gate deleted that
+sentence). (b) A `signal` source (GDELT, D082) caps at SPECULATIVE — radar, never a cited fact. (c) An
+UNCLASSIFIED source defaults to REPORTED, never PRIMARY/CONFIRMED — widening the net must not silently
+inflate confidence; a future private-AI newsroom/DoD-press source (P3) maps to `reported` deliberately.
+
+**Scope cut (deliberate):** this gate is the vocabulary + pure derivation + tests only. The behavioral wiring
+— flipping the publish path from *exclude under-grounded* (D070/D072) to *keep-and-label*, persisting the
+label, and rendering the reader chip — is the NEXT gate, because the publish-gate flip is the behaviorally
+risky core and is naturally coupled to threading per-item source_id + grounding outcome. Anti-fabrication
+(`eval_analysis`, D071/D073) is untouched and remains the one hard line. **Reversibility:** high — additive
+pure module, nothing wired yet.
+
+**Verification:** 11 unit tests pin the ladder ordering, the source→evidence map (incl. the honest unknown
+→ reported default), and every `classify_item` branch (primary+cited=confirmed, primary+uncited=analysis,
+signal=speculative, reported caps, analysis_only). Full backend suite 409 green.

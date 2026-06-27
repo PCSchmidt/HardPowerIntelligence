@@ -13,6 +13,15 @@ live ingestion runner, with Supabase auth and Lemon Squeezy subscriptions. Built
 (Gates 1–8 closed).
 
 ### Added
+- **Epistemic-framing taxonomy** (2026-06-27, D098, widen-the-net keystone): the deterministic vocabulary
+  for grading every item by its basis — a single ordered ladder, Confirmed (primary record, cited) →
+  Reported (attributed, not primary) → HPI analysis (synthesis/inference) → Speculative (early/weak signal).
+  `classify_item` derives the tier from signals already in the pipeline (source evidence class + whether the
+  claim was citation-supported), with no LLM call and no new fabrication surface. This is the foundation for
+  retiring "every claim cites the public record" as an *admission gate*: a primary-record claim that isn't
+  individually cited becomes *labeled* HPI analysis instead of being dropped; an unclassified source defaults
+  to Reported, never silently Confirmed. Pure module + 11 tests; the publish-path flip (keep-and-label),
+  persistence, and reader chip follow next gate. Suite 409 green.
 - **Primary-desk routing — desk-bleed fix** (2026-06-27, D097): each item now appears on ONE home desk
   (the first, primary entry of its desk array) instead of duplicating onto every desk it touches. A
   cross-desk record — an AI∩Energy data-center filing, a Defense∩AI autonomy paper — used to print on
