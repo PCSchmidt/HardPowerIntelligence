@@ -2475,3 +2475,36 @@ is additive.
 excluded; survivors carry a valid attribution; regen retries an empty draw); full backend suite 411 green.
 Live confirmation rides the next cron + an operator brief inspection. Bucket C mechanism docs (SPEC,
 ARCHITECTURE) updated; the frozen Gate-1 CONTRACT carries a dated addendum rather than an in-place rewrite.
+
+## D100 — Brief is a comprehensive desk read: raise the item ceiling to 25, supersede D039
+
+**Decision (operator directive, 2026-06-28):** A desk brief is a *comprehensive picture of the domain*,
+not a five-minute skim. Supersede D039's `BRIEF_MAX_ITEMS=8` ("practical upper bound for a sub-5-minute
+read") with **25**. Rework the synthesis prompt accordingly: write one substantive item per genuinely
+material development up to the cap (was hard-instructed to "target 2–3 items" — a thinness cause as real as
+the cap itself), enrich the BLUF into a 4–6 sentence state-of-the-domain narrative (was a 2–3 sentence
+teaser), and add explicit desk-discipline ("include only developments whose center of gravity is THIS desk")
+to reinforce the D097 primary-desk routing at the synthesis layer.
+
+**Why:** The operator's product judgment: a handful of items per desk is not a saleable intelligence product;
+HPI must show the domain thoroughly. The arbitrary "scannable in 5 minutes" framing was rejected.
+
+**Guardrails kept (quality over quota):** the prompt forbids padding, splitting one development across items,
+duplication, and manufacturing items the passages don't support — "if material is thin, write fewer strong
+items rather than weak filler." The significance gate (D085) is UNCHANGED: more content must come from more
+*sources*, never from loosening the froth filter (SPAC/shell/obituary noise stays dropped). The D099 publish
+posture is unchanged: a desk still publishes whatever quality items it has.
+
+**Honest limitation — the ceiling is not the fill.** Raising the cap and unblocking the prompt is necessary
+but NOT sufficient: real output is **supply-limited**. With only 4 source adapters built (USAspending, EDGAR,
+arXiv, NRC) and froth filtered out, desks produce ~3–6 quality items today regardless of the cap. The cap
+fills toward 25 only as **source breadth (P3)** grows — building the unbuilt Tier-0 veins (SAM.gov, DoD
+contracts, Congress.gov, EIA, FERC/ISO), the news/trade-press *reported* tier (now publishable under D098/
+D099), and GDELT-as-story. That source build is the next major effort; this decision is the ceiling-raise
+that lets it land without re-tuning the cap.
+
+**Cost note:** up to 25 LLM-synthesized items/desk × 3 desks raises per-run synthesis + analysis + eval cost
+roughly linearly; the daily budget guard still applies. Acceptable at current absolute scale.
+
+**Verification:** prompt unit tests (persona + citation discipline) green; full suite 411 green. Live effect
+rides the next cron once deployed. **Reversibility:** trivial — `BRIEF_MAX_ITEMS` is one env var.

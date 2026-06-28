@@ -13,6 +13,14 @@ live ingestion runner, with Supabase auth and Lemon Squeezy subscriptions. Built
 (Gates 1–8 closed).
 
 ### Changed
+- **Brief is a comprehensive desk read — item ceiling 8 → 25** (2026-06-28, D100, supersedes D039): a desk
+  brief now aims to cover its domain thoroughly, not skim it. Raised `BRIEF_MAX_ITEMS` to 25 and reworked
+  the synthesis prompt — which had hard-instructed "target 2–3 items" (a thinness cause as real as the cap)
+  — to write one substantive item per genuine development up to the cap, with explicit no-padding / no-
+  fabrication guardrails. Enriched the BLUF into a 4–6 sentence state-of-the-domain narrative and added
+  desk-discipline language reinforcing D097 routing. The significance froth filter is unchanged: more
+  content comes from more *sources*, not a looser filter. Note: output is supply-limited — it fills toward
+  25 only as source breadth (P3) grows; with 4 adapters built, desks still produce ~3–6 items today.
 - **Publish-path flip — grounding labels, no longer suppresses** (2026-06-28, D099): the publish gate
   no longer fails a brief for falling under a provable-claim floor (the retired D070 gate). A brief now
   publishes when it has at least one honest, non-fabricated item, and every item is stamped a confidence

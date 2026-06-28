@@ -27,7 +27,12 @@ def build_synthesis_prompt(
 
     schema = json.dumps({
         "headline": "string — one-line brief title",
-        "bluf": "string — 2–3 sentence bottom-line-up-front summary",
+        "bluf": (
+            "string — a 4–6 sentence bottom-line-up-front NARRATIVE on the state of the "
+            "desk's domain today: the most important developments, the through-line "
+            "connecting them, and what it means for the reader. A real summary an analyst "
+            "would lead with, not a one-line teaser. ANALYSIS — no [CITE:N] required."
+        ),
         "convergence_read": (
             "string — cross-signal thesis tying the day's items together, especially "
             "Defense/AI/Energy overlaps. ANALYSIS, not new facts; no citations required. "
@@ -59,12 +64,15 @@ def build_synthesis_prompt(
 
     system = (
         f"You are a senior {persona} intelligence analyst producing the daily {desk.upper()} desk brief. "
-        "Each item has two layers: a `body` of VERIFIABLE FACTS where every sentence cites its source with "
-        "[CITE:N], and a `read` (plus optional `watch`) of ANALYSIS — your interpretation of why the facts "
-        "matter, what they imply, and what to watch. The analysis may interpret and look forward but must "
-        "stay grounded in the facts: introduce no new concrete fact (number, name, date, event) and give no "
-        "buy/sell advice. Do not invent facts not supported by the provided passages. "
-        "Return only valid JSON matching the output schema."
+        f"Your job is a COMPREHENSIVE read of the {desk.upper()} domain — cover every genuinely material "
+        "development the facts support, not just the top few. Each item has two layers: a `body` of "
+        "VERIFIABLE FACTS where every sentence cites its source with [CITE:N], and a `read` (plus optional "
+        "`watch`) of ANALYSIS — your interpretation of why the facts matter, what they imply, and what to "
+        "watch. The analysis may interpret and look forward but must stay grounded in the facts: introduce "
+        "no new concrete fact (number, name, date, event) and give no buy/sell advice. Do not invent facts "
+        f"not supported by the provided passages. DESK DISCIPLINE: include only developments that genuinely "
+        f"belong on the {desk.upper()} desk; if a development's center of gravity is another desk, leave it "
+        "out. Return only valid JSON matching the output schema."
     )
 
     user = f"""## Verified facts (ground truth — do not contradict or modify)
@@ -77,8 +85,13 @@ def build_synthesis_prompt(
 {schema}
 
 ## Instructions
-Generate a {desk.upper()} desk BLUF brief with {max_items} items maximum (target 2–3 given the passage count).
-Prioritize high-dollar contract awards, significant filings, and policy developments.
+Generate a comprehensive {desk.upper()} desk BLUF brief. Write ONE substantive item for each genuinely
+material development the facts support, up to {max_items} items. Aim to cover the domain thoroughly — do
+NOT stop at two or three if the facts support more. But quality over quota: never pad, never split one
+development into multiple items, never duplicate, and never manufacture an item the passages don't support.
+If the material is thin, write fewer strong items rather than weak filler. Cover the full range that belongs
+on this desk — contract awards, significant filings, regulatory and policy moves, research and technology
+milestones, and notable corporate or market developments — not only the highest-dollar awards.
 
 CRITICAL CITATION RULE (applies to `body` only): Every single sentence in every item `body` MUST end with
 [CITE:N]. If a body sentence has no [CITE:N], it is automatically dropped by the evaluation system.

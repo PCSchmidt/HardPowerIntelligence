@@ -87,8 +87,11 @@ class Settings(BaseSettings):
     novelty_window_days: int = 7
     novelty_penalty: float = 0.5
 
-    # Brief generation (D039, D040)
-    brief_max_items: int = 8
+    # Brief generation (D039 → D100). A desk brief is a comprehensive read of the
+    # domain, not a 5-minute skim: the cap is the *ceiling* on substantive items the
+    # synthesis may surface (one per genuine development, no padding). Real output is
+    # supply-limited — it fills toward this ceiling only as source breadth grows.
+    brief_max_items: int = 25
     brief_min_items: int = 3
     brief_window_hours_fallback: int = 48
     # Multi-source briefs (D068): reserve up to N fact slots for advancement
