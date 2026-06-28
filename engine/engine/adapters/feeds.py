@@ -70,11 +70,12 @@ _FEEDS: tuple[_Feed, ...] = (
     _Feed("https://www.utilitydive.com/feeds/news/", "Utility Dive", "energy"),
     _Feed("https://www.world-nuclear-news.org/rss", "World Nuclear News", "energy"),
     _Feed("https://www.powermag.com/feed/", "POWER Magazine", "energy"),
-    _Feed("https://www.canarymedia.com/feed", "Canary Media", "energy"),
     _Feed("https://www.pv-magazine.com/feed/", "pv magazine", "energy"),
     # ── Think tanks / research (reported) ──
-    _Feed("https://www.csis.org/analysis/feed", "CSIS", "defense"),
-    _Feed("https://www.rand.org/news.xml", "RAND", "defense"),
+    # Live-validated 2026-06-28: CSIS /rss.xml ✓ (the /analysis/feed path was 404);
+    # RAND + Canary Media bot-blocked (403), dropped — RAND replaced by War on the Rocks.
+    _Feed("https://www.csis.org/rss.xml", "CSIS", "defense"),
+    _Feed("https://warontherocks.com/feed/", "War on the Rocks", "defense"),
     _Feed("https://rmi.org/feed/", "RMI", "energy"),
     _Feed("https://cset.georgetown.edu/feed/", "CSET (Georgetown)", "ai"),
 )
