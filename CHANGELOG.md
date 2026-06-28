@@ -12,6 +12,16 @@ cited briefs, organized around the Defense∩AI∩Energy **convergence** thesis 
 live ingestion runner, with Supabase auth and Lemon Squeezy subscriptions. Built gate-by-gate
 (Gates 1–8 closed).
 
+### Changed
+- **Publish-path flip — grounding labels, no longer suppresses** (2026-06-28, D099): the publish gate
+  no longer fails a brief for falling under a provable-claim floor (the retired D070 gate). A brief now
+  publishes when it has at least one honest, non-fabricated item, and every item is stamped a confidence
+  label (confirmed / reported / analysis / speculative; new `brief_items.attribution` column, surfaced via
+  the briefs API). Thin desks publish labeled instead of going dark. The one hard line is unchanged: an
+  item with no source-supported content is still excluded (anti-fabrication, D069), and the analysis
+  grounding gate (D071/D073) is untouched. The reader confidence chip is the next gate. Publish tests
+  rewritten to the new contract; suite 411 green.
+
 ### Added
 - **Epistemic-framing taxonomy** (2026-06-27, D098, widen-the-net keystone): the deterministic vocabulary
   for grading every item by its basis — a single ordered ladder, Confirmed (primary record, cited) →

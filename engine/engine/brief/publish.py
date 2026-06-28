@@ -16,7 +16,8 @@ from dataclasses import dataclass
 import asyncpg
 import structlog
 
-from engine.brief.generator import GeneratedBrief, generate_brief
+from engine.brief.epistemics import classify_item
+from engine.brief.generator import GeneratedBrief, _item_source_id, generate_brief
 from engine.eval.citation_eval import (
     CitationEvaluator,
     EvalResult,
@@ -54,10 +55,18 @@ async def evaluate_brief(
     evaluator: CitationEvaluator,
     min_claims: int,
 ) -> BriefAttempt:
-    """Run the per-item citation eval and decide the publish verdict.
+    """Run the per-item citation eval, stamp each surviving item's epistemic
+    attribution, and decide the publish verdict (the widen-the-net flip, D099).
 
-    Surviving items are trimmed to their provable sentences (D069); the gate counts
-    provable *claims*, not items, so it is stable to how synthesis packs facts (D070).
+    Grounding level is no longer a suppression gate (the old D070 provable-claim
+    publish floor); it is a per-item confidence **label**. A brief publishes when it
+    has at least one honest item; each item is graded confirmed / reported / analysis
+    / speculative from its source + citation support (``classify_item``, D098).
+
+    The one hard line stays: an item whose claims have NO source support is still
+    excluded (D069) — that is not suppressing signal, it is refusing to dress an
+    unsupported guess as a confirmed fact. ``min_claims`` no longer gates publication;
+    it is retained only as a quality metric / best-attempt tiebreak for the regen loop.
     """
     item_results: list[EvalResult] = []
     excluded_ids: set[str] = set()
@@ -76,14 +85,22 @@ async def evaluate_brief(
         else:
             item["body"] = result.cleaned_body
             item["citation_indices"] = extract_citation_indices(result.cleaned_body)
+            item["attribution"] = classify_item(
+                source_id=_item_source_id(item, brief.passages),
+                citation_supported=result.claims_passing > 0,
+            ).attribution.value
 
+    surviving = sum(
+        1 for it in brief.items if it.get("_item_id") not in excluded_ids
+    )
     provable_claims = evaluator.provable_claim_count(item_results)
     return BriefAttempt(
         brief=brief,
         item_results=item_results,
         excluded_ids=excluded_ids,
         provable_claims=provable_claims,
-        eval_passed=provable_claims >= min_claims,
+        # Publish on honest content, not on a grounding floor: ≥1 non-fabricated item.
+        eval_passed=surviving >= 1,
     )
 
 
@@ -137,7 +154,11 @@ async def generate_publishable_brief(
         )
         if result.eval_passed:
             return result
-        if best is None or result.provable_claims > best.provable_claims:
+        # A failed attempt now means zero honest items survived (or an exception);
+        # keep the draw with the most surviving items, provable claims as tiebreak.
+        if best is None or (
+            len(result.surviving_items), result.provable_claims
+        ) > (len(best.surviving_items), best.provable_claims):
             best = result
 
     if best is not None:

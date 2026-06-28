@@ -82,16 +82,20 @@ final prose constrained to cited facts and passages only.
 
 ## Brief Generation — Citation Eval Gate
 
-Every claim in the generated brief carries a citation id.
-A verifier (entailment check for prose; exact-match for numbers) confirms each
-claim against its source record before the brief is marked publish-ready.
-A brief below the citation-faithfulness threshold does not ship.
+Every claim that draws on a source carries a citation id, and a verifier (entailment
+check for prose; exact-match for numbers) checks it against that source. The result is
+not a suppression gate — it is a per-item **confidence label** (D098/D099): an item is
+graded confirmed / reported / analysis / speculative by its source and citation support.
 The eval score is a published product metric.
-**Evolved (2026-06-16):** the brief is now *layered* — cited `body` facts plus a `read`/`watch`
-analysis layer and a brief-level `convergence_read`. Facts stay per-sentence cited; analysis is
-held to a separate **grounding** gate (regenerate-then-omit, D073) so it interprets without
-fabricating. Publish gates on **provable claims** (≥3, D070), regenerates on a bad draw or
-generation exception (D072), and down-ranks recently-featured records for freshness (D074).
+**Evolved (2026-06-16 → 2026-06-28):** the brief is *layered* — `body` facts plus a
+`read`/`watch` analysis layer and a brief-level `convergence_read`. Analysis is held to a
+separate **grounding** gate (regenerate-then-omit, D073) so it interprets without
+fabricating. Publication **no longer gates on a provable-claim floor** (the old D070 floor,
+retired by D099): grounding became a label, not suppression — a brief ships when it has at
+least one honest, non-fabricated item, each wearing its confidence chip. The one hard line
+stays: an item with no source-supported content is excluded (anti-fabrication, D069). The
+loop still regenerates on an empty draw or generation exception (D072) and down-ranks
+recently-featured records for freshness (D074).
 
 ## Brief Delivery — Web Cards and PDF
 

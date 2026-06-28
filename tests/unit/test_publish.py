@@ -1,8 +1,11 @@
 """
-Tests for engine/brief/publish.py (D072): the publish gate with
-regenerate-on-failure. The synthesis model is non-deterministic, so a failed gate
-is often a bad draw a re-run clears — these verify the loop returns the first
-passing attempt, retries on failure, and falls back to the best attempt seen.
+Tests for engine/brief/publish.py — the publish gate.
+
+The widen-the-net flip (D099): grounding level is no longer a suppression gate (the
+old D070 provable-claim floor). A brief publishes when it has ≥1 honest item; each
+surviving item is stamped an epistemic attribution label (D098). The one hard line
+stays: an item with NO source-supported content is still excluded (anti-fabrication,
+D069). Regenerate-on-failure (D072) now retries only a genuinely empty/failed draw.
 
 generate_brief is mocked (no DB / no LLM); the evaluator is a minimal fake whose
 verdict is encoded in each item body, so the loop logic is tested in isolation.
@@ -10,14 +13,17 @@ verdict is encoded in each item body, so the loop logic is tested in isolation.
 from unittest.mock import AsyncMock, patch
 
 import pytest
+from engine.brief.epistemics import Attribution
 from engine.brief.generator import GeneratedBrief
 from engine.brief.publish import evaluate_brief, generate_publishable_brief
 from engine.eval.citation_eval import EvalResult
 
+_VALID_ATTRIBUTIONS = {a.value for a in Attribution}
+
 
 class FakeEvaluator:
     """Stand-in for CitationEvaluator. ``eval_item`` reads its verdict from the item
-    body: ``"excluded"`` → dropped; ``"claims=N"`` → N supported claims."""
+    body: ``"excluded"`` → dropped (no support); ``"claims=N"`` → N supported claims."""
 
     def __init__(self):
         self.eval_calls = 0
@@ -50,23 +56,41 @@ def _brief(*item_bodies) -> GeneratedBrief:
 
 class TestEvaluateBrief:
     @pytest.mark.asyncio
-    async def test_counts_claims_and_marks_excluded(self):
+    async def test_excludes_unsupported_keeps_supported(self):
+        # The hard line holds: a zero-support item is still excluded (anti-fabrication).
         brief = _brief("claims=2", "excluded", "claims=1")
         attempt = await evaluate_brief(brief, FakeEvaluator(), min_claims=3)
 
-        assert attempt.provable_claims == 3
+        assert attempt.provable_claims == 3   # retained as a metric
         assert attempt.eval_passed is True
         assert attempt.excluded_ids == {"item-1"}
-        # surviving items carry their _item_id and the cleaned body
         assert [it["_item_id"] for it in attempt.surviving_items] == ["item-0", "item-2"]
-        assert brief.items[1]["_item_id"] == "item-1"
 
     @pytest.mark.asyncio
-    async def test_below_floor_does_not_pass(self):
-        brief = _brief("claims=1", "excluded")
+    async def test_thin_brief_now_publishes(self):
+        # THE FLIP: a single supported claim used to fail the ≥3 provable-claim floor.
+        # Now one honest item is enough to publish — grounding labels, doesn't suppress.
+        brief = _brief("claims=1")
         attempt = await evaluate_brief(brief, FakeEvaluator(), min_claims=3)
         assert attempt.provable_claims == 1
+        assert attempt.eval_passed is True
+
+    @pytest.mark.asyncio
+    async def test_no_honest_items_does_not_publish(self):
+        # Only when nothing honest survives does the brief fail to publish.
+        brief = _brief("excluded", "excluded")
+        attempt = await evaluate_brief(brief, FakeEvaluator(), min_claims=3)
         assert attempt.eval_passed is False
+        assert attempt.surviving_items == []
+
+    @pytest.mark.asyncio
+    async def test_surviving_items_carry_a_valid_attribution(self):
+        brief = _brief("claims=2", "excluded", "claims=1")
+        attempt = await evaluate_brief(brief, FakeEvaluator(), min_claims=3)
+        for it in attempt.surviving_items:
+            assert it["attribution"] in _VALID_ATTRIBUTIONS
+        # the excluded item is never stamped/published
+        assert "attribution" not in brief.items[1]
 
 
 class TestGeneratePublishableBrief:
@@ -84,8 +108,9 @@ class TestGeneratePublishableBrief:
         assert gen.call_count == 1   # stopped on first pass
 
     @pytest.mark.asyncio
-    async def test_retries_until_pass(self):
-        briefs = [_brief("claims=1"), _brief("claims=2"), _brief("claims=3", "claims=1")]
+    async def test_retries_an_empty_draw_until_one_has_content(self):
+        # First draw has no honest items (bad synthesis draw); the loop retries.
+        briefs = [_brief("excluded"), _brief("claims=2", "claims=1")]
         with patch(
             "engine.brief.publish.generate_brief",
             new=AsyncMock(side_effect=briefs),
@@ -95,13 +120,13 @@ class TestGeneratePublishableBrief:
                 min_claims=3, max_attempts=3,
             )
         assert attempt.eval_passed is True
-        assert attempt.provable_claims == 4
-        assert gen.call_count == 3
+        assert len(attempt.surviving_items) == 2
+        assert gen.call_count == 2
 
     @pytest.mark.asyncio
-    async def test_returns_best_attempt_when_all_fail(self):
-        # provable claims 1, 2, 0 across attempts — best (2) is returned, marked failed.
-        briefs = [_brief("claims=1"), _brief("claims=2"), _brief("excluded")]
+    async def test_returns_best_attempt_when_all_empty(self):
+        # Every draw is empty → return the best (most surviving), marked failed.
+        briefs = [_brief("excluded"), _brief("excluded", "excluded"), _brief("excluded")]
         with patch(
             "engine.brief.publish.generate_brief",
             new=AsyncMock(side_effect=briefs),
@@ -111,14 +136,14 @@ class TestGeneratePublishableBrief:
                 min_claims=3, max_attempts=3,
             )
         assert attempt.eval_passed is False
-        assert attempt.provable_claims == 2   # the strongest draw
+        assert attempt.surviving_items == []
         assert gen.call_count == 3
 
     @pytest.mark.asyncio
     async def test_max_attempts_one_disables_retry(self):
         with patch(
             "engine.brief.publish.generate_brief",
-            new=AsyncMock(side_effect=[_brief("claims=1")]),
+            new=AsyncMock(side_effect=[_brief("excluded")]),
         ) as gen:
             attempt = await generate_publishable_brief(
                 desk="defense", pool=None, evaluator=FakeEvaluator(),
@@ -129,8 +154,6 @@ class TestGeneratePublishableBrief:
 
     @pytest.mark.asyncio
     async def test_generation_exception_is_retried(self):
-        # First attempt raises (e.g. synthesis returned whitespace → JSON error);
-        # the loop retries and the second attempt publishes.
         with patch(
             "engine.brief.publish.generate_brief",
             new=AsyncMock(side_effect=[RuntimeError("whitespace stall"), _brief("claims=3")]),
@@ -157,24 +180,21 @@ class TestGeneratePublishableBrief:
         assert gen.call_count == 2
 
     @pytest.mark.asyncio
-    async def test_exception_then_failed_gate_returns_best_not_crash(self):
-        # One attempt raises, the other produces a sub-floor brief — return the brief
-        # (marked failed) rather than crashing on the earlier exception.
+    async def test_exception_then_empty_draw_returns_best_not_crash(self):
+        # One attempt raises, the other is empty — return the (failed) brief, don't crash.
         with patch(
             "engine.brief.publish.generate_brief",
-            new=AsyncMock(side_effect=[RuntimeError("stall"), _brief("claims=1")]),
+            new=AsyncMock(side_effect=[RuntimeError("stall"), _brief("excluded")]),
         ) as gen:
             attempt = await generate_publishable_brief(
                 desk="defense", pool=None, evaluator=FakeEvaluator(),
                 min_claims=3, max_attempts=2,
             )
         assert attempt.eval_passed is False
-        assert attempt.provable_claims == 1
         assert gen.call_count == 2
 
     @pytest.mark.asyncio
     async def test_uses_settings_defaults_when_unspecified(self):
-        # min_claims / max_attempts omitted → pulled from settings (3 / 3).
         with patch(
             "engine.brief.publish.generate_brief",
             new=AsyncMock(side_effect=[_brief("claims=3")]),

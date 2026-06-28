@@ -57,7 +57,7 @@ async def _assemble_brief(conn: asyncpg.Connection, brief: asyncpg.Record, stale
     items = await conn.fetch(
         """
         SELECT id, item_type, headline, body, read, watch,
-               entity_ids, materiality_score, display_order
+               attribution, entity_ids, materiality_score, display_order
         FROM brief_items WHERE brief_id = $1 ORDER BY display_order
         """,
         brief["id"],
@@ -110,6 +110,10 @@ async def _assemble_brief(conn: asyncpg.Connection, brief: asyncpg.Record, stale
                 # Analysis layer (D071/D073): grounded interpretation, "" if withheld.
                 "read": it["read"],
                 "watch": it["watch"],
+                # Epistemic attribution (D098/D099): the item's confidence/basis label —
+                # confirmed / reported / analysis / speculative. The reader renders it as
+                # a chip; grounding is shown as transparency, never used to suppress.
+                "attribution": it["attribution"],
                 "entity_ids": [str(e) for e in (it["entity_ids"] or [])],
                 "citation_ids": cit_ids_by_item.get(str(it["id"]), []),
                 "materiality_score": it["materiality_score"],

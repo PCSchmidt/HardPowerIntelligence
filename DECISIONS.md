@@ -2436,3 +2436,42 @@ pure module, nothing wired yet.
 **Verification:** 11 unit tests pin the ladder ordering, the source→evidence map (incl. the honest unknown
 → reported default), and every `classify_item` branch (primary+cited=confirmed, primary+uncited=analysis,
 signal=speculative, reported caps, analysis_only). Full backend suite 409 green.
+
+## D099 — Publish-path flip: grounding becomes a per-item confidence label, not a suppression gate
+
+**Why:** Completes the widen-the-net direction (information-philosophy 2026-06-27; D098 built the
+taxonomy). The operator retired *"every claim cites the public record"* as an **admission gate**. The
+literal mechanism of that gate was the D070 publish floor — a brief with fewer than `brief_min_claims`
+(3) provable claims was marked `failed` and withheld — so an honest-but-thin desk went dark on a quiet
+day. That is the suppression the memory names: *"the publish-floor + grounding gates must become
+confidence/attribution labels, not suppression."*
+
+**Decision:** `evaluate_brief` no longer gates publication on a provable-claim count. It publishes when
+the brief has **≥1 honest item**, and stamps every surviving item with an epistemic **attribution** label
+(`classify_item`, D098) derived from its dominant cited source + whether its claims were citation-supported:
+confirmed / reported / analysis / speculative. `provable_claims` is retained as a quality metric and as the
+best-attempt tiebreak for the regen loop (D072), which now retries only a genuinely empty draw or a
+generation exception.
+
+**The hard line is unchanged.** An item whose claims have NO source support is still excluded (D069) — that
+is not suppressing signal, it is refusing to dress an unsupported guess as a confirmed fact. Per-sentence
+citation stripping in the generator and the analysis grounding gate (D071/D073) are untouched; fabrication
+remains the one thing that blocks content.
+
+**What changes in practice, today:** thin desks publish (labeled) instead of going dark; every item now
+carries a `brief_items.attribution` column (migration 20260628000001, default `confirmed` — accurate, since
+the pre-D099 ledger was all cited-confirmed) surfaced through the briefs API. The non-`confirmed` tiers are
+wired and ready: they light up when reported-news / signal sources feed items (P3), without a citation gate
+excluding them.
+
+**Editorial floor (open knob):** the publish minimum is ≥1 surviving item. If the operator wants a thicker
+"enough to publish" bar, that is a one-line change; it is intentionally NOT a grounding gate.
+
+**Scope cut:** the reader confidence chip (rendering the label in `web/`) is the next gate — frontend-only,
+exposed via the API field added here. **Reversibility:** moderate — the gate logic and a column; the column
+is additive.
+
+**Verification:** publish tests rewritten to the new contract (thin brief publishes; zero-support item still
+excluded; survivors carry a valid attribution; regen retries an empty draw); full backend suite 411 green.
+Live confirmation rides the next cron + an operator brief inspection. Bucket C mechanism docs (SPEC,
+ARCHITECTURE) updated; the frozen Gate-1 CONTRACT carries a dated addendum rather than an in-place rewrite.

@@ -1,5 +1,6 @@
 import json
 import uuid
+from collections import Counter
 from dataclasses import dataclass, field, replace
 from datetime import date, datetime, timedelta, timezone
 
@@ -404,6 +405,18 @@ def _item_raw_record_ids(item: dict, passages: list[PassageContext]) -> list[str
     return [p.raw_record_id for p in passages if p.index in cited and p.raw_record_id]
 
 
+def _item_source_id(item: dict, passages: list[PassageContext]) -> str:
+    """The dominant source behind a brief item, via its [CITE:N] passages — the input
+    to epistemic attribution (D098/D099). Returns the most frequently cited source_id,
+    or "" when the item has no resolvable citation (which classifies as ``reported``,
+    the honest default — we never grant ``confirmed`` standing without a known source)."""
+    cited = set(item.get("citation_indices", []))
+    srcs = [p.source_id for p in passages if p.index in cited and p.source_id]
+    if not srcs:
+        return ""
+    return Counter(srcs).most_common(1)[0][0]
+
+
 @transient_retry()
 async def persist_brief(
     brief: GeneratedBrief,
@@ -470,8 +483,8 @@ async def persist_brief(
                     """
                     INSERT INTO brief_items (
                         id, brief_id, item_type, headline, body, read, watch,
-                        entity_ids, display_order
-                    ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8::uuid[],$9)
+                        attribution, entity_ids, display_order
+                    ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9::uuid[],$10)
                     """,
                     item_id, brief_id,
                     item.get("item_type", "signal"),
@@ -479,6 +492,10 @@ async def persist_brief(
                     item.get("body", ""),
                     item.get("read", ""),    # analysis layer, grounded gate applied (D073)
                     item.get("watch", ""),
+                    # Epistemic attribution (D098/D099): confidence/basis label stamped by
+                    # evaluate_brief. Defaults to "confirmed" for any path that didn't classify
+                    # (matches the column default; the pre-D099 ledger was all cited-confirmed).
+                    item.get("attribution", "confirmed"),
                     item_entity_ids[i],   # resolved + minted entities (T3.3, D091); [] on best-effort miss
                     i,
                 )

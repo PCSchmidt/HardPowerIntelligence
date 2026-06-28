@@ -99,3 +99,17 @@ entities only.
 - Data spend: Tier-0 sources are free; FMP ~$19/mo is the only Cycle-1 paid source.
 - Infrastructure: stay inside the $80–230/mo envelope at MVP scale.
 - Break-even: designed to reach profitability at a small number of paying subscribers.
+
+---
+
+## Addendum — publish posture superseded (2026-06-28, D099)
+
+The Cycle-1 lines above — "every claim links to its source" and "the eval harness reports
+at or above the target threshold **before any brief is published**" — described a
+citation-faithfulness **admission gate**. That gate is **retired** (D098/D099, see
+`DECISIONS.md` and `docs/PHILOSOPHY.md`). Current posture: grounding is a per-item
+**confidence label** (confirmed / reported / analysis / speculative), not a suppression
+gate; a brief publishes when it has at least one honest, non-fabricated item; the one hard
+line is **no fabrication** (an item with no source-supported content is excluded). This is
+a Cycle-2 scope/quality-bar change and is recorded here rather than rewriting the Cycle-1
+acceptance criteria, which stand as the historical record of what Cycle 1 was held to.

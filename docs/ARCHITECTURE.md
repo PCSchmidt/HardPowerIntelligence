@@ -145,11 +145,13 @@ verified brief per desk**.
    citation id.
 3. **Waterfall synthesis** — cheap models cluster/select; the strong model writes
    final prose constrained to cited facts/passages.
-4. **Citation binding + eval gate** — every claim carries a citation id; a verifier
-   (entailment check for prose, exact-match for numbers) confirms each claim against
-   its source before publish. A brief below the faithfulness threshold does not ship.
-   This is the eval harness, run on every brief; its score is a published product
-   metric.
+4. **Citation binding + epistemic labeling** — every source-drawn claim carries a
+   citation id; a verifier (entailment for prose, exact-match for numbers) checks it
+   against its source. The verdict is a per-item **confidence label**, not a publish
+   gate (D098/D099): items are graded confirmed / reported / analysis / speculative.
+   The only hard line is no fabrication — an item with no source-supported content is
+   excluded (D069). This is the eval harness, run on every brief; its score is a
+   published product metric.
 5. **Output + render** — one `Brief` JSON renders to web cards and PDF; `citations[]`
    becomes the source drawer; `license_class` decides full-quote vs link-only.
    Personalization = filtering/reordering by a user's follows, never regeneration.
@@ -157,9 +159,11 @@ verified brief per desk**.
 **Refinements (2026-06-16).** The eval gate (step 4) evolved into a two-layer, self-healing
 publisher: the brief is now **layered** — cited `body` facts plus a `read`/`watch`/`convergence_read`
 *analysis* layer held to a separate **grounding** gate (regenerate-then-omit, never per-sentence
-citation, D071/D073). Publication gates on **provable claims** (≥3, stable to how facts pack into
-items, D070), and the whole generate→eval loop **regenerates on a failed gate or a generation
-exception** (D072) so an unattended run survives a bad model draw. Step 1's materiality additionally
+citation, D071/D073). Publication **no longer gates on a provable-claim floor** — the old D070
+floor was retired by **D099** (widen-the-net): grounding became a per-item confidence label, not
+suppression, so a brief ships with ≥1 honest item rather than going dark on a thin day; only
+fabrication is excluded (D069). The generate→eval loop still **regenerates on an empty draw or a
+generation exception** (D072) so an unattended run survives a bad model draw. Step 1's materiality additionally
 **down-ranks recently-featured records** (novelty gate, D074) so each daily brief is signal, not a
 re-summary. Rendered drill-down: see COMPONENT_REGISTRY §2 (P3).
 
