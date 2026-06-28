@@ -118,6 +118,11 @@ class TestRequestBuilding:
             "iron-air battery",                # energy LDES
             "space-based solar power",         # SBSP convergence
             "orbital data center",             # compute-in-space
+            "contested logistics",             # defense sustainment
+            "Ultra Ethernet AI networking",    # AI networking fabric
+            "optical circuit switching",       # AI networking fabric
+            "hydrokinetic turbine",            # energy next-gen hydro
+            "grid transformer shortage",       # grid-component crunch
         ):
             assert topic in queries, f"missing GDELT coverage for: {topic}"
 

@@ -2581,3 +2581,24 @@ flagged the topic lists are non-exhaustive — treat the probe sets as living an
 
 **Verification:** GDELT coverage spot-check test pins 11 representative new topics across desks so they
 can't silently regress; NRC count test generalized; full suite 424 green.
+
+## D103 — Probe top-up: remaining cutting-edge clusters (continuation of D102)
+
+**Why:** D102's coverage audit left three clusters un-named; the operator chose to close them.
+
+**Decision:** Add the remaining fronts to GDELT (news) and EDGAR (filings):
+- **Defense — contested logistics:** contested logistics, military biomanufacturing, autonomous
+  resupply, cyber-electromagnetic warfare.
+- **AI — networking fabric + efficiency:** NVLink/UALink interconnect, Ultra Ethernet, optical circuit
+  switching, data processing unit (DPU/SmartNIC), Groq/LPU inference, mixture-of-experts.
+- **Energy — next-gen hydro + grid-component crunch:** hydrokinetic turbines, closed-loop geothermal,
+  high-voltage transformer/copper shortage.
+
+GDELT now ~52 probes, EDGAR ~65 (home-desk-tagged, D097 preserved; biomanufacturing tagged
+defense∩energy as a genuine cross-desk). Same bounding as D102 (materiality + significance gate +
+25-item cap). Coverage test extended to guard the new topics. Note: EDGAR per-run call count is now
+high (~65 EFTS calls) — if ingest time/reliability suffers, consolidate via OR-group queries (the
+GDELT OR-group option from D102) or trim low-yield probes. Pure-software efficiency terms beyond MoE
+left out as unlikely to surface as discrete filings/news.
+
+**Verification:** full suite 424 green.

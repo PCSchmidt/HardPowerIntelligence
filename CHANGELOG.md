@@ -31,6 +31,11 @@ live ingestion runner, with Supabase auth and Lemon Squeezy subscriptions. Built
   rewritten to the new contract; suite 411 green.
 
 ### Changed
+- **Probe top-up — remaining cutting-edge clusters** (2026-06-28, D103): closed the gaps D102 left.
+  Defense contested logistics (contested logistics, military biomanufacturing, autonomous resupply,
+  cyber-EM warfare); AI networking fabric + efficiency (NVLink, Ultra Ethernet, optical circuit
+  switching, DPU/SmartNIC, Groq/LPU, mixture-of-experts); energy next-gen hydro + grid-component crunch
+  (hydrokinetic, closed-loop geothermal, transformer/copper shortage). GDELT ~52 probes, EDGAR ~65.
 - **Probe vocabulary expanded to the cutting-edge fronts** (2026-06-28, D102): from an operator topic
   review, the search vocabularies now systematically name the current cutting-edge topics, not just the
   basics. GDELT news probes grew from ~5/desk to ~12/desk plus a Space∩Energy∩AI convergence cluster

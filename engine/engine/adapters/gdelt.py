@@ -96,6 +96,23 @@ _PROBES: tuple[_Probe, ...] = (
     _Probe("space-based solar power", "energy"),             # SBSP / power beaming to Earth
     _Probe("space solar power beaming", "energy"),           # microwave/laser rectenna
     _Probe("orbital data center", "ai"),                     # compute-in-space / inference
+    # ── Remaining fronts (top-up, D103) ──
+    # Defense — contested logistics, cyber-EM:
+    _Probe("contested logistics", "defense"),                # far-forward sustainment
+    _Probe("military biomanufacturing", "defense"),          # synthetic-bio point-of-need supply
+    _Probe("autonomous military resupply", "defense"),       # cargo drones / autonomous convoys
+    _Probe("cyber electromagnetic warfare", "defense"),      # cyber-EW convergence
+    # AI — networking fabric, LPU, model efficiency:
+    _Probe("Nvidia NVLink interconnect", "ai"),              # NVLink / UALink scale-up fabric
+    _Probe("Ultra Ethernet AI networking", "ai"),            # UEC vs InfiniBand scale-out
+    _Probe("optical circuit switching", "ai"),               # OCS data-center networking
+    _Probe("data processing unit", "ai"),                    # DPU / SmartNIC offload
+    _Probe("Groq inference chip", "ai"),                     # LPU / static-scheduling inference
+    _Probe("mixture of experts model", "ai"),                # MoE efficiency architecture
+    # Energy — next-gen hydro, geothermal, grid-component crunch:
+    _Probe("hydrokinetic turbine", "energy"),                # ultra-low-head hydro
+    _Probe("closed-loop geothermal", "energy"),              # advanced/radiator geothermal
+    _Probe("grid transformer shortage", "energy"),           # high-voltage transformer/copper crunch
 )
 
 

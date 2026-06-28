@@ -135,6 +135,17 @@ _PROBES: tuple[_Probe, ...] = (
     # Space ∩ Energy ∩ AI convergence — the thesis core (SBSP / compute-in-space):
     _Probe("space-based solar power", ("energy", "ai")),         # SBSP / power beaming
     _Probe("orbital data center", ("ai", "energy")),            # compute-in-space inference
+    # ── Remaining fronts top-up (D103) ──
+    # Defense — contested logistics:
+    _Probe("contested logistics", ("defense",)),                 # far-forward sustainment
+    _Probe("biomanufacturing", ("defense", "energy")),           # synthetic-bio supply / biofuels
+    # AI — networking fabric:
+    _Probe("optical circuit switching", ("ai",)),                # OCS data-center networking
+    _Probe("data processing unit", ("ai",)),                     # DPU / SmartNIC offload
+    _Probe("Ultra Ethernet", ("ai",)),                           # UEC scale-out fabric
+    # Energy — next-gen hydro, grid-component crunch:
+    _Probe("hydrokinetic", ("energy",)),                         # ultra-low-head hydro/tidal
+    _Probe("grid transformer shortage", ("energy",)),            # transformer/copper crunch
 )
 
 
