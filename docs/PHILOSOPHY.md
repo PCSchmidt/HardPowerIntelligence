@@ -34,10 +34,10 @@ source-fragmented, and moved by public events most readers never have time to tr
 | HPI is | HPI is not |
 |--------|------------|
 | A recurring **research and reporting** product | An AI stock picker or trading-signal app |
-| **Source-grounded** synthesis with citations | A chatbot that answers from memory |
+| **Graded, source-attributed** synthesis (every item shows its basis) | A chatbot that answers from memory |
 | A **publication** (general, not personalized) | A robo-advisor or personalized portfolio tool |
 | **"What changed since yesterday"** intelligence | A static one-off report |
-| Built on **free public data**, synthesized | A reseller of expensive licensed feeds |
+| A **wide net** over on-thesis public information | A reseller of expensive licensed feeds |
 
 This framing is deliberate. The weakest part of AI-finance is hallucinated
 recommendations; the strongest is information compression, change detection, source
@@ -56,14 +56,23 @@ Three things, in order of durability:
    product. It also enables second-order insight (e.g., AI capex → power/cooling
    suppliers → utilities) that commodity tools cannot surface.
 
-2. **Provenance and a published accuracy bar.** Every claim cites a source; an eval
-   harness scores citation-faithfulness and blocks unsupported claims before publish.
-   Publishing the accuracy methodology turns the industry's biggest weakness
-   (hallucination) into HPI's differentiator.
+2. **Graded provenance and a published accuracy bar.** Every item shows its **basis
+   and confidence** — confirmed (primary record, cited), reported (attributed
+   third-party), HPI analysis (our synthesis/inference), or speculative (early
+   signal) — so the reader weighs it with the estimative transparency real
+   intelligence analysis uses. Grounding is shown as *transparency about the basis*,
+   never used as an admission filter that withholds important-but-not-pristinely-
+   citable signal. The one hard line is **no fabrication**: an eval harness flags
+   invented specifics before publish. Publishing this accuracy methodology turns the
+   industry's biggest weakness (hallucination) into HPI's differentiator.
 
-3. **Domain credibility + free-data alignment.** The sources that make HPI credible
-   for these verticals — USAspending, EDGAR, EIA, NRC, Congress.gov, BIS — are public
-   and free. The moat and the cost advantage point the same direction.
+3. **Judgment over a wide intake — not institutional origin.** HPI casts a wide net
+   across on-thesis AI/defense/energy information — any development with a linkable
+   source is fair game — and the value is the synthesis, foresight, and compounding
+   entity graph over that intake, *not* the .gov origin of a citation. Public primary
+   records (USAspending, EDGAR, EIA, NRC, Congress.gov, BIS) stay the backbone and a
+   real cost advantage, but they are the strongest *tier* of evidence, not the only
+   admissible kind.
 
 ---
 
@@ -78,9 +87,13 @@ Three things, in order of durability:
    ingestion. Citations are guaranteed downstream because they're guaranteed at the
    source.
 
-3. **Ground, then generate.** Numbers come from structured fields verbatim; prose is
-   constrained to retrieved, cited context. A verifier checks each claim against its
-   source before publish.
+3. **Attribute, don't exclude.** Numbers come from structured fields verbatim; prose
+   brings synthesis and clearly-hedged inference. Rather than dropping what isn't
+   airtight, every item is graded and attributed so its basis is visible to the
+   reader; the only bar enforced before publish is **no fabricated specifics**.
+   *(The epistemic-framing layer implementing this is rolling out — primary-desk
+   routing D097 and the attribution taxonomy D098 have shipped; the publish path is
+   moving from suppress-under-grounded to keep-and-label.)*
 
 4. **Cost discipline by default.** A model waterfall (cheap models for
    extraction/clustering, the strong model only for final synthesis), aggressive

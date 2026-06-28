@@ -4,7 +4,7 @@
 
 Hard Power Intelligence (HPI) turns scattered public data — SEC filings, federal
 contract awards, energy and macro releases, regulatory actions, and news — into
-**cited, source-grounded BLUF intelligence briefings** for investors tracking the
+**source-attributed, confidence-graded BLUF intelligence briefings** for investors tracking the
 three strategic build-outs reshaping global markets:
 
 - **AI Infrastructure** — the multi-year compute build-out: chips, data centers,
@@ -24,11 +24,12 @@ power** (energy), and **compute power** (AI) — the three forces this product t
 HPI is a **recurring intelligence-production engine**, not a chatbot and not a
 stock picker. On a cadence, it ingests disparate public sources, resolves every
 mention to the investable entity behind it, and synthesizes a professional
-**Bottom-Line-Up-Front (BLUF)** brief where **every claim links to its source**.
-One shared brief per sector desk serves all subscribers, so the marginal cost of
-another reader is near zero.
+**Bottom-Line-Up-Front (BLUF)** brief where **every item shows its basis and
+confidence** — from confirmed primary records to attributed reporting and
+clearly-labeled HPI analysis. One shared brief per sector desk serves all
+subscribers, so the marginal cost of another reader is near zero.
 
-The product is positioned as **source-grounded research and reporting** — an
+The product is positioned as **source-attributed research and reporting** — an
 informational publication, not personalized investment advice.
 
 > "An intelligence officer for the industries rebuilding national power."
@@ -56,14 +57,18 @@ See [docs/PHILOSOPHY.md](docs/PHILOSOPHY.md) for the full thesis.
    segment, its program, and (via supply-chain edges) the second-order beneficiaries
    most tools miss.
 2. **Provenance by construction.** Every ingested record carries a source URL and
-   timestamp, so every brief claim is citable. There is no uncited assertion.
-3. **A published accuracy bar.** A built-in eval harness scores each brief for
-   citation-faithfulness and flags unsupported claims before publish.
+   timestamp, so every item can show its basis. Grounding is transparency the reader
+   can check — not a filter that withholds important-but-not-airtight signal.
+3. **A published accuracy bar.** A built-in eval harness flags fabricated specifics
+   before publish and grades each item's confidence/attribution (confirmed →
+   reported → HPI analysis → speculative), turning hallucination — the industry's
+   weakness — into a visible trust signal.
 4. **"What changed" focus.** Change detection over the graph means each brief is
    signal — what's new since yesterday — not a re-summary of the same headlines.
-5. **Free-data moat.** The sources that make HPI credible (USAspending, EDGAR, EIA,
-   NRC, FRED, Congress.gov, BIS) are public and free. The moat and the low cost
-   point the same way.
+5. **Wide-net intake, free-data backbone.** HPI takes any on-thesis development with
+   a linkable source; public primary records (USAspending, EDGAR, EIA, NRC, FRED,
+   Congress.gov, BIS) are the free, credible *backbone*, not the only admissible
+   source. The moat is judgment and the entity graph over a wide intake.
 
 ---
 
@@ -82,8 +87,8 @@ See [docs/PHILOSOPHY.md](docs/PHILOSOPHY.md) for the full thesis.
 **Pipeline shape:** a per-source scheduler fetches each source at its own cadence →
 adapters emit immutable, hashed, cited records → entity resolution writes provenanced
 edges into a bitemporal graph → change-detection + graph-grounded RAG generate a
-cached BLUF brief per desk → a citation/entailment gate verifies it before publish →
-the brief renders to web cards and PDF.
+cached BLUF brief per desk → an eval gate checks it for fabrication and grades each
+item's attribution before publish → the brief renders to web cards and PDF.
 
 Full design in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 

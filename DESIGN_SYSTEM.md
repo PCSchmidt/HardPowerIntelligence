@@ -487,4 +487,4 @@ Implementation notes for the frontend gate:
   low-opacity chrome crop — do not scrim a 3.2 MB PNG at runtime.
 - Respect `prefers-reduced-motion`/contrast: the scrim must keep body text ≥ WCAG AA.
 - Verify the equations are correct before launch — visibly wrong math undercuts the
-  "every claim cites its source" brand promise.
+  "every item shows its basis" brand promise.

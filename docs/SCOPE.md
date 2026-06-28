@@ -93,7 +93,7 @@ These are good and planned — just **not now**. Naming them protects the cycle:
 
 | Dimension | Target |
 |-----------|--------|
-| Trust | Published citation-faithfulness score; zero uncited claims |
+| Trust | Every item shows its basis + confidence (confirmed/reported/HPI analysis/speculative); zero fabricated specifics; published accuracy methodology |
 | Habit | Daily "what changed" that subscribers open repeatedly |
 | Cost | Stay inside the low monthly run-cost envelope |
 | Profitability | Break-even at a small number of subscribers |

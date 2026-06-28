@@ -1,11 +1,20 @@
 # Data Sources
 
-The source map for Hard Power Intelligence. The strategic fact that shapes everything:
-**the sources that make this product credible — government, regulatory, defense, and
-energy data — are overwhelmingly free and public.** The expensive licensed data
+The source map for Hard Power Intelligence. Primary public records — government,
+regulatory, defense, and energy data — are the **backbone**: overwhelmingly free and
+the strongest tier of evidence. But credibility comes from **transparency, not .gov
+origin** (D098, [PHILOSOPHY.md](PHILOSOPHY.md) §3): HPI casts a wider net over any
+on-thesis AI/defense/energy development with a linkable source, and *grades* each item
+by its basis rather than admitting only the airtight. The expensive licensed data
 (prices, estimates, transcripts) is the *commodity* layer, bought cheaply or deferred.
-The moat (synthesis + provenance over free strategic data) and the low cost point the
-same way.
+The moat is judgment + the entity graph over a wide intake, not the institutional
+origin of a citation.
+
+**Attribution tiers (D098).** Every source maps to an evidence class that sets the
+ceiling on an item's confidence label: primary public records → *confirmed* (when the
+claim is cited); named third-party reporting (e.g. private-AI newsroom RSS, DoD press
+releases) → *reported*; aggregate signal (GDELT, D082) → *speculative*. An item is
+never excluded for sitting below "confirmed" — it is shown with its tier.
 
 Legend: **🟢 Free** · **🟡 Cheap (<$50/mo)** · **🔴 Paid/Enterprise**
 
