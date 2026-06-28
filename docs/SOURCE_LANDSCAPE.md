@@ -39,6 +39,7 @@ Legend — **Status:** ✅ built · 🟡 queued (named, unbuilt) · ⬜ missing 
 | arXiv | Research preprints | ai, def∩ai | public_domain | confirmed |
 | NRC (via Federal Register) | Nuclear regulatory | energy | public_domain | confirmed |
 | GDELT | Worldwide news (D101) | all | scrape_gray | speculative |
+| **Feeds** (RSS/Atom, ~21 outlets) | Trade press / think tanks / IR (D104) | all | scrape_gray | reported |
 
 ---
 
@@ -157,7 +158,7 @@ Legend — **Status:** ✅ built · 🟡 queued (named, unbuilt) · ⬜ missing 
 
 Sequenced by **coverage-per-engineering-hour**, not by category order.
 
-**Phase 1 — the generic feed adapter (unlocks C–G at scale).** Build ONE configurable
+**Phase 1 — the generic feed adapter (unlocks C–G at scale). ✅ SHIPPED (D104).** ONE configurable
 RSS/Atom/sitemap adapter driven by a `feed_registry` of `{url, desk, license_class,
 reliability_tier}` rows. This single adapter onboards trade press (E), think tanks (C),
 company IR + PR wires (G), associations (F), and university feeds (D). Per-feed

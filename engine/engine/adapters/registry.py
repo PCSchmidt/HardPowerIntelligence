@@ -11,6 +11,7 @@ from __future__ import annotations
 
 from engine.adapters.arxiv import ArxivAdapter
 from engine.adapters.edgar import EDGARFullTextAdapter
+from engine.adapters.feeds import FeedsAdapter
 from engine.adapters.gdelt import GDELTAdapter
 from engine.adapters.nrc import NRCAdapter
 from engine.adapters.usaspending import USASpendingAdapter
@@ -22,6 +23,7 @@ _ADAPTERS: dict[str, type] = {
     ArxivAdapter.source_id: ArxivAdapter,
     NRCAdapter.source_id: NRCAdapter,
     GDELTAdapter.source_id: GDELTAdapter,
+    FeedsAdapter.source_id: FeedsAdapter,
 }
 
 

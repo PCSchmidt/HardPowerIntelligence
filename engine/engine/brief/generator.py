@@ -409,7 +409,7 @@ def _item_raw_record_ids(item: dict, passages: list[PassageContext]) -> list[str
 # never republish raw (scrape_gray, per DATA_SOURCES.md). Everything else is government /
 # regulatory / openly-licensed primary data (public_domain). Drives the citation's
 # license_class, which the reader uses to decide full-quote vs link-only rendering.
-_SCRAPE_GRAY_SOURCES = frozenset({"gdelt"})
+_SCRAPE_GRAY_SOURCES = frozenset({"gdelt", "feeds"})
 
 
 def _license_class_for(source_id: str) -> str:

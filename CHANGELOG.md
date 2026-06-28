@@ -48,6 +48,15 @@ live ingestion runner, with Supabase auth and Lemon Squeezy subscriptions. Built
   significance gate, and the 25-item cap. A coverage test guards the topics from silent regression.
 
 ### Added
+- **Generic RSS/Atom feed adapter — the breadth scale lever** (2026-06-28, D104): one configurable
+  adapter ingests a registry of ~21 named outlets (trade press, think tanks, company IR — Breaking
+  Defense, Data Center Dynamics, IEEE Spectrum, Utility Dive, World Nuclear News, CSIS, RAND, CSET, …),
+  each tagged to a home desk. Onboarding an outlet is one registry line, not a build — Phase 1 of the
+  source-breadth plan (see docs/SOURCE_LANDSCAPE.md). A named outlet is attributed reporting → the
+  **Reported** confidence tier (vs GDELT's raw firehose → Speculative); `scrape_gray` (outlet + title +
+  short snippet + link only, HTML stripped). RSS 2.0 and Atom both parsed (stdlib); per-feed fetch
+  isolation in `enrich` so one dead feed can't abort the rest. 9 tests; suite 433 green. Per-feed
+  license/reliability overrides and entity linking are documented follow-ups.
 - **GDELT-as-story source — worldwide news radar** (2026-06-28, D101): GDELT's global news index now
   feeds brief *items*, not just the aggregate Signal line. A curated, on-thesis query per desk-theme
   (≈5/desk, English-only, capped) via the keyless DOC 2.0 ArtList API; each article becomes a `news`

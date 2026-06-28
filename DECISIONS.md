@@ -2602,3 +2602,37 @@ GDELT OR-group option from D102) or trim low-yield probes. Pure-software efficie
 left out as unlikely to surface as discrete filings/news.
 
 **Verification:** full suite 424 green.
+
+## D104 — Generic RSS/Atom feed adapter: the scale lever for source breadth
+
+**Decision:** Build ONE configurable feed adapter (`engine/engine/adapters/feeds.py`) driven by a
+registry of named outlets (`_FEEDS`: trade press, think tanks, company IR — SOURCE_LANDSCAPE.md §C–G),
+each tagged to a home desk. Onboarding an outlet is one registry line, not a new adapter. This is
+Phase 1 of the source-breadth plan and the highest coverage-per-engineering-hour build — it converts
+"~60 bespoke adapters" into "1 adapter + a config list." Seeded with ~21 feeds across all three desks
+(Breaking Defense, DefenseScoop, Defense One, TWZ, Naval News, SpaceNews; Data Center Dynamics, IEEE
+Spectrum, HPCwire, The Register, Tom's Hardware, SemiAnalysis; Utility Dive, World Nuclear News, POWER,
+Canary Media, pv magazine; CSIS, RAND, RMI, CSET).
+
+**Confidence + license, by design:** `source_id="feeds"` → `epistemics` maps the whole class to the
+**REPORTED** tier — a configured, *named* outlet is attributed third-party reporting, distinct from
+GDELT's raw un-vetted global firehose (SIGNAL → speculative, D101). Materiality weight 0.6 (above
+GDELT 0.5, below primary records). `license_class = scrape_gray` (in `_SCRAPE_GRAY_SOURCES`): store/cite
+**outlet attribution + title + a ≤300-char snippet + link**, never full article text; HTML stripped.
+
+**Integration without a runner change:** feeds die, and the runner's try/except is per-source — one
+404 would otherwise abort the whole feeds run. So the runner fetches only the first feed (the "canary",
+via a `base_url` property the runner reads after `build_request_payload`); the remaining feeds are
+fetched in the `enrich` hook with **per-feed try/except**, logged-and-skipped on failure. RSS 2.0 and
+Atom are both parsed with stdlib ElementTree (matching arXiv), tolerant of malformed XML (→ empty).
+
+**Deliberate simplifications (documented follow-ups):** every feed is handled uniformly
+(scrape_gray / reported); per-feed `license_class` (a gov RSS → public_domain) and `source_reliability`
+(promote a vetted outlet → confirmed-ish, demote a weak one → speculative) come next, threaded as record
+fields rather than keyed off the single `source_id`. No entity linking yet (NER deferred, as GDELT).
+Feed URLs are best-known and need live validation — a bad URL fails only its own feed (isolated).
+
+**Verification:** 9 unit tests (RSS + Atom parse, HTML stripping, link/guid fallbacks, per-feed cap,
+malformed→empty, registry desk span, canary base_url); full suite 433 green. Source row activated via
+migration `20260628000003`. Live confirmation rides the next ingest after `supabase db push`.
+**Reversibility:** high — additive adapter + one registry line; `is_active=false` disables it.

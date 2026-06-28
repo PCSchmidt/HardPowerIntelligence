@@ -99,6 +99,10 @@ _SOURCE_EVIDENCE: dict[str, str] = {
     "edgar": PRIMARY,
     "nrc": PRIMARY,
     "arxiv": PRIMARY,
+    # Curated, named outlets (trade press / think tanks / company IR) via the feed
+    # adapter (D104): attributed third-party reporting → REPORTED. Distinct from GDELT's
+    # raw, un-vetted global firehose (SIGNAL → speculative).
+    "feeds": REPORTED,
     "gdelt": SIGNAL,
 }
 
