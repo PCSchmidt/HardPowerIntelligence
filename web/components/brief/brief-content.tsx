@@ -6,6 +6,12 @@ import type { BriefItem, Citation, EntitySummary } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { formatUsd, keyAmount } from "@/lib/amounts";
 import { ITEM_BG, ITEM_ICON, ITEM_LABEL, ITEM_TEXT } from "@/lib/item-types";
+import {
+  ATTRIBUTION_CLASS,
+  ATTRIBUTION_LABEL,
+  ATTRIBUTION_TOOLTIP,
+  attributionOf,
+} from "@/lib/attribution";
 import { CitationsDrawer } from "./citations-drawer";
 import { EntityChips } from "./entity-chips";
 
@@ -114,11 +120,21 @@ export function BriefContent({
     <div className="divide-y divide-border">
       {rows.map(({ item, amount }) => {
         const Icon = ITEM_ICON[item.item_type];
+        const attribution = attributionOf(item.attribution);
         return (
         <article key={item.id} id={item.id} className="scroll-mt-20 space-y-3 py-8">
           <div className="flex items-center gap-2 text-ui-xs font-medium uppercase tracking-wide text-muted-foreground">
             <Icon size={14} className={cn("shrink-0", ITEM_TEXT[item.item_type])} />
             {ITEM_LABEL[item.item_type]}
+            <span
+              className={cn(
+                "rounded-sm px-1.5 py-0.5 text-[0.6rem] normal-case tracking-normal",
+                ATTRIBUTION_CLASS[attribution],
+              )}
+              title={ATTRIBUTION_TOOLTIP[attribution]}
+            >
+              {ATTRIBUTION_LABEL[attribution]}
+            </span>
             {amount !== null && (
               <span className="ml-auto flex items-center gap-2 normal-case tracking-normal">
                 <span className="hidden h-1.5 w-24 overflow-hidden rounded-full bg-muted sm:block">

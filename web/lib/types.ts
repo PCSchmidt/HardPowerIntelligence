@@ -24,9 +24,15 @@ export interface Citation {
   excerpt: string | null;
 }
 
+// Epistemic confidence/attribution tier (D098/D099): the basis on which an item's
+// facts are evidenced, shown to the reader as estimative framing.
+export type Attribution = "confirmed" | "reported" | "analysis" | "speculative";
+
 export interface BriefItem {
   id: string;
   item_type: ItemType;
+  // Confidence/attribution label (D099). Defaults to "confirmed" for pre-D099 items.
+  attribution: Attribution;
   headline: string;
   body: string;
   // Analysis layer (D071/D073): grounded HPI interpretation. Empty string when the

@@ -2661,3 +2661,21 @@ entity_mentions empty (awardee unknown pre-award) — entity linking can attach 
 titleless skip, dedup-stable hash ignoring the probe query, required posted-date range, probe desk span);
 full suite 439 green. Live `fetched>0` confirmation rides the next ingest once the key is set.
 **Reversibility:** high — additive adapter + one registry line.
+
+## D106 — Reader attribution chip (completes the D099 epistemic layer in the UI)
+
+**Decision:** Render the per-item confidence/attribution label in the web reader, completing the
+epistemic-framing layer end-to-end (D098 taxonomy → D099 publish-path flip + API → this UI). Each brief
+item now wears a small tinted chip in its header row — **Confirmed** (emerald) / **Reported** (sky) /
+**HPI analysis** (amber) / **Speculative** (muted) — with a tooltip explaining the basis. So a wide,
+graded intake (GDELT speculative, feeds reported, primary records confirmed) is now *visible* to the
+reader as estimative framing, not hidden.
+
+**Shape:** `web/lib/attribution.ts` is the single source of truth (label + tooltip + chip class +
+`attributionOf` fallback), mirroring `lib/item-types.ts`; `BriefContent` renders it next to the item-type
+label. `BriefItem.attribution` typed as the `Attribution` union; `attributionOf` falls back to `confirmed`
+for any missing/unknown value (pre-D099 rows), so the render never breaks.
+
+**Verification:** 2 component tests (renders the right label per tier; falls back to Confirmed when the
+field is absent); full web suite 18 green; `tsc --noEmit` clean. Backend 439 green. The chip shows live
+once the API/web deploy ships the D099 `attribution` field (already in the briefs API).
