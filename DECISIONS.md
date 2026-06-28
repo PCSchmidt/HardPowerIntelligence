@@ -2545,3 +2545,39 @@ desk, title truncation, cross-probe dedup hashing, probe walk, license derivatio
 green. Source row activated via migration `20260628000002` (placeholder corrected: scrape_gray, daily
 cron, all-desk). Live `fetched>0` confirmation rides the next ingest after `supabase db push`.
 **Reversibility:** high — additive adapter + one registry line; `is_active=false` disables it.
+
+## D102 — Probe vocabulary expansion to the cutting-edge fronts (operator topic review)
+
+**Why:** The operator supplied detailed maps of the current cutting-edge topics across all three
+desks (2026-06-28) — DoD's six tech pillars (applied AI, unmanned systems, directed energy,
+quantum/PNT, hypersonics/missile defense, proliferated space, contested logistics); the energy
+build-out (micro-nuclear/TRISO, enhanced geothermal, perovskite, NiZn/iron-air/LDES/TES, VPP); the
+AI compute stack (accelerators, HBM, advanced packaging, photonics, networking, EUV, cooling); and
+the Space∩Energy∩AI convergence (space-based solar power, orbital data centers, power beaming). Audit
+verdict: existing probes covered the *basics* (SMR, GPU, liquid cooling, directed energy, hypersonic,
+counter-UAS, advanced packaging…) but missed most of the *specifics*. Search parameters that don't
+name a topic can't find it — so coverage gaps in the probe vocabularies were a direct coverage gap.
+
+**Decision:** Expand the probe vocabularies to systematically cover these fronts, prioritizing the two
+highest-leverage sources:
+- **GDELT (news radar, D101)** — rebuilt from ~5/desk to ~12/desk + a Space∩Energy∩AI convergence
+  cluster (39 probes), organized by topic cluster: defense autonomy/DE/space/PNT, the AI compute
+  stack, energy micro-nuclear/geothermal/storage/grid, and SBSP/orbital-data-center.
+- **EDGAR (filings)** — appended 18 cutting-edge terms after the position-pinned 8 (HPM, HEL, CCA,
+  UUV, quantum sensing, SSA; HBM, silicon photonics, EUV, immersion cooling; microreactor, enhanced
+  geothermal, perovskite, iron-air, LDES, VPP; SBSP, orbital data center), each with desk[0] = home
+  desk (D097 demarcation preserved; the pinned positions and energy-only curation untouched).
+- **NRC (nuclear regulatory)** — added microreactor and TRISO.
+
+**Guardrails:** desk demarcation (D097) preserved — every new probe's home desk is its first tuple
+entry; the SBSP/orbital-data-center convergence probes are intentionally multi-desk (the thesis core).
+Per-probe = one API call, so GDELT runs ~39 calls/run (keyless, fast); EDGAR ~58 (within EFTS limits).
+Volume stays bounded downstream by materiality ranking, the significance gate (D085), and the 25-item
+cap (D100). This is vocabulary breadth, NOT a filter change.
+
+**Follow-ups (noted, not done):** arXiv/USAspending probe expansion for the same fronts; GDELT OR-group
+queries if call count needs trimming; per-domain source_reliability promotion (D101). The operator
+flagged the topic lists are non-exhaustive — treat the probe sets as living and revisit as fronts move.
+
+**Verification:** GDELT coverage spot-check test pins 11 representative new topics across desks so they
+can't silently regress; NRC count test generalized; full suite 424 green.

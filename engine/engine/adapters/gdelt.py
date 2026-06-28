@@ -46,27 +46,56 @@ class _Probe:
 
 
 # Curated, on-thesis news queries — one home desk each. Decoupled from the EDGAR filing
-# probes on purpose: GDELT searches global *news* vocabulary, not filing text. Kept tight
-# (≈5/desk) so the run stays bounded and relevant; extend freely.
+# probes on purpose: GDELT searches global *news* vocabulary, not filing text. Organized to
+# systematically cover the cutting-edge topic clusters in each desk's domain (operator topic
+# review, 2026-06-28) — extend freely as the fronts move.
 _PROBES: tuple[_Probe, ...] = (
-    # ── Defense ──
-    _Probe("hypersonic missile", "defense"),
-    _Probe("counter-drone system", "defense"),
-    _Probe("directed energy weapon", "defense"),
-    _Probe("munitions production", "defense"),
-    _Probe("naval shipbuilding", "defense"),
-    # ── AI ──
-    _Probe("AI data center", "ai"),
-    _Probe("artificial intelligence chip", "ai"),
-    _Probe("large language model", "ai"),
-    _Probe("semiconductor export controls", "ai"),
-    _Probe("AI infrastructure investment", "ai"),
-    # ── Energy ──
-    _Probe("small modular reactor", "energy"),
-    _Probe("nuclear power plant", "energy"),
-    _Probe("grid interconnection queue", "energy"),
-    _Probe("uranium enrichment", "energy"),
-    _Probe("liquefied natural gas export", "energy"),
+    # ── Defense ── unmanned/autonomy, directed energy, hypersonics/missile defense,
+    # space, quantum/PNT, applied military AI (the DoD's official tech pillars).
+    _Probe("collaborative combat aircraft", "defense"),     # CCA / "loyal wingman"
+    _Probe("military drone swarm", "defense"),               # swarm intelligence
+    _Probe("unmanned underwater vehicle", "defense"),        # UUV / XLUUV
+    _Probe("unmanned surface vessel", "defense"),            # USV
+    _Probe("high-energy laser weapon", "defense"),           # HEL
+    _Probe("high-power microwave weapon", "defense"),        # HPM
+    _Probe("hypersonic missile", "defense"),                 # HGV / scramjet
+    _Probe("missile defense system", "defense"),             # "Golden Dome" architecture
+    _Probe("quantum sensing navigation", "defense"),         # alternative PNT / quantum
+    _Probe("proliferated low earth orbit", "defense"),       # pLEO constellations
+    _Probe("space situational awareness", "defense"),        # SSA / space control
+    _Probe("military artificial intelligence", "defense"),   # applied AI / Maven / agentic
+    # ── AI ── accelerators, memory/packaging, networking, photonics, data-center power,
+    # cooling, lithography (the compute build-out stack).
+    _Probe("Nvidia Blackwell", "ai"),                        # next-gen GPU
+    _Probe("AI accelerator chip", "ai"),                     # ASIC / custom silicon
+    _Probe("Google TPU", "ai"),                              # hyperscaler custom silicon
+    _Probe("high bandwidth memory", "ai"),                   # HBM3e / HBM4
+    _Probe("advanced chip packaging", "ai"),                 # CoWoS / interposer
+    _Probe("silicon photonics", "ai"),                       # optical / photonic chips
+    _Probe("AI data center", "ai"),                          # buildout / superfactory
+    _Probe("data center power demand", "ai"),                # grid coupling
+    _Probe("immersion cooling", "ai"),                       # thermal management
+    _Probe("liquid cooling data center", "ai"),              # direct-to-chip
+    _Probe("EUV lithography", "ai"),                         # High-NA EUV supply chokepoint
+    _Probe("AI inference chip", "ai"),                       # inference / LPU
+    # ── Energy ── micro-nuclear, advanced geothermal, next-gen solar, short- and
+    # long-duration storage, grid orchestration, fuel cycle.
+    _Probe("small modular reactor", "energy"),               # SMR
+    _Probe("nuclear microreactor", "energy"),                # MMR (eVinci / KRONOS / XENITH)
+    _Probe("TRISO nuclear fuel", "energy"),                  # TRISO particle fuel
+    _Probe("enhanced geothermal", "energy"),                 # EGS / closed-loop
+    _Probe("perovskite solar cell", "energy"),               # tandem solar
+    _Probe("nickel-zinc battery", "energy"),                 # data-center transient buffering
+    _Probe("iron-air battery", "energy"),                    # multi-day LDES
+    _Probe("long-duration energy storage", "energy"),        # LDES broadly
+    _Probe("thermal energy storage", "energy"),              # TES
+    _Probe("virtual power plant", "energy"),                 # VPP / grid orchestration
+    _Probe("grid interconnection queue", "energy"),          # interconnection / load growth
+    _Probe("uranium enrichment", "energy"),                  # HALEU / fuel cycle
+    # ── Space ∩ Energy ∩ AI convergence (operator add, 2026-06-28) ──
+    _Probe("space-based solar power", "energy"),             # SBSP / power beaming to Earth
+    _Probe("space solar power beaming", "energy"),           # microwave/laser rectenna
+    _Probe("orbital data center", "ai"),                     # compute-in-space / inference
 )
 
 

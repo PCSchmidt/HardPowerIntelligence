@@ -30,6 +30,18 @@ live ingestion runner, with Supabase auth and Lemon Squeezy subscriptions. Built
   grounding gate (D071/D073) is untouched. The reader confidence chip is the next gate. Publish tests
   rewritten to the new contract; suite 411 green.
 
+### Changed
+- **Probe vocabulary expanded to the cutting-edge fronts** (2026-06-28, D102): from an operator topic
+  review, the search vocabularies now systematically name the current cutting-edge topics, not just the
+  basics. GDELT news probes grew from ~5/desk to ~12/desk plus a Space∩Energy∩AI convergence cluster
+  (39 total): defense autonomy / directed energy / space / quantum-PNT (CCA, drone swarm, UUV, HEL, HPM,
+  hypersonics, missile defense, quantum sensing, pLEO, SSA); the AI compute stack (Blackwell, TPU, HBM,
+  advanced packaging, silicon photonics, EUV, immersion cooling, inference chips); energy (microreactor,
+  TRISO, enhanced geothermal, perovskite, NiZn, iron-air, LDES, TES, VPP); and SBSP / orbital data
+  centers. EDGAR filing probes gained 18 of the same terms (home-desk-tagged, pinned positions intact);
+  NRC added microreactor + TRISO. Demarcation (D097) preserved; volume stays bounded by materiality, the
+  significance gate, and the 25-item cap. A coverage test guards the topics from silent regression.
+
 ### Added
 - **GDELT-as-story source — worldwide news radar** (2026-06-28, D101): GDELT's global news index now
   feeds brief *items*, not just the aggregate Signal line. A curated, on-thesis query per desk-theme

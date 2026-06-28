@@ -103,6 +103,24 @@ class TestRequestBuilding:
         desks = {p.desk for p in _PROBES}
         assert desks == {"defense", "ai", "energy"}
 
+    def test_cutting_edge_topics_are_covered(self):
+        # Guard against silently dropping the cutting-edge fronts (operator review, D102).
+        queries = {p.query for p in _PROBES}
+        for topic in (
+            "collaborative combat aircraft",   # defense autonomy
+            "high-power microwave weapon",     # directed energy
+            "quantum sensing navigation",      # alternative PNT
+            "Nvidia Blackwell",                # AI accelerators
+            "high bandwidth memory",           # AI memory
+            "silicon photonics",               # AI photonics
+            "nuclear microreactor",            # energy micro-nuclear
+            "enhanced geothermal",             # energy geothermal
+            "iron-air battery",                # energy LDES
+            "space-based solar power",         # SBSP convergence
+            "orbital data center",             # compute-in-space
+        ):
+            assert topic in queries, f"missing GDELT coverage for: {topic}"
+
     def test_next_cursor_walks_then_watermarks(self):
         adapter = GDELTAdapter()
         assert adapter.next_cursor({}, current_page=1) == {"page": 2}

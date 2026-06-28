@@ -111,6 +111,30 @@ _PROBES: tuple[_Probe, ...] = (
     _Probe("germanium", ("defense", "ai", "energy")),
     _Probe("critical minerals", ("defense", "ai", "energy")),
     _Probe("quantum computing", ("defense", "ai")),
+    # ── Cutting-edge fronts (operator topic review, 2026-06-28) ───────────────────
+    # Append-only (positions after the pinned 8); desk[0] is the home desk (D097).
+    # Defense — autonomy, directed energy, space, quantum/PNT:
+    _Probe("collaborative combat aircraft", ("defense", "ai")),  # CCA / loyal wingman
+    _Probe("high-power microwave", ("defense",)),                # HPM counter-swarm
+    _Probe("high-energy laser", ("defense",)),                   # HEL (cost-per-shot)
+    _Probe("unmanned underwater vehicle", ("defense", "ai")),    # UUV / XLUUV
+    _Probe("quantum sensing", ("defense", "ai")),                # alternative PNT
+    _Probe("space situational awareness", ("defense", "ai")),    # SSA / space control
+    # AI — memory, photonics, lithography, cooling:
+    _Probe("high bandwidth memory", ("ai",)),                    # HBM3e / HBM4
+    _Probe("silicon photonics", ("ai",)),                        # optical interconnect/compute
+    _Probe("extreme ultraviolet lithography", ("ai",)),          # High-NA EUV chokepoint
+    _Probe("immersion cooling", ("ai", "energy")),               # data-center thermal
+    # Energy — micro-nuclear, advanced geothermal, next-gen storage, grid:
+    _Probe("microreactor", ("energy",)),                         # MMR / nuclear battery
+    _Probe("enhanced geothermal", ("energy",)),                  # EGS / closed-loop
+    _Probe("perovskite", ("energy",)),                           # tandem solar
+    _Probe("iron-air battery", ("energy",)),                     # multi-day LDES
+    _Probe("long-duration energy storage", ("energy",)),         # LDES
+    _Probe("virtual power plant", ("energy",)),                  # VPP / grid orchestration
+    # Space ∩ Energy ∩ AI convergence — the thesis core (SBSP / compute-in-space):
+    _Probe("space-based solar power", ("energy", "ai")),         # SBSP / power beaming
+    _Probe("orbital data center", ("ai", "energy")),            # compute-in-space inference
 )
 
 

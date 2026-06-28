@@ -117,6 +117,8 @@ _PROBES: tuple[_Probe, ...] = (
     _Probe("high-assay low-enriched uranium", ("energy",)),   # HALEU fuel supply (Centrus/Oklo)
     _Probe("combined license", ("energy",)),                   # new-reactor build authorization
     _Probe("uranium enrichment", ("energy",)),                 # fuel-cycle / enrichment capacity
+    _Probe("microreactor", ("energy",)),                       # MMR licensing (eVinci/KRONOS/XENITH)
+    _Probe("TRISO", ("energy",)),                              # TRISO particle-fuel qualification
 )
 
 

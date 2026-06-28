@@ -162,8 +162,11 @@ class TestContentHash:
 
 
 class TestProbes:
-    def test_five_energy_probes(self):
-        assert NRCAdapter().probe_count == 5
+    def test_all_probes_are_energy_only(self):
+        # NRC is the Energy desk's regulatory leg; every probe is energy-home (D095).
+        # Count grows as the nuclear front widens (microreactor/TRISO added D102).
+        assert NRCAdapter().probe_count == len(_PROBES)
+        assert _PROBES  # non-empty
         for probe in _PROBES:
             assert probe.desks == ("energy",)
 
