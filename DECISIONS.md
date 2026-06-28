@@ -2636,3 +2636,28 @@ Feed URLs are best-known and need live validation — a bad URL fails only its o
 malformed→empty, registry desk span, canary base_url); full suite 433 green. Source row activated via
 migration `20260628000003`. Live confirmation rides the next ingest after `supabase db push`.
 **Reversibility:** high — additive adapter + one registry line; `is_active=false` disables it.
+
+## D105 — SAM.gov opportunities adapter (Phase 2 federal veins begin)
+
+**Decision:** Build `SAMGovAdapter` (`engine/engine/adapters/sam_gov.py`), the first of the Phase-2
+structured federal veins (SOURCE_LANDSCAPE.md §A). USAspending shows awards after the fact; SAM.gov shows
+the **opportunities** — solicitations/pre-solicitations agencies post *before* an award, the earliest
+public confirmed-tier signal of where federal money is about to flow. Defense-primary, cross-desk (AI
+compute + energy-infrastructure procurements appear too). Mirrors the NRC/USAspending probe pattern: one
+on-thesis keyword `q` per probe tagged to its home desk (D097), fixed 30-day rolling lookback +
+content-hash dedup (no forward watermark — the trap that zeroed USAspending, Phase B).
+
+**Wiring was already in place:** the initial schema seeded the `sam_gov` source_registry row
+(adapter_class `SAMGovAdapter`, public_domain, active); `source_weights["sam_gov"]=0.8` and
+`epistemics` PRIMARY→confirmed were already mapped; `sam_gov_api_key` already in settings. So the build
+was the adapter + one registry line — **no migration needed**.
+
+**Operational note:** the SAM.gov Opportunities v2 API is free but **requires `SAM_GOV_API_KEY`** (register
+at api.sam.gov), passed as a query param. Without it the call 403s and the run is recorded *failed* (never
+silent). Set the secret before the first ingest. record_type is `award` (a pre-award opportunity);
+entity_mentions empty (awardee unknown pre-award) — entity linking can attach the soliciting agency later.
+
+**Verification:** 8 unit tests against an inline golden fixture mirroring the live API (notice parse,
+titleless skip, dedup-stable hash ignoring the probe query, required posted-date range, probe desk span);
+full suite 439 green. Live `fetched>0` confirmation rides the next ingest once the key is set.
+**Reversibility:** high — additive adapter + one registry line.

@@ -14,6 +14,7 @@ from engine.adapters.edgar import EDGARFullTextAdapter
 from engine.adapters.feeds import FeedsAdapter
 from engine.adapters.gdelt import GDELTAdapter
 from engine.adapters.nrc import NRCAdapter
+from engine.adapters.sam_gov import SAMGovAdapter
 from engine.adapters.usaspending import USASpendingAdapter
 
 # source_id → zero-arg adapter factory. New sources register one line here.
@@ -24,6 +25,7 @@ _ADAPTERS: dict[str, type] = {
     NRCAdapter.source_id: NRCAdapter,
     GDELTAdapter.source_id: GDELTAdapter,
     FeedsAdapter.source_id: FeedsAdapter,
+    SAMGovAdapter.source_id: SAMGovAdapter,
 }
 
 
