@@ -4,7 +4,25 @@ Spec: persisting a brief for (desk, date) first DELETEs any existing brief for
 that day (cascades to items + citations), then inserts — so re-runs replace
 instead of raising UniqueViolation, and a passing brief can supersede a failed one.
 """
-from engine.brief.generator import GeneratedBrief, _is_home_desk, persist_brief
+from engine.brief.generator import (
+    GeneratedBrief,
+    _is_home_desk,
+    _license_class_for,
+    persist_brief,
+)
+
+
+class TestLicenseClassForSource:
+    """Citation license_class derives from the source (D101), not a hardcoded value:
+    GDELT is third-party news → scrape_gray (title + link only); gov/regulatory primary
+    data → public_domain. Drives full-quote vs link-only rendering in the reader."""
+
+    def test_gdelt_is_scrape_gray(self):
+        assert _license_class_for("gdelt") == "scrape_gray"
+
+    def test_primary_sources_are_public_domain(self):
+        for src in ("usaspending", "edgar", "nrc", "arxiv", ""):
+            assert _license_class_for(src) == "public_domain"
 
 
 class _Txn:

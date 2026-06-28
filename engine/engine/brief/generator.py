@@ -405,6 +405,17 @@ def _item_raw_record_ids(item: dict, passages: list[PassageContext]) -> list[str
     return [p.raw_record_id for p in passages if p.index in cited and p.raw_record_id]
 
 
+# Sources whose records are third-party content we may store/cite as title + link only,
+# never republish raw (scrape_gray, per DATA_SOURCES.md). Everything else is government /
+# regulatory / openly-licensed primary data (public_domain). Drives the citation's
+# license_class, which the reader uses to decide full-quote vs link-only rendering.
+_SCRAPE_GRAY_SOURCES = frozenset({"gdelt"})
+
+
+def _license_class_for(source_id: str) -> str:
+    return "scrape_gray" if source_id in _SCRAPE_GRAY_SOURCES else "public_domain"
+
+
 def _item_source_id(item: dict, passages: list[PassageContext]) -> str:
     """The dominant source behind a brief item, via its [CITE:N] passages — the input
     to epistemic attribution (D098/D099). Returns the most frequently cited source_id,
@@ -515,7 +526,7 @@ async def persist_brief(
                         """,
                         brief_id, item_id, passage.raw_record_id,
                         passage.source_id, passage.url, passage.fetched_at,
-                        passage.native_id, "public_domain",
+                        passage.native_id, _license_class_for(passage.source_id),
                     )
 
         # Best-effort, AFTER the brief commits: the GDELT sparkline series (D082/D089) is

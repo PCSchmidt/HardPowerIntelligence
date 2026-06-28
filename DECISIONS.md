@@ -2508,3 +2508,40 @@ roughly linearly; the daily budget guard still applies. Acceptable at current ab
 
 **Verification:** prompt unit tests (persona + citation discipline) green; full suite 411 green. Live effect
 rides the next cron once deployed. **Reversibility:** trivial — `BRIEF_MAX_ITEMS` is one env var.
+
+## D101 — GDELT-as-story adapter: worldwide news radar across all three desks
+
+**Decision:** Build `GDELTAdapter` (`engine/engine/adapters/gdelt.py`) so GDELT's global news
+index feeds brief items, not just the aggregate Signal line (D082). One curated, on-thesis query
+per desk-theme (≈5/desk, English-only, `maxrecords`-capped) hits the keyless DOC 2.0 ArtList API;
+each article becomes a normalized `news` record tagged to its single home desk (D097 demarcation).
+First source build of the P3 source-breadth push (the lever for D100's 25-item comprehensive desk
+read), and the operator-chosen starting point (2026-06-28) — biggest free worldwide store, fetcher
+half-existing (D082), and the layer a reader perceives as "the state of the world."
+
+**Why this was blocked before, and what unblocked it:** under "every claim cites the public record"
+(retired) there was no lane for un-vetted third-party reporting, so GDELT could only be aggregate
+color (D082). The epistemic flip (D098/D099) opened the lane: content enters carrying a *confidence
+label* instead of being excluded. GDELT reuses `source_id="gdelt"`, which gives the right behavior
+for free — `source_weights` 0.5 (low; never crowds out a primary record) and
+`epistemics.evidence_class` = signal ⇒ every GDELT item is labeled **Speculative**. So it's the
+radar that fills out the desk read below the primary-record spine, honestly graded.
+
+**Guardrails (the D055/D082 role, unchanged):** `license_class = scrape_gray` — store/cite the
+**title** and link only, never article body (structural: the DOC API returns only the title).
+Citation `license_class` now derives from the source (`_license_class_for`, gdelt → scrape_gray)
+instead of the prior hardcoded `public_domain`, so the reader renders GDELT link-only. No entity
+links yet (the DOC API exposes no structured entities; per-article NER / BigQuery GKG
+V2Organizations is the deferred upgrade). Significance gate (D085) still judges every item.
+
+**Adaptations anticipated (operator flagged, high probability):** promote vetted mainstream outlets
+from Speculative → Reported via a per-domain `source_reliability` map; swap the fetch layer to the
+BigQuery GKG/Events backend for entity-spike/co-occurrence → `entity_edges` (the convergence moat,
+per `updated_data_source_arguments.md`); widen languages beyond English. All are fetch-layer or
+labeling changes that don't touch the brief contract.
+
+**Verification:** 12 unit tests (English-only + url filter, attributed-title-only chunk, single home
+desk, title truncation, cross-probe dedup hashing, probe walk, license derivation); full suite 423
+green. Source row activated via migration `20260628000002` (placeholder corrected: scrape_gray, daily
+cron, all-desk). Live `fetched>0` confirmation rides the next ingest after `supabase db push`.
+**Reversibility:** high — additive adapter + one registry line; `is_active=false` disables it.

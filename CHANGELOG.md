@@ -31,6 +31,16 @@ live ingestion runner, with Supabase auth and Lemon Squeezy subscriptions. Built
   rewritten to the new contract; suite 411 green.
 
 ### Added
+- **GDELT-as-story source — worldwide news radar** (2026-06-28, D101): GDELT's global news index now
+  feeds brief *items*, not just the aggregate Signal line. A curated, on-thesis query per desk-theme
+  (≈5/desk, English-only, capped) via the keyless DOC 2.0 ArtList API; each article becomes a `news`
+  record tagged to its single home desk. Lands as **Speculative**, link-only (`scrape_gray`: title +
+  link, never article body), reusing `source_id="gdelt"` so it carries low materiality weight and the
+  speculative confidence label automatically — the radar that fills out the comprehensive desk read
+  (D100) below the primary-record spine. Unblocked by the epistemic flip (D098/D099). First adapter of
+  the P3 source-breadth push. Citation `license_class` now derives from the source (gdelt → scrape_gray)
+  instead of a hardcoded value. 12 tests; suite 423 green. Source activated via migration; entity
+  linking and a Reported-tier promotion for vetted outlets are planned follow-ups.
 - **Epistemic-framing taxonomy** (2026-06-27, D098, widen-the-net keystone): the deterministic vocabulary
   for grading every item by its basis — a single ordered ladder, Confirmed (primary record, cited) →
   Reported (attributed, not primary) → HPI analysis (synthesis/inference) → Speculative (early/weak signal).
