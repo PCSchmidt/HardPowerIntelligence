@@ -16,7 +16,7 @@ export default async function AIDeskPage() {
       <div className="mx-auto max-w-content px-4 py-16 sm:px-6">
         <EmptyState
           title="Today's brief is being prepared."
-          hint="Check back at 5:30am ET for the latest AI Infrastructure desk briefing."
+          hint="Check back at 5:00am ET for the latest AI Infrastructure desk briefing."
         />
       </div>
     );

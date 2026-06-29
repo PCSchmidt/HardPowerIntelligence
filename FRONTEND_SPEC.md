@@ -217,7 +217,7 @@ Appears on all pages. Client Component.
 - **Normal**: brief renders fully server-side, no spinners
 - **Pending/Failed (D013)**: `StalenessIndicator` shown, previous brief rendered
 - **Loading skeleton**: `BriefItemSkeleton` × 4 (used only if client-side revalidation is in flight)
-- **No brief exists (first deploy)**: `EmptyState` — "Today's brief is being prepared. Check back at 5:30am ET."
+- **No brief exists (first deploy)**: `EmptyState` — "Today's brief is being prepared. Check back at 5:00am ET."
 
 **SEO:** `robots: noindex` (auth-gated). `title`: "Defense Desk — Hard Power Intelligence"
 
@@ -551,7 +551,7 @@ Dynamic OG image generation for the marketing home and subscribe pages.
 
 ### Empty states
 
-- **No brief published (new deploy):** `EmptyState` on `/desk/defense` — "Today's brief is being prepared. Check back at 5:30am ET."
+- **No brief published (new deploy):** `EmptyState` on `/desk/defense` — "Today's brief is being prepared. Check back at 5:00am ET."
 - **Entity with no data:** Per-tab `EmptyState` — "No [awards] on record for this entity yet."
 - **No follows:** `EmptyState` on `/account` follows section — "Follow entities from any brief or entity page."
 
