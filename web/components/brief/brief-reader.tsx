@@ -43,14 +43,6 @@ export function BriefReader({ brief }: { brief: Brief }) {
       )}
       <BriefContent items={brief.items} citations={brief.citations} entities={brief.entities} />
       {brief.signal && <SignalLine signal={brief.signal} series={brief.signal_series} />}
-      <footer className="mt-8 border-t border-border pt-4 text-ui-sm text-muted-foreground">
-        {brief.model_waterfall.synthesis_model && (
-          <span>Synthesis: {brief.model_waterfall.synthesis_model}</span>
-        )}
-        {brief.faithfulness_score != null && (
-          <span> · Eval score: {brief.faithfulness_score.toFixed(2)}</span>
-        )}
-      </footer>
     </div>
   );
 }
