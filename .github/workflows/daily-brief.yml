@@ -78,6 +78,10 @@ jobs:
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          # SAM.gov Opportunities adapter (D105) reads settings.sam_gov_api_key from env.
+          # Without this the adapter silently no-ops on every ingest. Set the secret with:
+          #   gh secret set SAM_GOV_API_KEY --body '<key>'
+          SAM_GOV_API_KEY: ${{ secrets.SAM_GOV_API_KEY }}
         run: uv run python scripts/run_ingest.py
 
       - name: Generate + eval + publish brief(s)
