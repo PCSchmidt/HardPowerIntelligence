@@ -116,7 +116,7 @@ fixtures onto live data and became genuinely multi-desk:
 
 - **Production ingestion runner** (`scripts/run_ingest.py`, D057) — pulls fresh data through
   a retry/backoff fetcher with DB-level dedup, per-source cursors + accounting, a circuit
-  breaker, and hot-window retention. The `daily-brief.yml` cron is **live** (09:00 UTC, ingest
+  breaker, and hot-window retention. The `daily-brief.yml` cron is **live** (06:00 UTC, ingest
   once → publish all three desks), made safe to run unattended by the reliability work below.
 - **Layered analyst brief (2026-06-16, D071/D073)** — each item pairs the cited fact with a
   grounded `read` (why it's material) and `watch` (forward catalyst), plus a brief-level

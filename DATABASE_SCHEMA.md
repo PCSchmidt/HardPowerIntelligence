@@ -251,6 +251,14 @@ INSERT INTO source_registry (id, name, adapter_class, desk, license_class, fetch
 ON CONFLICT (id) DO NOTHING;
 ```
 
+> **Note (current state, 2026-06-29):** the block above is the *initial* aspirational seed. The live
+> registry has since been amended by later migrations and is the source of truth. Built & active sources
+> today: **usaspending, edgar, arxiv, nrc, gdelt, feeds, sam_gov**. `dod_contracts`, `congress_gov`, and
+> `fred` were placeholders and are not yet built. `gdelt` was corrected to `license_class = scrape_gray`
+> and a daily cron (D101/D109 — it stores title + link only, never article body), and `feeds` (generic
+> RSS/Atom, D104) is also `scrape_gray`; all desks are tagged per-record at parse time (D097), so the
+> `desk` column here is informational. Cadence is daily via `daily-brief.yml`, not per-source cron.
+
 ---
 
 ### `ingestion_runs`

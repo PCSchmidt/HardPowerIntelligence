@@ -816,7 +816,7 @@ All secrets in environment variables; never hardcoded.
 | `LLM_MODEL_EVAL` | `openrouter/qwen/qwen3.7-max` |
 | `LLM_MODEL_SYNTHESIS_FALLBACK` | `openrouter/qwen/qwen3.7-max` |
 | `LLM_DAILY_BUDGET_USD` | Daily LLM spend cap (default `5.00`) |
-| `BRIEF_GENERATION_CRON` | `30 10 * * *` (5:30am ET = 10:30 UTC) |
+| `BRIEF_GENERATION_CRON` | `0 6 * * *` (06:00 UTC) — the live schedule lives in `.github/workflows/daily-brief.yml`; moved earlier 2026-06-29 (D108) to absorb GitHub's scheduler delay |
 | `DATA_READINESS_CUTOFF_UTC` | `10:00` (5:00am ET = 10:00 UTC) |
 
 ---
