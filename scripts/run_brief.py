@@ -134,8 +134,13 @@ async def main(desk: str, brief_date: str) -> int:
 
     # GDELT media-attention signal (D082): labeled, disclaimed momentum color, computed
     # separately from the citable-fact path. Best-effort — never fails the brief.
+    # Fail-fast fetcher (D108): GDELT rate-limits hard (HTTP 429); the default 4-attempt /
+    # 20s-backoff budget turned a throttled signal into ~3 min/desk of dead waiting and blew
+    # the workflow timeout (only Defense published 2026-06-29). The signal is decorative, so
+    # one shot is right — on 429 it degrades to no Signal block rather than stalling the brief.
     async with httpx.AsyncClient() as client:
-        gdelt_signal = await compute_brief_signal(themes_for_desk(desk), HttpFetcher(client))
+        signal_fetcher = HttpFetcher(client, max_attempts=1)
+        gdelt_signal = await compute_brief_signal(themes_for_desk(desk), signal_fetcher)
     brief.signal = gdelt_signal.line
     brief.signal_series = gdelt_signal.series_json()   # lead-theme series for the sparkline (D089)
     if brief.signal:

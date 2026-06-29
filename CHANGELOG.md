@@ -14,6 +14,14 @@ live ingestion runner, with Supabase auth and Lemon Squeezy subscriptions. Built
 
 ### Fixed
 
+- **Daily run no longer times out — GDELT signal fails fast** (2026-06-29, D108): the 6/29 scheduled run
+  was killed at the 30-min timeout with only Defense published (AI cut off mid-synthesis, Energy never
+  ran). GDELT rate-limits hard (HTTP 429), and the decorative media-attention Signal was fetching 6 themes
+  per desk through the full 4-attempt/20s-backoff budget — ~3 min of dead waiting per desk. The Signal now
+  uses a fail-fast fetcher (one attempt; degrades to no Signal block on 429). Also moved the cron 09:00 →
+  06:00 UTC (GitHub delays scheduled runs 40–100 min) and raised the job timeout 30 → 45 min. Backend
+  suite 447 green. (GDELT *story* ingestion still 429s — restoring it via SITREP-style OR-combined queries
+  with request throttling is a separate follow-up; it's non-fatal since briefs publish from the RSS feeds.)
 - **Cross-desk filing duplication — one filing now homes on one desk** (2026-06-28, D107): the same SEC
   filing was printing on two desks (Energy Fuels' rare-earth deal and REalloys' $100M placement showed on
   both Energy and AI; the AI desk even led with "Defense Tech and Energy Deals Dominate"). Cause was in

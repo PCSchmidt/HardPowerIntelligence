@@ -2712,3 +2712,32 @@ rows from earlier runs simply fall outside tomorrow's brief window, so the next 
 distinct filings preserved, tie-break, single-desk-beats-multi, empty-desk skip); runner suite 11 green;
 full backend suite 447 green. Effect is visible in the next ingest+brief run, not a redeploy (ingest runs
 in GitHub Actions).
+
+
+## D108 — GDELT signal fail-fast + earlier/longer cron (the 30-min timeout fix)
+
+**Problem (2026-06-29 scheduled run):** the job was killed at the 30-min `timeout-minutes` with
+ONLY Defense published; AI was cut off mid-synthesis and Energy never ran. Root cause: GDELT
+rate-limits hard (HTTP 429), and the per-brief GDELT media-attention **signal** (D082) fetched up to
+6 themes through the shared fetcher's full retry budget (4 attempts × up to 20s backoff) — so a
+throttled signal became ~3 min of dead waiting *per desk* (~9 min total), enough to blow the window.
+(The GDELT *story* adapter's 429s during ingest failed fast and non-fatally — not the culprit.)
+SITREP (sibling app) pulls GDELT cleanly by spacing requests and tolerating empties; same lesson here.
+
+**Decision:** the Signal is decorative (it already degrades to "" / no sparkline), so fetch it
+**fail-fast** — `scripts/run_brief.py` now passes `HttpFetcher(client, max_attempts=1)` for the signal
+only; on 429 it gives up in one shot and the brief renders with no Signal block instead of stalling.
+Also moved the cron **09:00 → 06:00 UTC** (GitHub delays scheduled runs 40–100 min; observed 09:44–10:38
+for a "09:00" cron — start earlier so even a delayed, slow run lands before the ~06:00 ET reader window)
+and raised `timeout-minutes` **30 → 45** for headroom on a re-roll-heavy 3-desk day.
+
+**Shape:** one-line fetcher swap in `run_brief.py` (the ingest path keeps the default 4-attempt budget);
+two config lines in `.github/workflows/daily-brief.yml`. No adapter/schema change.
+
+**Verification:** full backend suite 447 green (no test churn — the signal already tolerates fetch
+failure). Effect is the next scheduled run.
+
+**Deferred (separate gate):** make the GDELT *story* adapter actually yield articles instead of
+429-storming — apply SITREP's pattern (collapse the 52 single-phrase probes into a few OR-combined
+per-desk queries + a ≥5s inter-request throttle). It's non-fatal today (briefs publish from feeds), so
+it's a feature gate, not part of this timeout fix.

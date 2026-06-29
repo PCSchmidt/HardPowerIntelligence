@@ -24,9 +24,11 @@ on:
         default: false
         type: boolean
   schedule:
-    # 09:00 UTC daily (~5am ET) so the ~15-min ingest+3-desk run finishes before the
-    # site's "5:30am ET" promise. Adjust to your cadence (and keep the copy in sync).
-    - cron: "0 9 * * *"
+    # 06:00 UTC daily (D108). GitHub delays scheduled runs 40–100 min under load (observed:
+    # 09:44–10:38 UTC for a "09:00" cron), and a 3-desk run takes ~25–40 min — so a 09:00 cron
+    # could finish after the ~06:00 ET reader window. Starting at 06:00 UTC buys a multi-hour
+    # buffer so even a delayed, slow run lands before 06:00 ET.
+    - cron: "0 6 * * *"
 
 concurrency:
   group: daily-brief
@@ -35,7 +37,10 @@ concurrency:
 jobs:
   brief:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    # 45 min (D108, was 30): the 2026-06-29 run was killed at 30 min with only Defense
+    # published. The GDELT signal fail-fast reclaims most of the overrun; this is headroom
+    # for a slow LLM day (re-rolls, 3 desks) so a sparse desk can't get cut off again.
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
 
