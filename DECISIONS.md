@@ -2679,3 +2679,36 @@ for any missing/unknown value (pre-D099 rows), so the render never breaks.
 **Verification:** 2 component tests (renders the right label per tier; falls back to Confirmed when the
 field is absent); full web suite 18 green; `tsc --noEmit` clean. Backend 439 green. The chip shows live
 once the API/web deploy ships the D099 `attribution` field (already in the briefs API).
+
+
+## D107 — Cross-probe filing dedup: one filing, one home desk (fixes desk bleed D097 missed)
+
+**Problem (operator, 2026-06-28, from the live briefs):** the same SEC filing printed on two desks —
+Energy Fuels' rare-earth acquisition and REalloys' $100M placement appeared on BOTH Energy and AI; the
+AI desk headline was literally "Defense Tech and Energy Deals Dominate." D097 home-desk routing was
+working — it was being fed duplicates. Root cause is in INGEST, not routing: EDGAR walks one search per
+`(query, desk)` probe, so a filing matching several probes (e.g. "rare earth"→(defense,ai,energy),
+"uranium enrichment"→(energy,defense)) is parsed once per probe, each copy carrying that probe's desk
+tuple AND a probe-specific `content_hash` (the probe `theme` is folded into `structured_data`). Because
+the hash differs, the `raw_records UNIQUE(source_id, native_id, content_hash)` dedup never collapses them
+→ N normalized records for one filing, each with a different `desk[0]` → D097 faithfully homes each copy
+on a different desk.
+
+**Decision:** collapse the copies at ingest, before persist. A multi-probe adapter opts in with
+`merge_by_native_id = True`; the runner then buffers the whole run and `_merge_by_native_id` keeps ONE
+record per `(source_id, native_id)`: `desk[]` = the UNION of every matching probe's desks (so the
+convergence / `desk_count` signal survives), and the home (`desk[0]`) is taken from the **most-specific
+probe** — fewest desks wins, since a narrow match is the strongest home signal (a 2-desk "uranium
+enrichment" beats the 3-desk "rare earth", so Energy Fuels homes on Energy). Exact specificity ties are
+broken by `_DESK_TIEBREAK = (defense, energy, ai)` — tunable, only breaks ties. Operator chose the
+most-specific-wins rule over fixed-priority or primary-vote.
+
+**Shape:** `engine/ingest/runner.py` gains `_merge_by_native_id` + `_tiebreak_rank` (pure, order-independent)
+and a buffer/merge branch in `run_source` gated on the adapter flag (streaming persist is unchanged for
+every other source). `EDGARFullTextAdapter.merge_by_native_id = True`. No schema change; existing duplicate
+rows from earlier runs simply fall outside tomorrow's brief window, so the next run is clean.
+
+**Verification:** 8 unit tests on the merge (collapse, most-specific home, desk union, order-independence,
+distinct filings preserved, tie-break, single-desk-beats-multi, empty-desk skip); runner suite 11 green;
+full backend suite 447 green. Effect is visible in the next ingest+brief run, not a redeploy (ingest runs
+in GitHub Actions).

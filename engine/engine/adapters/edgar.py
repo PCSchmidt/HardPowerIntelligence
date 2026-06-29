@@ -173,6 +173,10 @@ class EDGARFullTextAdapter:
     source_id: str = _SOURCE_ID
     base_url: str = _BASE_URL
     http_method: str = "GET"
+    # One filing can match several (query, desk) probes; collapse those copies into a
+    # single record (unioned desks, most-specific home) before persist so home-desk
+    # routing can't print it on multiple desks (D107).
+    merge_by_native_id: bool = True
 
     def __init__(self) -> None:
         # Set per request in build_request_payload and read in parse(). The runner

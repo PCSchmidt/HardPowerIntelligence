@@ -12,6 +12,18 @@ cited briefs, organized around the Defense∩AI∩Energy **convergence** thesis 
 live ingestion runner, with Supabase auth and Lemon Squeezy subscriptions. Built gate-by-gate
 (Gates 1–8 closed).
 
+### Fixed
+
+- **Cross-desk filing duplication — one filing now homes on one desk** (2026-06-28, D107): the same SEC
+  filing was printing on two desks (Energy Fuels' rare-earth deal and REalloys' $100M placement showed on
+  both Energy and AI; the AI desk even led with "Defense Tech and Energy Deals Dominate"). Cause was in
+  ingest, not D097 routing: EDGAR parses one filing once per matching `(query, desk)` probe, and each copy
+  carried a probe-specific `content_hash`, so the `raw_records` dedup never collapsed them → many records
+  per filing, each with a different home desk. Fixed with an opt-in `merge_by_native_id` pass in the
+  ingestion runner that keeps one record per `(source_id, native_id)`: desks are unioned (the convergence
+  signal survives) and the home desk is taken from the most-specific probe (fewest desks wins; ties broken
+  by a fixed order). Takes effect on the next ingest run. +8 unit tests; backend suite 447 green.
+
 ### Changed
 - **Brief is a comprehensive desk read — item ceiling 8 → 25** (2026-06-28, D100, supersedes D039): a desk
   brief now aims to cover its domain thoroughly, not skim it. Raised `BRIEF_MAX_ITEMS` to 25 and reworked

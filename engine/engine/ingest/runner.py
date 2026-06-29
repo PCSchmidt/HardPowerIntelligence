@@ -117,6 +117,62 @@ async def _persist_page(
     return new, dup
 
 
+# Fixed tie-break order for the home desk when two probes match a filing with EQUAL
+# specificity but disagree on the primary desk (D107). The most-specific-probe rule
+# decides the common case; this only breaks exact ties. Tunable — earlier = higher priority.
+_DESK_TIEBREAK: tuple[str, ...] = ("defense", "energy", "ai")
+
+
+def _tiebreak_rank(desk: str) -> int:
+    try:
+        return _DESK_TIEBREAK.index(desk)
+    except ValueError:
+        return len(_DESK_TIEBREAK)
+
+
+def _merge_by_native_id(records: list) -> list:
+    """Collapse multiple probe-matches of the SAME filing into one record (D107).
+
+    A full-text adapter (EDGAR) walks one search per ``(query, desk)`` probe, so a filing
+    matching several probes is parsed once per probe — each copy carrying that probe's desk
+    tuple (and a probe-specific ``content_hash``, which defeats the ``raw_records`` dedup).
+    Left alone, D097 home-desk routing then prints the same filing on every matched desk —
+    the desk-bleed the operator saw (Energy Fuels / REalloys on both Energy and AI).
+
+    Here we keep ONE record per ``(source_id, native_id)``: its ``desk[]`` is the UNION of
+    every matching probe's desks (so the convergence / ``desk_count`` signal survives), and
+    its HOME (``desk[0]``) is taken from the MOST-SPECIFIC probe — the one with the fewest
+    desks, since a narrow match is the strongest home signal (a 2-desk "uranium enrichment"
+    beats the 3-desk "rare earth"). Equal specificity is broken by ``_DESK_TIEBREAK``. The
+    result is order-independent."""
+    merged: dict[tuple[str, str], object] = {}
+    home_size: dict[tuple[str, str], int] = {}
+    for rec in records:
+        if not rec.desk:
+            continue
+        key = (rec.source_id, rec.native_id)
+        cur = merged.get(key)
+        if cur is None:
+            merged[key] = rec
+            home_size[key] = len(rec.desk)
+            continue
+        incoming_size = len(rec.desk)
+        incoming_home, existing_home = rec.desk[0], cur.desk[0]
+        if incoming_size < home_size[key] or (
+            incoming_size == home_size[key]
+            and _tiebreak_rank(incoming_home) < _tiebreak_rank(existing_home)
+        ):
+            home, home_size[key] = incoming_home, incoming_size
+        else:
+            home = existing_home
+        union = [home]
+        for d in list(cur.desk) + list(rec.desk):
+            if d not in union:
+                union.append(d)
+        cur.desk = union
+    return list(merged.values())
+
+
 async def run_source(
     source_id: str,
     pool: asyncpg.Pool,
@@ -168,6 +224,13 @@ async def run_source(
     try:
         async with pool.acquire() as conn:
             page = 1
+            # A multi-probe adapter (EDGAR) parses the same filing once per matching
+            # (query, desk) probe, so the same native_id arrives across several pages with
+            # conflicting desk primacy (D107). When the adapter opts in, buffer the whole
+            # run and collapse those copies into one record per filing BEFORE persisting,
+            # so D097 home-desk routing can't print the filing on multiple desks.
+            merge_mode = getattr(adapter, "merge_by_native_id", False)
+            buffer: list = []
             while page <= max_pages:
                 payload = adapter.build_request_payload(cursor, page)
                 kwargs = {"json": payload} if adapter.http_method == "POST" else {"params": payload}
@@ -185,9 +248,12 @@ async def run_source(
                 result.pages_fetched += 1
                 result.records_fetched += len(records)
 
-                new, dup = await _persist_page(conn, records, run_id, now)
-                result.records_new += new
-                result.records_duplicate += dup
+                if merge_mode:
+                    buffer.extend(records)
+                else:
+                    new, dup = await _persist_page(conn, records, run_id, now)
+                    result.records_new += new
+                    result.records_duplicate += dup
 
                 nxt = adapter.next_cursor(response, page)
                 if nxt and "page" in nxt:
@@ -199,6 +265,13 @@ async def run_source(
                 # Hit max_pages — persist a date-advancing cursor so the next run
                 # doesn't replay the same first pages forever.
                 final_cursor = adapter.next_cursor({}, page)
+
+            # Collapse cross-probe duplicates of the same filing, then persist once (D107).
+            if merge_mode:
+                merged = _merge_by_native_id(buffer)
+                new, dup = await _persist_page(conn, merged, run_id, now)
+                result.records_new += new
+                result.records_duplicate += dup
 
         if embed and settings.openai_api_key:
             since = now - timedelta(days=settings.ingest_hot_window_days)
