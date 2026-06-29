@@ -91,13 +91,18 @@ class TestParse:
 
 
 class TestRequestBuilding:
-    def test_page_selects_probe_and_quotes_phrase(self):
+    def test_page_selects_consolidated_or_query(self):
+        from engine.adapters.gdelt import _QUERIES
         adapter = GDELTAdapter()
         payload = adapter.build_request_payload(cursor=None, page=1)
         assert payload["mode"] == "artlist"
         assert payload["format"] == "json"
         assert payload["maxrecords"] == _MAXRECORDS
-        assert payload["query"] == f'"{_PROBES[0].query}"'
+        # Query is the pre-combined OR group for the first desk, not a single phrase (D109).
+        assert payload["query"] == _QUERIES[0].query
+        assert payload["query"].startswith("(") and payload["query"].endswith(")")
+        # The first probe's phrase is one of the OR clauses in the first group.
+        assert f'"{_PROBES[0].query}"' in payload["query"]
 
     def test_probes_span_all_three_desks(self):
         desks = {p.desk for p in _PROBES}
@@ -127,10 +132,50 @@ class TestRequestBuilding:
             assert topic in queries, f"missing GDELT coverage for: {topic}"
 
     def test_next_cursor_walks_then_watermarks(self):
+        from engine.adapters.gdelt import _QUERIES
         adapter = GDELTAdapter()
         assert adapter.next_cursor({}, current_page=1) == {"page": 2}
-        last = adapter.next_cursor({}, current_page=len(_PROBES))
+        last = adapter.next_cursor({}, current_page=len(_QUERIES))
         assert "last_date" in last
 
-    def test_max_pages_is_probe_count(self):
-        assert GDELTAdapter().max_pages == len(_PROBES)
+
+class TestConsolidatedQueries:
+    """D109: the ~50 single-phrase probes are OR-combined into a few bounded per-desk queries
+    so GDELT (which rate-limits ~1 req/5s) isn't stormed into HTTP 429."""
+
+    def test_far_fewer_queries_than_probes(self):
+        from engine.adapters.gdelt import _QUERIES
+        assert len(_QUERIES) < len(_PROBES)
+
+    def test_every_probe_phrase_is_covered(self):
+        # No coverage lost in consolidation: every probe phrase appears in some query.
+        from engine.adapters.gdelt import _QUERIES
+        haystack = " ".join(q.query for q in _QUERIES)
+        for p in _PROBES:
+            assert f'"{p.query}"' in haystack, f"dropped phrase: {p.query}"
+
+    def test_each_query_is_single_desk_and_or_combined(self):
+        from engine.adapters.gdelt import _QUERIES, _QUERY_GROUP_SIZE
+        for q in _QUERIES:
+            assert q.desk in {"defense", "ai", "energy"}
+            assert q.query.startswith("(") and q.query.endswith(")")
+            # Bounded to the proven-safe OR-clause envelope.
+            assert q.query.count('"') // 2 <= _QUERY_GROUP_SIZE
+
+    def test_a_query_only_mixes_one_desks_phrases(self):
+        # Every phrase OR'd into a query shares that query's home desk (preserves D097).
+        from engine.adapters.gdelt import _QUERIES
+        phrase_desk = {p.query: p.desk for p in _PROBES}
+        for q in _QUERIES:
+            for phrase, desk in phrase_desk.items():
+                if f'"{phrase}"' in q.query:
+                    assert desk == q.desk
+
+    def test_throttle_hint_present(self):
+        # The runner spaces GDELT requests by this interval to stay under the rate limit.
+        assert GDELTAdapter().min_request_interval >= 5.0
+
+    def test_max_pages_is_query_count(self):
+        # One API call per CONSOLIDATED query now, not per probe (D109).
+        from engine.adapters.gdelt import _QUERIES
+        assert GDELTAdapter().max_pages == len(_QUERIES)

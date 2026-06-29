@@ -2741,3 +2741,36 @@ failure). Effect is the next scheduled run.
 429-storming — apply SITREP's pattern (collapse the 52 single-phrase probes into a few OR-combined
 per-desk queries + a ≥5s inter-request throttle). It's non-fatal today (briefs publish from feeds), so
 it's a feature gate, not part of this timeout fix.
+
+
+## D109 — GDELT stories: consolidate probes + throttle (stop the 429 storm); fix two moved feeds
+
+**Problem (2026-06-29 run):** the GDELT-as-story adapter fired ~50 single-phrase probes back-to-back and
+GDELT (which rate-limits ~1 request / 5s) answered HTTP 429 across the board — the source yielded **zero**.
+The sibling SITREP app pulls GDELT cleanly by OR-combining many keywords into a FEW queries and spacing
+them out; same lesson applied here.
+
+**Decision:** keep the ~50 `_PROBES` as the source of truth (and the coverage tests), but ingest now walks
+**derived consolidated queries**: phrases grouped by home desk and OR-combined into bounded groups
+(`_QUERY_GROUP_SIZE = 8`, SITREP's proven-safe envelope), one home desk per group so D097 demarcation is
+preserved. ~50 calls → ~8. The runner also honors a new `min_request_interval` (GDELT = 5.0s) and spaces
+requests (sleep before every request after the first) so the walk can't trip 429. `maxrecords` 15 → 50
+since each query now covers ~8 themes. Downside is bounded — if GDELT rejects a long OR query the adapter
+returns empty, i.e. no worse than today's zero (and the brief publishes from feeds regardless).
+
+**Also (same ingest-robustness pass):** two RSS feeds moved and were being skipped (the fetcher doesn't
+follow redirects) — pointed at their final targets: The Register `headlines.atom` → the api.theregister.com
+RSS remapper (302); Tom's Hardware `/feeds/all` → `/feeds.xml` (301).
+
+**Shape:** `engine/adapters/gdelt.py` gains `_Query` + `_build_queries` + `_QUERIES`; the adapter walks
+queries not probes (`max_pages`, `build_request_payload`, `next_cursor`, `parse` now read `_active_query`).
+`engine/ingest/runner.py` sleeps `min_request_interval` between requests. `engine/adapters/feeds.py` URL fixes.
+
+**Verification:** 16 gdelt-adapter tests (incl. 5 new: fewer-queries-than-probes, every-phrase-covered,
+single-desk-per-query, ≤8-clause bound, throttle hint) + a runner throttle test (driving the real GDELT
+adapter, asserting it sleeps before the 2nd/3rd request, not the 1st). Full backend suite 453 green. Live
+effect is the next ingest run.
+
+**Still deferred:** SAM.gov adapter — its API key secret was re-set clean (D108 follow-up), but the endpoint
+itself can't be tested from this network; whether `opportunities/v2/search` returns data is confirmed only
+by the next CI ingest. BigQuery GKG backend for GDELT entities remains the future upgrade (D082).

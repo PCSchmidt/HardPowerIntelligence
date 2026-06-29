@@ -34,7 +34,7 @@ from .base import NormalizedRecord
 
 _SOURCE_ID = "gdelt"
 _BASE_URL = "https://api.gdeltproject.org/api/v2/doc/doc"
-_MAXRECORDS = 15          # articles per probe (most-recent-first); bounds volume per run
+_MAXRECORDS = 50          # articles per consolidated query (covers ~8 OR'd themes); bounds volume
 _TIMESPAN = "2d"          # ~matches the 48h brief window; dedup absorbs cross-run repeats
 _TITLE_CHARS = 300        # cap the stored/cited title length (scrape_gray: title + link only)
 
@@ -116,6 +116,46 @@ _PROBES: tuple[_Probe, ...] = (
 )
 
 
+# ── Consolidated queries (D109) ────────────────────────────────────────────────────
+# GDELT rate-limits hard (~1 request / 5s); firing all ~50 single-phrase probes back-to-back
+# tripped HTTP 429 and the adapter yielded zero (2026-06-29). The SITREP app pulls GDELT cleanly
+# by OR-combining many keywords into a FEW queries and spacing them out. Same fix here: the
+# probes above stay the source of truth (and the coverage tests), but ingestion walks these
+# derived queries — each desk's phrases OR'd into bounded groups, one home desk per group so the
+# D097 demarcation is preserved. ~50 single-phrase calls → ~8 grouped calls (+ a throttle below).
+
+_QUERY_GROUP_SIZE = 8     # OR-clauses per request — SITREP's proven-safe envelope for GDELT DOC
+
+
+@dataclass(frozen=True)
+class _Query:
+    query: str               # OR-combined GDELT DOC query: ("phrase a" OR "phrase b" OR …)
+    desk: str                # single home desk shared by every phrase in the group (D097)
+
+
+def _build_queries(
+    probes: tuple[_Probe, ...], group_size: int = _QUERY_GROUP_SIZE
+) -> tuple[_Query, ...]:
+    """Group probe phrases by home desk, chunk to ``group_size``, OR-combine into one query each.
+
+    Order-stable (preserves the desk order in which phrases first appear) so the probe walk is
+    deterministic. Every phrase lands in exactly one query, so coverage is unchanged — only the
+    number of HTTP requests shrinks."""
+    by_desk: dict[str, list[str]] = {}
+    for p in probes:
+        by_desk.setdefault(p.desk, []).append(p.query)
+    queries: list[_Query] = []
+    for desk, phrases in by_desk.items():
+        for i in range(0, len(phrases), group_size):
+            chunk = phrases[i : i + group_size]
+            combined = "(" + " OR ".join(f'"{ph}"' for ph in chunk) + ")"
+            queries.append(_Query(query=combined, desk=desk))
+    return tuple(queries)
+
+
+_QUERIES: tuple[_Query, ...] = _build_queries(_PROBES)
+
+
 def _clean(text: str | None) -> str:
     return " ".join((text or "").split())
 
@@ -125,28 +165,31 @@ class GDELTAdapter:
     base_url: str = _BASE_URL
     http_method: str = "GET"
     response_format: str = "json"
+    # GDELT rate-limits ~1 request / 5s; the runner spaces our requests by this many seconds so
+    # the consolidated query walk can't trip HTTP 429 (D109). Honored via getattr in the runner.
+    min_request_interval: float = 5.0
 
     def __init__(self) -> None:
         # Set per request in build_request_payload, read in parse(); the runner calls
-        # build → fetch → parse sequentially on one instance. Defaults to the first probe
+        # build → fetch → parse sequentially on one instance. Defaults to the first query
         # so parse() works standalone (e.g. in tests).
-        self._active_probe: _Probe = _PROBES[0]
+        self._active_query: _Query = _QUERIES[0]
 
     @property
-    def probe_count(self) -> int:
-        return len(_PROBES)
+    def query_count(self) -> int:
+        return len(_QUERIES)
 
     @property
     def max_pages(self) -> int:
-        # One API call per probe; the bound is the probe count (mirrors NRC/EDGAR). The
-        # runner stops earlier once next_cursor stops advancing.
-        return len(_PROBES)
+        # One API call per consolidated query; the bound is the query count (mirrors NRC/EDGAR).
+        # The runner stops earlier once next_cursor stops advancing.
+        return len(_QUERIES)
 
     # ── parse ────────────────────────────────────────────────────────────────────
 
     def parse(self, response: dict) -> list[NormalizedRecord]:
-        desk = self._active_probe.desk
-        query = self._active_probe.query
+        desk = self._active_query.desk
+        query = self._active_query.query
         records: list[NormalizedRecord] = []
 
         for art in (response or {}).get("articles", []):
@@ -204,12 +247,13 @@ class GDELTAdapter:
     # ── cursor / request building ──────────────────────────────────────────────────
 
     def build_request_payload(self, cursor: dict | None, page: int = 1) -> dict:
-        # page (1-based) selects the probe; the window is a fixed rolling timespan (no forward
-        # watermark — that trap silently zeroed USAspending, Phase B). Dedup absorbs repeats.
-        probe = _PROBES[(page - 1) % len(_PROBES)]
-        self._active_probe = probe
+        # page (1-based) selects the consolidated query; the window is a fixed rolling timespan
+        # (no forward watermark — that trap silently zeroed USAspending, Phase B). Dedup absorbs
+        # repeats. The query is already OR-combined + parenthesized, so it is passed as-is.
+        q = _QUERIES[(page - 1) % len(_QUERIES)]
+        self._active_query = q
         return {
-            "query": f'"{probe.query}"',   # quoted exact phrase
+            "query": q.query,              # ("phrase a" OR "phrase b" OR …) — pre-combined
             "mode": "artlist",
             "format": "json",
             "maxrecords": _MAXRECORDS,
@@ -218,7 +262,7 @@ class GDELTAdapter:
         }
 
     def next_cursor(self, response, current_page: int) -> dict:
-        # Walk every probe once per run, then advance the date watermark.
-        if current_page < len(_PROBES):
+        # Walk every consolidated query once per run, then advance the date watermark.
+        if current_page < len(_QUERIES):
             return {"page": current_page + 1}
         return {"last_date": date.today().isoformat()}

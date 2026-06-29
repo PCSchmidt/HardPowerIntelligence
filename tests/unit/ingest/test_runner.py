@@ -160,6 +160,29 @@ async def test_only_new_records_are_normalized():
     assert conn.normalized_inserts == 1  # only the new raw_record, not the dup
 
 
+async def test_rate_limited_source_is_throttled(monkeypatch):
+    # GDELT declares min_request_interval; the runner spaces requests (sleeping before every
+    # request except the first) so the probe walk can't trip HTTP 429 and zero the source (D109).
+    sleeps: list[float] = []
+
+    async def fake_sleep(secs):
+        sleeps.append(secs)
+
+    monkeypatch.setattr("engine.ingest.runner.asyncio.sleep", fake_sleep)
+
+    conn = FakeConn(make_source(id="gdelt"), raw_returns=[])
+    pool = FakePool(conn)
+    empty = {"articles": []}
+    fetcher = FakeFetcher([empty, empty, empty])
+
+    result = await run_source("gdelt", pool, fetcher=fetcher, embed=False, max_pages=3)
+
+    assert result.status == "success"
+    assert fetcher.calls == 3              # three requests made
+    assert len(sleeps) == 2                # spaced before the 2nd and 3rd, never the 1st
+    assert all(s >= 5.0 for s in sleeps)   # at least GDELT's min interval
+
+
 async def test_pagination_advances_through_pages():
     # The runner advances page-by-page via next_cursor until max_pages or a terminal cursor.
     conn = FakeConn(make_source(), raw_returns=["id1", "id2"])

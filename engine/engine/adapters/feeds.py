@@ -63,8 +63,10 @@ _FEEDS: tuple[_Feed, ...] = (
     _Feed("https://www.datacenterdynamics.com/en/rss/", "Data Center Dynamics", "ai"),
     _Feed("https://spectrum.ieee.org/feeds/feed.rss", "IEEE Spectrum", "ai"),
     _Feed("https://www.hpcwire.com/feed/", "HPCwire", "ai"),
-    _Feed("https://www.theregister.com/headlines.atom", "The Register", "ai"),
-    _Feed("https://www.tomshardware.com/feeds/all", "Tom's Hardware", "ai"),
+    # Live-validated 2026-06-29: both moved (The Register 302→api host, Tom's 301→feeds.xml);
+    # the runner's fetcher doesn't follow redirects, so point at the final targets (D109).
+    _Feed("https://api.theregister.com/api/v1/article?orderBy=published&site_id=2&remapper=rss", "The Register", "ai"),
+    _Feed("https://www.tomshardware.com/feeds.xml", "Tom's Hardware", "ai"),
     _Feed("https://semianalysis.com/feed/", "SemiAnalysis", "ai"),
     # ── Energy trade press ──
     _Feed("https://www.utilitydive.com/feeds/news/", "Utility Dive", "energy"),

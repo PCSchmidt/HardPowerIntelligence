@@ -14,6 +14,12 @@ live ingestion runner, with Supabase auth and Lemon Squeezy subscriptions. Built
 
 ### Fixed
 
+- **GDELT stories now flow instead of 429-storming** (2026-06-29, D109): the news-radar adapter fired ~50
+  single-phrase probes back-to-back and GDELT (rate-limited ~1 req/5s) returned HTTP 429 on all of them —
+  the source yielded zero. Following the SITREP app's approach, the ~50 probes are now OR-combined into ~8
+  bounded per-desk queries and the runner spaces GDELT requests by ≥5s, so the walk stays under the limit.
+  Also fixed two RSS feeds that had moved (The Register, Tom's Hardware) and were being skipped. +6 tests;
+  backend suite 453 green.
 - **Daily run no longer times out — GDELT signal fails fast** (2026-06-29, D108): the 6/29 scheduled run
   was killed at the 30-min timeout with only Defense published (AI cut off mid-synthesis, Energy never
   ran). GDELT rate-limits hard (HTTP 429), and the decorative media-attention Signal was fetching 6 themes

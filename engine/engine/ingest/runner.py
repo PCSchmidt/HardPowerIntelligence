@@ -22,6 +22,7 @@ Design notes:
 """
 from __future__ import annotations
 
+import asyncio
 import json
 import uuid
 from dataclasses import dataclass, field
@@ -230,8 +231,14 @@ async def run_source(
             # run and collapse those copies into one record per filing BEFORE persisting,
             # so D097 home-desk routing can't print the filing on multiple desks.
             merge_mode = getattr(adapter, "merge_by_native_id", False)
+            # Some sources rate-limit hard (GDELT ~1 request / 5s). When an adapter declares a
+            # min_request_interval, space its requests so the probe walk can't trip HTTP 429 and
+            # zero the source (D109). First request is immediate; only subsequent ones wait.
+            throttle = float(getattr(adapter, "min_request_interval", 0) or 0)
             buffer: list = []
             while page <= max_pages:
+                if throttle and page > 1:
+                    await asyncio.sleep(throttle)
                 payload = adapter.build_request_payload(cursor, page)
                 kwargs = {"json": payload} if adapter.http_method == "POST" else {"params": payload}
                 response = await fetcher.fetch_json(
