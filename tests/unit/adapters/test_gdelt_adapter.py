@@ -175,6 +175,11 @@ class TestConsolidatedQueries:
         # The runner spaces GDELT requests by this interval to stay under the rate limit.
         assert GDELTAdapter().min_request_interval >= 5.0
 
+    def test_sends_descriptive_user_agent(self):
+        # GDELT 429s anonymous/default library agents; we must send a real UA (D110).
+        ua = GDELTAdapter().headers["User-Agent"]
+        assert ua and "httpx" not in ua.lower() and "python" not in ua.lower()
+
     def test_max_pages_is_query_count(self):
         # One API call per CONSOLIDATED query now, not per probe (D109).
         from engine.adapters.gdelt import _QUERIES

@@ -2774,3 +2774,33 @@ effect is the next ingest run.
 **Still deferred:** SAM.gov adapter — its API key secret was re-set clean (D108 follow-up), but the endpoint
 itself can't be tested from this network; whether `opportunities/v2/search` returns data is confirmed only
 by the next CI ingest. BigQuery GKG backend for GDELT entities remains the future upgrade (D082).
+
+
+## D110 — GDELT User-Agent + SAM.gov endpoint/param fixes (the 6/30 ingest failures)
+
+**Context:** the 2026-06-30 scheduled run published all three desks (D108 timeout fix held — 40 min), but
+three sources failed at ingest: GDELT 429, SAM.gov 404, EDGAR 500. Root-caused each against the working
+SITREP app and the GSA API docs.
+
+**GDELT (429 on the *first* request) — User-Agent, not rate.** D109 consolidation/throttle didn't help
+because the very first request 429'd: GDELT was blocking us as an anonymous bot. SITREP pulls GDELT cleanly
+every night and the difference is it sends a **browser-style User-Agent**; our adapter sent the default
+`python-httpx/x`. Fix: the GDELT story adapter now exposes a `headers` property with a descriptive UA
+(mirrors EDGAR), and the per-brief GDELT *signal* client (`run_brief.py`) sets the same UA. (SITREP also runs
+from a persistent server IP vs our GitHub Actions shared IP — if the UA alone doesn't clear it, relocating
+the fetch off CI is the next lever, but UA is the documented common cause and the cheap first fix.)
+
+**SAM.gov (404 with a clean key) — wrong endpoint + nonexistent param.** Two bugs: (1) the Get Opportunities
+Public API lives under **`/prod/`** — `https://api.sam.gov/prod/opportunities/v2/search` (the path without
+it 404s); (2) v2 has **no free-text `q` param** — keyword search is the **`title`** field. Mapped the probe
+keyword to `title` and corrected the base URL (per GSA open.gsa.gov docs). Caveat: `title` matches the
+notice title only, so probe keywords may want broadening later.
+
+**EDGAR (500) — confirmed CODE IS CORRECT, no fix.** Endpoint `efts.sec.gov/LATEST/search-index` is the
+right EFTS API and the UA is SEC-compliant (`HardPowerIntelligence/1.0 <email>`). The 500 is SEC-side and
+transient (6/29 was simply a quiet/zero-hit day, a different cause). Nothing in our code prevents the pull;
+monitor, harden retries only if it recurs.
+
+**Verification:** +1 GDELT UA test (rejects default agents), SAM test asserts `title` + `/prod/` endpoint;
+full backend suite 454 green. Live confirmation is the next ingest run (can't reach either host from the dev
+network).

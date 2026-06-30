@@ -23,7 +23,9 @@ from engine.settings import settings
 from .base import NormalizedRecord
 
 _SOURCE_ID = "sam_gov"
-_BASE_URL = "https://api.sam.gov/opportunities/v2/search"
+# The Get Opportunities Public API lives under /prod/ — the path without it 404s (the bug
+# that failed every ingest, confirmed 2026-06-30 with a clean key). Per GSA open.gsa.gov docs.
+_BASE_URL = "https://api.sam.gov/prod/opportunities/v2/search"
 _LOOKBACK_DAYS = 30        # SAM allows up to a 1-year postedFrom..postedTo range
 _LIMIT = 25                # opportunities per probe (most-recent-first)
 _TITLE_CHARS = 300
@@ -147,7 +149,9 @@ class SAMGovAdapter:
         today = date.today()
         return {
             "api_key": settings.sam_gov_api_key,
-            "q": probe.q,
+            # v2 has no free-text "q" param; keyword search is the `title` field (matches the
+            # notice title only). Broader full-text would need post-filtering (D110).
+            "title": probe.q,
             "postedFrom": _mmddyyyy(today - timedelta(days=_LOOKBACK_DAYS)),
             "postedTo": _mmddyyyy(today),
             "limit": _LIMIT,

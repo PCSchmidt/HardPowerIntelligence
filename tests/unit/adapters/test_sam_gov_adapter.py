@@ -63,8 +63,11 @@ class TestRequestBuilding:
     def test_page_selects_probe_and_sets_required_params(self):
         adapter = SAMGovAdapter()
         payload = adapter.build_request_payload(cursor=None, page=1)
-        assert payload["q"] == _PROBES[0].q
+        # SAM Opportunities v2 has no free-text "q" param — keyword search is the `title`
+        # field (D110 fix); the probe keyword is mapped there.
+        assert payload["title"] == _PROBES[0].q
         assert payload["limit"] == _LIMIT
+        assert adapter.base_url.endswith("/prod/opportunities/v2/search")
         # SAM requires a posted-date range in MM/DD/YYYY
         assert "/" in payload["postedFrom"] and "/" in payload["postedTo"]
         assert "api_key" in payload

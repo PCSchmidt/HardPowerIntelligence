@@ -37,6 +37,10 @@ _BASE_URL = "https://api.gdeltproject.org/api/v2/doc/doc"
 _MAXRECORDS = 50          # articles per consolidated query (covers ~8 OR'd themes); bounds volume
 _TIMESPAN = "2d"          # ~matches the 48h brief window; dedup absorbs cross-run repeats
 _TITLE_CHARS = 300        # cap the stored/cited title length (scrape_gray: title + link only)
+# GDELT 429s/blocks requests carrying a default library user-agent (e.g. python-httpx/x). The
+# sibling SITREP app pulls GDELT cleanly every night precisely because it sends a browser-style
+# UA — that, not our request rate, is why the first request 429'd from CI (D110).
+_USER_AGENT = "Mozilla/5.0 (compatible; HardPowerIntelligence/1.0; +https://hard-power-intelligence.vercel.app)"
 
 
 @dataclass(frozen=True)
@@ -168,6 +172,12 @@ class GDELTAdapter:
     # GDELT rate-limits ~1 request / 5s; the runner spaces our requests by this many seconds so
     # the consolidated query walk can't trip HTTP 429 (D109). Honored via getattr in the runner.
     min_request_interval: float = 5.0
+
+    @property
+    def headers(self) -> dict:
+        # Descriptive UA so GDELT doesn't 429/block us as an anonymous bot (D110). The runner
+        # reads this via getattr and passes it to the fetcher (mirrors the EDGAR adapter).
+        return {"User-Agent": _USER_AGENT}
 
     def __init__(self) -> None:
         # Set per request in build_request_payload, read in parse(); the runner calls

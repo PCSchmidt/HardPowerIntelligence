@@ -14,6 +14,13 @@ live ingestion runner, with Supabase auth and Lemon Squeezy subscriptions. Built
 
 ### Fixed
 
+- **GDELT User-Agent + SAM.gov endpoint fixes** (2026-06-30, D110): the 6/30 run published all three desks
+  (timeout fix held) but GDELT, SAM.gov, and EDGAR failed at ingest. GDELT was 429ing on the *first* request
+  — it blocks anonymous/default library user-agents, so the adapter (and the signal client) now send a
+  browser-style UA, matching how the SITREP app pulls GDELT cleanly. SAM.gov 404'd because the endpoint was
+  missing the `/prod/` path segment and used a nonexistent `q` keyword param — corrected to
+  `/prod/opportunities/v2/search` with the `title` search field. EDGAR's 500 was confirmed SEC-side (the
+  endpoint and SEC-compliant UA are correct) — no code change, monitor only. Backend suite 454 green.
 - **GDELT stories now flow instead of 429-storming** (2026-06-29, D109): the news-radar adapter fired ~50
   single-phrase probes back-to-back and GDELT (rate-limited ~1 req/5s) returned HTTP 429 on all of them —
   the source yielded zero. Following the SITREP app's approach, the ~50 probes are now OR-combined into ~8

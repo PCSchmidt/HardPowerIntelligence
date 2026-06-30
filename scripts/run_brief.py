@@ -138,7 +138,10 @@ async def main(desk: str, brief_date: str) -> int:
     # 20s-backoff budget turned a throttled signal into ~3 min/desk of dead waiting and blew
     # the workflow timeout (only Defense published 2026-06-29). The signal is decorative, so
     # one shot is right — on 429 it degrades to no Signal block rather than stalling the brief.
-    async with httpx.AsyncClient() as client:
+    # Browser-style UA so GDELT doesn't 429 the signal as an anonymous bot (D110, same reason
+    # the story adapter sets one). Without it GDELT blocks the default python-httpx agent.
+    _GDELT_UA = "Mozilla/5.0 (compatible; HardPowerIntelligence/1.0; +https://hard-power-intelligence.vercel.app)"
+    async with httpx.AsyncClient(headers={"User-Agent": _GDELT_UA}) as client:
         signal_fetcher = HttpFetcher(client, max_attempts=1)
         gdelt_signal = await compute_brief_signal(themes_for_desk(desk), signal_fetcher)
     brief.signal = gdelt_signal.line
