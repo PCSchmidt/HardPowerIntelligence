@@ -14,6 +14,18 @@ live ingestion runner, with Supabase auth and Lemon Squeezy subscriptions. Built
 
 ### Fixed
 
+- **Curation: Defense/AI no longer flooded by DOE grants; convergence boost is now a tiebreak** (2026-06-30,
+  D111): the 6/30 desks read wrong — Defense led with small DOE/NASA awards over its actual thesis, and the
+  AI desk ranked "smaller DOE awards" above on-thesis research. Two root causes, three fixes: (1) re-homed the
+  USAspending `("rare earth","critical minerals")` convergence probe from defense-first to **energy-first** so
+  those grants land on Energy (where they read well) and Defense keeps its thesis; (2) rebalanced materiality
+  weights (authority 0.25→0.30, novelty 0.30→0.20, magnitude 0.20→0.25) — flat novelty couldn't rank same-day
+  items, so it was trimmed into authority+magnitude; lifting authority keeps no-dollar news/research signals
+  competitive rather than buried — plus sharper sub-$10M buckets so tiny grants sink; (3) changed the
+  cross-sector convergence boost from **multiplicative to additive** (default 0.15→0.02) so a small multi-desk
+  grant can't overpower a 20×-larger single-desk award — it's a tiebreak, not a dominator. Takes effect on the
+  next desk run. Backend suite 454 green.
+
 - **GDELT User-Agent + SAM.gov endpoint fixes** (2026-06-30, D110): the 6/30 run published all three desks
   (timeout fix held) but GDELT, SAM.gov, and EDGAR failed at ingest. GDELT was 429ing on the *first* request
   — it blocks anonymous/default library user-agents, so the adapter (and the signal client) now send a

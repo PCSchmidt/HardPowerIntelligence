@@ -91,9 +91,9 @@ class TestMaterialityScorer:
         scorer = self._scorer()
         new_score = scorer.score("usaspending", True, 500_000_000, "company", 0)
         old_score = scorer.score("usaspending", False, 500_000_000, "company", 0)
-        # Novelty is 0.30 weight — new should be materially higher
+        # Novelty is 0.20 weight (rebalanced 2026-06-30) — new still materially higher
         assert new_score > old_score
-        assert abs(new_score - old_score) > 0.25
+        assert abs(new_score - old_score) > 0.15
 
     def test_corroboration_capped_at_3(self):
         scorer = self._scorer()

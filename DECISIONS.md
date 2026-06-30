@@ -2804,3 +2804,45 @@ monitor, harden retries only if it recurs.
 **Verification:** +1 GDELT UA test (rejects default agents), SAM test asserts `title` + `/prod/` endpoint;
 full backend suite 454 green. Live confirmation is the next ingest run (can't reach either host from the dev
 network).
+
+
+## D111 — Curation fix: stop DOE grants flooding Defense/AI; convergence boost becomes a tiebreak
+
+**Context:** the 2026-06-30 desks published cleanly but read wrong (operator review). The **Defense** desk
+led with "DOE Critical Minerals Push" and 6 of 8 items were small DOE/NASA awards — only 2 were defense-
+thesis (a Space Force war-readiness warning, a nuclear-deterrence analysis). The **AI** desk's #1 item was
+literally "CF Technologies and Lehigh win *smaller* DOE awards," ranked above on-thesis LLM research. The
+**Energy** desk, by contrast, was excellent (14 clean items led by the $50M Westinghouse award) — the model.
+
+**Root cause (traced to code, not guessed).** Two compounding mechanisms:
+(1) the USAspending convergence probe `("rare earth","critical minerals")` was tagged `(defense, ai, energy)`
+with **defense first** — and home desk is `desk[0]` — so every critical-minerals DOE grant routed onto
+**Defense**, where the `desk_count` convergence multiplier then lifted those small grants above native signal.
+(2) the materiality formula weighted flat **novelty 0.30** highest, but every same-day candidate is
+`is_new=True`, so novelty couldn't rank items against each other — dead weight that let small fresh grants
+tie deeper signal; **magnitude** was only 0.20 and bucket-flattened (all sub-$10M = 0.2).
+
+**Decision — three changes (operator-approved):**
+- **Re-home the convergence probe** to `(energy, defense, ai)`. Critical-minerals DOE/ARPA-E grants now home
+  to Energy (where they already read well); Defense keeps its thesis. The all-three tag is retained as the
+  convergence marker (entity graph + ranking bonus) — only the home moves.
+- **Signal-safe weight rebalance:** authority 0.25→0.30, novelty 0.30→0.20, magnitude 0.20→0.25. Trimmed the
+  non-discriminating novelty into authority+magnitude so confirmed-tier sources and larger awards lead.
+  Magnitude is 0 for no-dollar items (news/research), so the lift to *authority* keeps those signals
+  competitive rather than burying them under awards. Also sharpened the sub-$10M buckets
+  (<$1M→0.05, <$5M→0.15) so genuinely tiny grants sink.
+- **Convergence boost: multiplicative → additive tiebreak.** A multiplicative `×(1+w·extra)` scaled with the
+  base score and let a small 3-desk grant overpower a 20×-larger single-desk award. Now an **additive** bonus
+  (`+w·extra`, capped +2 desks) with default weight 0.15→**0.02**: a convergence item outranks an otherwise-
+  equal single-desk one, but a much larger award still leads. (Operator chose tiebreak over keeping
+  convergence-leads; the north-star convergence signal stays visible without inverting magnitude.)
+
+**Why additive, with numbers (real source weights):** for {$50M 1-desk award, $2.3M 3-desk conv grant,
+$1.6M 1-desk grant, arXiv research, GDELT signal} the multiplicative 0.15 boost ranked the $2.3M grant FIRST
+(0.898) above the $50M award (0.753); even softening to 0.05 it still led (0.760 vs 0.753). The additive 0.02
+tiebreak gives $50M award 0.753 > $2.3M conv 0.731 > $1.6M grant 0.658 > research 0.538 > signal 0.496 —
+the intended order.
+
+**Verification:** full backend suite **454 green** (only `test_novelty_binary_impact` needed updating, for the
+new 0.20 novelty weight; the cross-sector tests assert monotonicity + the ≤1 cap, which additive still
+satisfies). Live confirmation is the next desk run.

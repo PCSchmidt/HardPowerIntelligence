@@ -64,9 +64,11 @@ class Settings(BaseSettings):
 
     # Materiality scoring (D030, D035, D036)
     materiality_threshold: float = 0.35
-    # Cross-sector convergence boost (D060): multiply a record's score by
-    # (1 + weight·(desks−1), capped at +2 desks). Rewards items touching ≥2 desks.
-    materiality_cross_sector_weight: float = 0.15
+    # Cross-sector convergence boost (D060; additive since 2026-06-30): ADD weight per
+    # extra desk (capped at +2 desks) as a ranking tiebreak. Small on purpose — it lifts a
+    # convergence item above an otherwise-equal single-desk one without letting a small
+    # multi-desk grant overpower a much larger single-desk award.
+    materiality_cross_sector_weight: float = 0.02
     magnitude_min_window: int = 10
     source_weights: str = (
         '{"usaspending":0.9,"dod_contracts":0.85,"edgar":0.85,"nrc":0.85,'

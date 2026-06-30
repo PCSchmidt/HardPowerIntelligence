@@ -78,8 +78,13 @@ _PROBES: tuple[_Probe, ...] = (
         "energy storage", "grid scale battery", "nuclear power", "hydrogen",
         "geothermal", "carbon capture", "high-assay low-enriched uranium",
     ), ("energy",), _GRANTS),
-    # Trilateral chokepoint → Defense ∩ AI ∩ Energy (DOE/critical-minerals grants)
-    _Probe(("rare earth", "critical minerals"), ("defense", "ai", "energy"), _GRANTS),
+    # Trilateral chokepoint → Energy ∩ Defense ∩ AI (DOE/critical-minerals grants).
+    # Energy-HOME (desk[0]) on purpose: these are DOE/ARPA-E mineral-processing grants
+    # whose native home is the Energy desk; left defense-home, every small grant routed
+    # onto Defense (boosted by the desk_count convergence multiplier) and crowded out the
+    # actual defense thesis (operator review, 2026-06-30). The all-three tag is retained
+    # as the convergence marker (entity graph + materiality boost); only the home moves.
+    _Probe(("rare earth", "critical minerals"), ("energy", "defense", "ai"), _GRANTS),
 )
 
 
