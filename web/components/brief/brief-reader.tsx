@@ -1,4 +1,5 @@
-import { AlertTriangle, Clock, Sparkles } from "lucide-react";
+import Link from "next/link";
+import { AlertTriangle, ArrowRight, Clock, Sparkles } from "lucide-react";
 import type { Brief } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { BriefHeader } from "./brief-header";
@@ -43,6 +44,14 @@ export function BriefReader({ brief }: { brief: Brief }) {
       )}
       <BriefContent items={brief.items} citations={brief.citations} entities={brief.entities} />
       {brief.signal && <SignalLine signal={brief.signal} series={brief.signal_series} />}
+      {/* Full Wire (D112): everything material that didn't fit the curated brief, so a heavy
+          news day doesn't throw away real signal. */}
+      <Link
+        href={`/desk/${brief.desk}/wire`}
+        className="mt-8 inline-flex items-center gap-1 text-ui-sm font-medium text-primary hover:underline"
+      >
+        See the full wire — everything that didn&apos;t fit <ArrowRight size={14} />
+      </Link>
     </div>
   );
 }

@@ -117,6 +117,26 @@ export interface Brief {
   model_waterfall: ModelWaterfall;
 }
 
+// "Full Wire" overflow (D112): material, on-thesis items that cleared scoring but lost the
+// brief's space cut. Listed with no narrative — title + source + link — so nothing relevant
+// is thrown away on a heavy news day.
+export interface WireItem {
+  source_id: string;
+  native_id: string | null;
+  item_type: string | null;
+  headline: string;
+  url: string | null;
+  materiality_score: number | null;
+}
+
+export interface Wire {
+  desk: Desk;
+  brief_id: string;
+  date: string;
+  published_at: string | null;
+  items: WireItem[];
+}
+
 export interface AuthMe {
   user_id: string;
   email: string;

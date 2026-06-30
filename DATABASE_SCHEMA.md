@@ -518,6 +518,37 @@ CREATE INDEX citations_brief_item_id
     ON citations (brief_item_id);
 ```
 
+### `brief_wire`
+
+The "Full Wire" overflow (D112): material, on-thesis items that cleared materiality scoring
+and home-desk routing but lost the brief's space cut (the synthesis fact-selection cap / item
+ceiling). Previously discarded; persisted here so a per-desk `/wire` page can surface them
+(title + source + link, no narrative) — so a heavy news day doesn't throw away real signal.
+One row per dropped material candidate; froth the significance gate rejected and items featured
+in the published brief are both excluded. Written best-effort after the brief commits (never
+darks a brief), the same posture as `signal_series`.
+
+```sql
+CREATE TABLE brief_wire (
+    id                UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    brief_id          UUID NOT NULL REFERENCES briefs(id) ON DELETE CASCADE,
+    source_id         TEXT NOT NULL,
+    native_id         TEXT,
+    item_type         TEXT,
+    headline          TEXT NOT NULL,
+    url               TEXT,
+    materiality_score FLOAT,
+    display_order     INT NOT NULL DEFAULT 0,   -- ranked by materiality, desc
+    created_at        TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX brief_wire_brief_id
+    ON brief_wire (brief_id, display_order);
+```
+
+Read only through the FastAPI boundary (`GET /wire/latest`); RLS is enabled with no permissive
+policy and the default grants revoked (D011 posture, same as briefs/brief_items).
+
 ### `calendar_events`
 
 Scheduled catalyst events that drive the fetch calendar and power the user-facing

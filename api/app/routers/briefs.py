@@ -220,6 +220,55 @@ async def latest_brief(
         return await _assemble_brief(conn, last_published, staleness)
 
 
+@router.get("/wire/latest")
+async def latest_wire(
+    desk: str = Query(...),
+    principal: Principal = Depends(get_principal),
+    pool: asyncpg.Pool = Depends(get_pool),
+) -> dict:
+    """The desk's "Full Wire" (D112): material, on-thesis items that cleared scoring but
+    lost the brief's space cut — title + source + link, no narrative — so nothing relevant
+    is thrown away on a heavy news day. Tied to the desk's latest PUBLISHED brief; same
+    free-tier access as that brief (the current desk read), so any signed-in user sees it."""
+    _validate_desk(desk)
+    async with pool.acquire() as conn:
+        brief = await conn.fetchrow(
+            "SELECT id, desk, date, published_at FROM briefs "
+            "WHERE desk = $1 AND status = 'published' ORDER BY published_at DESC LIMIT 1",
+            desk,
+        )
+        if brief is None:
+            raise APIError(404, "not_found", "No published brief available for this desk")
+
+        try:
+            rows = await conn.fetch(
+                "SELECT source_id, native_id, item_type, headline, url, materiality_score "
+                "FROM brief_wire WHERE brief_id = $1 ORDER BY display_order ASC",
+                brief["id"],
+            )
+        except asyncpg.UndefinedTableError:
+            # Migration 20260630000001 not yet applied — degrade to an empty wire, never 500.
+            rows = []
+
+    return {
+        "desk": brief["desk"],
+        "brief_id": str(brief["id"]),
+        "date": brief["date"],
+        "published_at": brief["published_at"],
+        "items": [
+            {
+                "source_id": r["source_id"],
+                "native_id": r["native_id"],
+                "item_type": r["item_type"],
+                "headline": r["headline"],
+                "url": r["url"],
+                "materiality_score": r["materiality_score"],
+            }
+            for r in rows
+        ],
+    }
+
+
 @router.get("/briefs/{brief_id}")
 async def get_brief(
     brief_id: UUID,

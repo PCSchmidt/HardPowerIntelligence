@@ -12,6 +12,19 @@ cited briefs, organized around the Defense∩AI∩Energy **convergence** thesis 
 live ingestion runner, with Supabase auth and Lemon Squeezy subscriptions. Built gate-by-gate
 (Gates 1–8 closed).
 
+### Added
+
+- **Full Wire: the material overflow the brief drops for space is now accessible** (2026-06-30,
+  D112): the curated brief is space-capped, so on a heavy news day material, on-thesis items that
+  cleared scoring fell off and were discarded. They're now persisted (`brief_wire` table) and
+  surfaced on a per-desk `/desk/{desk}/wire` page — title + source + link, no narrative, ranked by
+  materiality — linked from each desk reader ("See the full wire — everything that didn't fit").
+  Scope is material-overflow only: froth the significance gate rejected and items already featured
+  in the brief are excluded. New public endpoint `GET /wire/latest?desk=` (free tier, same access
+  as the current desk). Written best-effort after the brief commits, so it can never dark a brief;
+  degrades to empty if the migration isn't applied. +10 tests; backend 464 green, web 18 green.
+  Goes live after the migration push + API/web redeploy.
+
 ### Fixed
 
 - **Curation: Defense/AI no longer flooded by DOE grants; convergence boost is now a tiebreak** (2026-06-30,

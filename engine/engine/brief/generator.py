@@ -36,6 +36,10 @@ class GeneratedBrief:
     convergence_read: str = ""   # cross-signal analysis thesis (D071); "" if none
     signal: str = ""             # labeled GDELT media-attention momentum (D082); "" if none
     signal_series: dict | None = None  # lead-theme volume series for the sparkline (D089); None if none
+    # "Full Wire" overflow pool (D112): material, on-thesis candidates (froth excluded) that
+    # may not make the published brief. persist_brief subtracts the featured records and
+    # writes the remainder to brief_wire. Each is a lightweight dict (see _wire_signal).
+    wire: list[dict] = field(default_factory=list)
 
 
 async def _get_window_start(pool: asyncpg.Pool) -> datetime:
@@ -318,6 +322,17 @@ async def generate_brief(desk: str, pool: asyncpg.Pool) -> GeneratedBrief:
             reasons=[r for _d, _s, r in dropped][:8],
         )
 
+    # Step 4c: Build the Full Wire overflow pool (D112) — every material, home-desk
+    # candidate the significance gate did NOT reject as froth, ranked by score. This is
+    # the supply; persist_brief subtracts whatever the published brief features and writes
+    # the remainder, so a heavy news day's overflow stays accessible instead of discarded.
+    froth_rrids = {str(d[0]["rr_id"]) for d in dropped}
+    wire_pool = [
+        _wire_signal(row, score)
+        for row, score in candidates
+        if str(row["rr_id"]) not in froth_rrids
+    ]
+
     # Step 5: Build the citation pool. Fact passages (built straight from the facts)
     # are ALWAYS citable; RAG passages add semantic context, seeded by the material
     # facts so a high-volume source can't hijack retrieval by recency (D068, D041).
@@ -396,6 +411,7 @@ async def generate_brief(desk: str, pool: asyncpg.Pool) -> GeneratedBrief:
         synthesis_model=synthesis_model,
         model_waterfall_metadata=metadata,
         convergence_read=parsed.get("convergence_read", "") or "",
+        wire=wire_pool,
     )
 
 
@@ -403,6 +419,25 @@ def _item_raw_record_ids(item: dict, passages: list[PassageContext]) -> list[str
     """The source raw_record ids behind a brief item, via its [CITE:N] passage indices."""
     cited = set(item.get("citation_indices", []))
     return [p.raw_record_id for p in passages if p.index in cited and p.raw_record_id]
+
+
+def _wire_signal(row: dict, score: float) -> dict:
+    """A lightweight overflow row for the Full Wire (D112): the facts needed to list a
+    dropped material item with no narrative — a title, its source, a link, and the score
+    that ranks it. Prefers a structured title, falls back to the attributed text_chunk."""
+    sd = row.get("_sd")
+    if not isinstance(sd, dict):
+        sd = json.loads(sd) if isinstance(sd, str) and sd else {}
+    title = (sd.get("title") or sd.get("headline") or row.get("text_chunk") or "").strip()
+    return {
+        "record_id": str(row["rr_id"]),
+        "source_id": row.get("source_id", ""),
+        "native_id": row.get("native_id"),
+        "item_type": row.get("record_type"),
+        "headline": title[:300],
+        "url": row.get("url") or "",
+        "score": round(float(score), 4),
+    }
 
 
 # Sources whose records are third-party content we may store/cite as title + link only,
@@ -542,6 +577,38 @@ async def persist_brief(
                 )
             except Exception as exc:  # noqa: BLE001 — decorative; never fail the brief
                 log.warning("signal_series_write_skipped", brief_id=brief_id, error=str(exc))
+
+        # Best-effort, AFTER the brief commits: the Full Wire overflow (D112). Subtract the
+        # records the published brief already features (they're on the desk page) from the
+        # material pool, rank the remainder by score, and persist as the desk's wire. Same
+        # never-dark-a-brief posture as signal_series: a missing brief_wire table (migration
+        # not yet applied) or any write error is logged and skipped.
+        if brief.wire:
+            try:
+                featured_rrids = {
+                    rrid
+                    for item in surviving_items
+                    for rrid in _item_raw_record_ids(item, brief.passages)
+                }
+                overflow = sorted(
+                    (s for s in brief.wire if s["record_id"] not in featured_rrids),
+                    key=lambda s: s.get("score", 0.0),
+                    reverse=True,
+                )
+                for order, s in enumerate(overflow):
+                    await conn.execute(
+                        """
+                        INSERT INTO brief_wire (
+                            brief_id, source_id, native_id, item_type,
+                            headline, url, materiality_score, display_order
+                        ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
+                        """,
+                        brief_id, s["source_id"], s.get("native_id"), s.get("item_type"),
+                        s["headline"], s.get("url") or None, s.get("score"), order,
+                    )
+                log.info("wire_persisted", desk=desk, items=len(overflow))
+            except Exception as exc:  # noqa: BLE001 — overflow is additive; never fail the brief
+                log.warning("wire_write_skipped", brief_id=brief_id, error=str(exc))
 
     log.info("brief_persisted", brief_id=brief_id, status=status, desk=desk)
     return brief_id

@@ -2846,3 +2846,40 @@ the intended order.
 **Verification:** full backend suite **454 green** (only `test_novelty_binary_impact` needed updating, for the
 new 0.20 novelty weight; the cross-sector tests assert monotonicity + the ≤1 cap, which additive still
 satisfies). Live confirmation is the next desk run.
+
+
+## D112 — "Full Wire": capture the material overflow the brief drops for space
+
+**Context:** the brief is a curated, space-capped read (D100: ≤25 items; the synthesis fact pool
+is capped at 2× that). On a heavy news day, material, on-thesis items that clear the materiality
+threshold and home-desk routing fall off between fact-selection and the published brief — and
+were silently discarded. Operator (2026-06-30): "don't throw the baby out with the bathwater —
+all relevant AI/Energy/Defense information should be accessible to any user, light day or heavy."
+
+**Decision:** persist the overflow and surface it as a per-desk **Full Wire** page — title +
+source + link, no narrative. Scope (operator-chosen): **material overflow only** (froth the
+significance gate rejected is excluded; items featured in the published brief are excluded —
+they're already on the desk page). **Per-desk** page linked from each desk's reader, not one
+combined page.
+
+**Shape:**
+- New `brief_wire` table (one row per dropped material candidate, FK→briefs ON DELETE CASCADE,
+  ranked by `display_order` = materiality desc). D011 RLS posture: read only via FastAPI; RLS on,
+  no policy, grants revoked.
+- The generator builds the wire pool in `generate_brief` (all material candidates minus froth)
+  and attaches it to `GeneratedBrief.wire`. `persist_brief` subtracts the records the published
+  brief features (via each surviving item's citation passages) and writes the remainder —
+  **best-effort AFTER the brief commits**, same never-dark-a-brief posture as `signal_series`
+  (a missing table / unapplied migration is logged and skipped, never 500s a brief).
+- Public-ish endpoint `GET /wire/latest?desk=` (auth required, free tier — same access as the
+  current desk read; no Pro gate). Degrades to an empty wire if the table is absent.
+- Web: `/desk/{defense,energy,ai}/wire` pages (mirrors the three static desk pages) + a "See the
+  full wire — everything that didn't fit" link in the reader footer.
+
+**Why best-effort + featured-subtraction at persist (not in generate):** "featured" is only known
+after eval excludes unsupported items, so the subtraction must run at persist time against the
+surviving items' cited records — anything material not in the final brief becomes wire.
+
+**Verification:** +10 tests (`test_wire.py` signal-shape + persist subtraction/exclusion;
+`tests/api/test_wire.py` endpoint 200/400/404 + missing-table degrade). Backend **464 green**,
+web **18 green**, tsc clean. Goes live after the migration is pushed and API+web redeploy.

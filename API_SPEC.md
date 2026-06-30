@@ -287,6 +287,47 @@ first generation. Response is streamed.
 
 ---
 
+#### `GET /wire/latest`
+
+The desk's "Full Wire" (D112): material, on-thesis items that cleared scoring + home-desk
+routing but lost the brief's space cut — title + source + link, no narrative — so nothing
+relevant is thrown away on a heavy news day. Tied to the desk's latest **published** brief.
+
+**Auth:** required  
+**Tier gating:** none beyond auth — same access as the current desk read (free included).
+
+**Query params:** `desk` (required) — one of `defense` | `energy` | `ai`.
+
+**Response `200`:**
+```json
+{
+  "desk": "energy",
+  "brief_id": "uuid",
+  "date": "2026-06-30",
+  "published_at": "2026-06-30T10:00:00Z",
+  "items": [
+    {
+      "source_id": "usaspending",
+      "native_id": "…",
+      "item_type": "award",
+      "headline": "…",
+      "url": "https://…",
+      "materiality_score": 0.51
+    }
+  ]
+}
+```
+
+Items are ranked by materiality (desc). An empty `items` array is normal on a light day (or
+before the `brief_wire` migration is applied — the endpoint degrades to empty, never 500s).
+
+**Response `404`:**
+```json
+{"error": {"code": "not_found", "message": "No published brief available for this desk"}}
+```
+
+---
+
 ### Entities
 
 > **v1 implementation status (T3.4, D091).** `GET /entities/{id}` is implemented with a leaner,
