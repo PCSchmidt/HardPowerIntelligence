@@ -15,7 +15,7 @@ Gate 2 artifact. Pass `BACKEND APPROVED` to close Gate 2 and unlock Gate 4.
 | Graph | `entities`, `entity_identifiers`, `entity_aliases`, `entity_edges`, `resolution_queue` | Entity-resolution graph and crosswalk spine |
 | Ingestion | `source_registry`, `ingestion_runs`, `raw_records`, `normalized_records` | Adapter output and provenance |
 | Job queue | `procrastinate_*` | Task queue managed by procrastinate |
-| Product | `briefs`, `brief_items`, `citations`, `calendar_events` | Published intelligence output |
+| Product | `briefs`, `brief_items`, `brief_wire`, `citations`, `calendar_events` | Published intelligence output |
 | Accounts | `user_profiles`, `subscriptions`, `follows` | Users and subscription state |
 | Vectors | pgvector columns on `entity_aliases`, `normalized_records` | Semantic search for RAG |
 
