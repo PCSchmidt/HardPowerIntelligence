@@ -1,13 +1,20 @@
 # Daily ingest + brief cadence (DEPLOY_RUNBOOK.md §6).
 #
-# Two steps: (1) scripts/run_ingest.py pulls FRESH government data from live source APIs
-# into raw_records/normalized_records, embeds new chunks, advances cursors, and prunes the
-# hot window (D004, D055); (2) scripts/run_brief.py synthesizes + evals + publishes the
-# brief from that fresh data. A scheduled run ingests once, then publishes ALL THREE desks
-# (defense/ai/energy); a manual workflow_dispatch publishes just the chosen desk (ad-hoc).
+# Two phases across two jobs:
+#   (1) `ingest` — scripts/run_ingest.py pulls FRESH government data from live source APIs
+#       into raw_records/normalized_records, embeds new chunks, advances cursors, and prunes
+#       the hot window (D004, D055). Runs ONCE. Also reconciles migrations first.
+#   (2) `brief`  — scripts/run_brief.py synthesizes + evals + publishes ONE desk, fanned out
+#       over a per-desk MATRIX so defense/ai/energy generate CONCURRENTLY (D113). Previously
+#       all three ran sequentially in a single job and the 45-min ceiling kept cutting the
+#       LAST desk (Energy) off (2026-06-29 and 2026-07-01 both lost a desk). Parallel desks
+#       each get the full window, so a slow LLM day on one desk can't starve another.
+#
+# A scheduled run publishes all three desks off the single ingest; a manual workflow_dispatch
+# publishes just the chosen desk (the matrix collapses to one entry).
 #
 # Required repo secrets (gh secret set ...): DATABASE_URL, OPENROUTER_API_KEY,
-# OPENAI_API_KEY, and optionally ANTHROPIC_API_KEY.
+# OPENAI_API_KEY, SAM_GOV_API_KEY, and optionally ANTHROPIC_API_KEY.
 
 name: Daily Brief
 
@@ -25,9 +32,9 @@ on:
         type: boolean
   schedule:
     # 06:00 UTC daily (D108). GitHub delays scheduled runs 40–100 min under load (observed:
-    # 09:44–10:38 UTC for a "09:00" cron), and a 3-desk run takes ~25–40 min — so a 09:00 cron
-    # could finish after the ~06:00 ET reader window. Starting at 06:00 UTC buys a multi-hour
-    # buffer so even a delayed, slow run lands before 06:00 ET.
+    # 09:44–10:38 UTC for a "09:00" cron); starting at 06:00 UTC buys a multi-hour buffer so
+    # even a delayed run lands before the ~06:00 ET reader window. With the desks now parallel
+    # (D113) wall-clock is ingest (~15m) + the slowest single desk (~15m), not the sum.
     - cron: "0 6 * * *"
 
 concurrency:
@@ -35,12 +42,12 @@ concurrency:
   cancel-in-progress: false   # never run two brief generations at once
 
 jobs:
-  brief:
+  # ── Phase 1: reconcile migrations + ingest fresh source data (once) ──────────────
+  ingest:
     runs-on: ubuntu-latest
-    # 45 min (D108, was 30): the 2026-06-29 run was killed at 30 min with only Defense
-    # published. The GDELT signal fail-fast reclaims most of the overrun; this is headroom
-    # for a slow LLM day (re-rolls, 3 desks) so a sparse desk can't get cut off again.
-    timeout-minutes: 45
+    timeout-minutes: 30
+    outputs:
+      desks: ${{ steps.plan.outputs.desks }}
     steps:
       - uses: actions/checkout@v4
 
@@ -89,54 +96,62 @@ jobs:
           SAM_GOV_API_KEY: ${{ secrets.SAM_GOV_API_KEY }}
         run: uv run python scripts/run_ingest.py
 
-      - name: Generate + eval + publish brief(s)
+      - name: Plan desks
+        id: plan
+        # Scheduled → all three desks (fanned out in parallel below); a manual dispatch →
+        # just the chosen desk. Emitted as a JSON array the matrix reads via fromJSON.
+        run: |
+          if [ "${{ github.event_name }}" = "schedule" ]; then
+            echo 'desks=["defense","ai","energy"]' >> "$GITHUB_OUTPUT"
+          else
+            echo "desks=[\"${{ inputs.desk || 'defense' }}\"]" >> "$GITHUB_OUTPUT"
+          fi
+
+  # ── Phase 2: generate + eval + publish each desk CONCURRENTLY ────────────────────
+  brief:
+    needs: ingest
+    runs-on: ubuntu-latest
+    # Per-desk ceiling. One desk (re-rolls + synthesis + eval) fits comfortably in 30 min;
+    # because desks run in parallel this is the wall-clock cap for the slowest desk, not the sum.
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false   # one desk failing must NOT cancel the others (Energy independence)
+      matrix:
+        desk: ${{ fromJSON(needs.ingest.outputs.desks) }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          version: "0.8.0"
+
+      - name: Sync workspace
+        run: uv sync --all-packages --all-extras
+
+      - name: Generate + eval + publish ${{ matrix.desk }}
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
         run: |
-          # Scheduled run publishes every desk off the single ingest above; a manual
-          # dispatch publishes just the chosen desk.
-          if [ "${{ github.event_name }}" = "schedule" ]; then
-            DESKS="defense ai energy"
-          else
-            DESKS="${{ inputs.desk || 'defense' }}"
-          fi
-          # run_brief.py exit codes (D076): 0=published, 3=clean skip (below the
-          # provable-claim floor on a thin day — not an error), other=hard crash.
-          published=""; skipped=""; crashed=""; first=1
-          for d in $DESKS; do
-            # Space desks apart so we don't burst the provider rate budget (D076).
-            if [ "$first" = "0" ]; then sleep 15; fi
-            first=0
-            echo "::group::brief $d"
-            set +e
-            uv run python scripts/run_brief.py --desk "$d"
-            code=$?
-            set -e
-            echo "::endgroup::"
-            case "$code" in
-              0) published="$published $d" ;;
-              3) skipped="$skipped $d" ;;
-              *) crashed="$crashed $d" ;;
-            esac
-          done
-          {
-            echo "## Daily Brief"
-            echo "- **published:**${published:- (none)}"
-            echo "- **skipped (below claim floor):**${skipped:- (none)}"
-            echo "- **crashed:**${crashed:- (none)}"
-          } >> "$GITHUB_STEP_SUMMARY"
-          echo "published:${published:- none} | skipped:${skipped:- none} | crashed:${crashed:- none}"
-          # Go red (→ email) only on a genuine break: a desk crashed, or nothing
-          # published at all. A sparse desk cleanly skipping is a normal green run.
-          if [ -n "$crashed" ]; then
-            echo "::error::brief desk(s) crashed:$crashed"
-            exit 1
-          fi
-          if [ -z "$published" ]; then
-            echo "::error::no desk published (all desks skipped or empty)"
+          # run_brief.py exit codes (D076): 0=published, 3=clean skip (below the provable-claim
+          # floor on a thin day — not an error), other=hard crash. Per-desk job: a clean skip is
+          # green (a sparse day is normal); only a real crash goes red (→ email) for THIS desk.
+          set +e
+          uv run python scripts/run_brief.py --desk "${{ matrix.desk }}"
+          code=$?
+          set -e
+          case "$code" in
+            0) verdict="published" ;;
+            3) verdict="skipped (below claim floor)" ;;
+            *) verdict="CRASHED (exit $code)" ;;
+          esac
+          echo "- **${{ matrix.desk }}:** $verdict" >> "$GITHUB_STEP_SUMMARY"
+          echo "${{ matrix.desk }}: $verdict"
+          if [ "$code" != "0" ] && [ "$code" != "3" ]; then
+            echo "::error::${{ matrix.desk }} brief crashed (exit $code)"
             exit 1
           fi
           exit 0

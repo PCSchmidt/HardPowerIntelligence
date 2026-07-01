@@ -67,13 +67,19 @@ class TestRequestBuilding:
         # field (D110 fix); the probe keyword is mapped there.
         assert payload["title"] == _PROBES[0].q
         assert payload["limit"] == _LIMIT
-        assert adapter.base_url.endswith("/prod/opportunities/v2/search")
+        # GSA-documented production base URL (no /prod/; D114 — the /prod/ guess still 404'd).
+        assert adapter.base_url == "https://api.sam.gov/opportunities/v2/search"
         # SAM requires a posted-date range in MM/DD/YYYY
         assert "/" in payload["postedFrom"] and "/" in payload["postedTo"]
         assert "api_key" in payload
 
     def test_probes_span_all_three_desks(self):
         assert {p.desk for p in _PROBES} == {"defense", "ai", "energy"}
+
+    def test_declares_404_as_empty_not_fatal(self):
+        # SAM's documented "no matching opportunity" 404 must be a per-probe empty, not a
+        # source failure — the runner reads this to keep walking probes (D114).
+        assert 404 in SAMGovAdapter().empty_response_statuses
 
     def test_next_cursor_walks_then_watermarks(self):
         adapter = SAMGovAdapter()

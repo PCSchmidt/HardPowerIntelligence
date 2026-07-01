@@ -27,6 +27,18 @@ live ingestion runner, with Supabase auth and Lemon Squeezy subscriptions. Built
 
 ### Fixed
 
+- **Daily brief desks now run in parallel — the last desk stops getting cut off** (2026-07-01, D113): the 7/1
+  run was cancelled at the 45-min timeout with Energy never published (same shape as 6/29). The three desks were
+  generated sequentially in one job, so their times summed and a slow-LLM day starved the last one. Split the
+  workflow into a single `ingest` job plus a per-desk `brief` matrix so defense/ai/energy generate concurrently,
+  each with its own 30-min ceiling and `fail-fast: false`. Wall-clock is now ingest + the slowest single desk,
+  not the sum. Takes effect on the next scheduled run.
+- **SAM.gov ingests again — its 404 means "no match," not a broken endpoint** (2026-07-01, D114): SAM returned
+  0 records because the runner treated SAM's `404` as a fatal error and failed the whole source on the first
+  probe. Per GSA docs, that 404 is the API's "no opportunity matches your search" signal. Aligned the base URL
+  to the documented `https://api.sam.gov/opportunities/v2/search` and added an `empty_response_statuses` adapter
+  hook so the runner treats a declared status (SAM → 404) as an empty page and keeps walking the other probes.
+  Follow-up noted: title-only search is narrow; NAICS/PSC code filters are the real fix if volume stays low.
 - **Curation: Defense/AI no longer flooded by DOE grants; convergence boost is now a tiebreak** (2026-06-30,
   D111): the 6/30 desks read wrong — Defense led with small DOE/NASA awards over its actual thesis, and the
   AI desk ranked "smaller DOE awards" above on-thesis research. Two root causes, three fixes: (1) re-homed the

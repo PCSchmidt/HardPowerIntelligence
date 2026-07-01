@@ -23,9 +23,12 @@ from engine.settings import settings
 from .base import NormalizedRecord
 
 _SOURCE_ID = "sam_gov"
-# The Get Opportunities Public API lives under /prod/ — the path without it 404s (the bug
-# that failed every ingest, confirmed 2026-06-30 with a clean key). Per GSA open.gsa.gov docs.
-_BASE_URL = "https://api.sam.gov/prod/opportunities/v2/search"
+# GSA-documented production base URL (open.gsa.gov/api/get-opportunities-public-api). The
+# earlier "/prod/ fixes the 404" guess (D110) was wrong: the 7/1 run showed /prod/ ALSO 404s.
+# Per the docs a 404 here does NOT mean the endpoint is missing — it is the API's (odd) way of
+# saying "no opportunity matches this search". So the endpoint was never the real bug; treating
+# 404 as fatal was — it killed the whole source on the first probe (D114). See empty_response_statuses.
+_BASE_URL = "https://api.sam.gov/opportunities/v2/search"
 _LOOKBACK_DAYS = 30        # SAM allows up to a 1-year postedFrom..postedTo range
 _LIMIT = 25                # opportunities per probe (most-recent-first)
 _TITLE_CHARS = 300
@@ -71,6 +74,10 @@ class SAMGovAdapter:
     base_url: str = _BASE_URL
     http_method: str = "GET"
     response_format: str = "json"
+    # SAM returns 404 for a probe with no title match (documented no-results signal, D114).
+    # The runner treats these as an empty page and keeps walking the remaining probes, so one
+    # keyword with zero matches can't fail the whole source.
+    empty_response_statuses: frozenset[int] = frozenset({404})
 
     def __init__(self) -> None:
         self._active_probe: _Probe = _PROBES[0]

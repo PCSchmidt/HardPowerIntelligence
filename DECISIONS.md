@@ -2883,3 +2883,48 @@ surviving items' cited records — anything material not in the final brief beco
 **Verification:** +10 tests (`test_wire.py` signal-shape + persist subtraction/exclusion;
 `tests/api/test_wire.py` endpoint 200/400/404 + missing-table degrade). Backend **464 green**,
 web **18 green**, tsc clean. Goes live after the migration is pushed and API+web redeploy.
+
+
+## D113 — Parallelize the daily brief: per-desk job matrix (stop cutting off the last desk)
+
+**Context:** the 2026-07-01 scheduled run was **cancelled at the 45-min timeout** with only Defense + AI
+published — **Energy never ran** (no row at all; the site fell back to its 6/30 brief). Same failure shape as
+2026-06-29 (only Defense). Root cause is structural, not a too-tight timeout: all three desks were generated
+**sequentially in one job** (defense → ai → energy), so their times SUM. On a slow-LLM day (the D072 regen
+loop re-rolls a desk up to 3×), the sum blew past the ceiling and the LAST desk in the list (Energy) was the
+casualty. Bumping the timeout just delays the same failure and burns more minutes.
+
+**Decision:** split `daily-brief.yml` into two jobs — an `ingest` job that runs ONCE (migration reconcile +
+run_ingest.py) and emits the desk list, then a `brief` job with a **per-desk matrix** (`fromJSON` of that
+list) so defense/ai/energy generate **concurrently**, each in its own runner with its own 30-min ceiling.
+`fail-fast: false` so one desk crashing can't cancel the others (Energy independence). Wall-clock is now
+ingest (~15m) + the *slowest single desk* (~15m), not the sum — and no desk can starve another. A manual
+workflow_dispatch collapses the matrix to the one chosen desk. Per-desk exit handling preserved (D076): 0
+published / 3 clean-skip are green, a real crash reds only that desk's job.
+
+**Verification:** YAML validated (2 jobs, matrix over `fromJSON(needs.ingest.outputs.desks)`, fail-fast off).
+Live proof is the next scheduled run finishing all three desks.
+
+## D114 — SAM.gov: the 404 was "no match," not a broken endpoint (stop failing the whole source on it)
+
+**Context:** SAM.gov ingested 0 records on 7/1 despite the D110 fix. The CI log showed the real error:
+`404 Not Found for .../prod/opportunities/v2/search?...&title=hypersonic&...`. So D110's "/prod/ fixes the
+404" was **wrong — /prod/ 404s too.** The GSA docs (open.gsa.gov/api/get-opportunities-public-api) resolve it:
+**404 is the API's documented response for "no opportunity matches the search criteria."** `title=hypersonic`
+(title-only, exact) simply matched nothing in the window — and because the runner treated that 404 as a fatal
+HTTP error, it **failed the entire SAM source on the FIRST probe**, before the other 11 probes ran.
+
+**Decision:** two changes. (1) Align the base URL to the GSA-documented production endpoint
+`https://api.sam.gov/opportunities/v2/search` (no `/prod/` — the example string's `/prod/` is inconsistent
+legacy). (2) Add a generic adapter hook `empty_response_statuses`; the runner catches `httpx.HTTPStatusError`
+and, when the status is declared empty (SAM → `{404}`), treats that probe as an empty page and KEEPS WALKING
+the remaining probes instead of failing the source. So a barren keyword yields nothing, a matching keyword
+yields its opportunities, and the source succeeds as long as the endpoint is reachable.
+
+**Caveat / follow-up:** SAM v2 has no free-text search — only `title` (title-field match) and structured
+filters. Title-only is inherently narrow; if SAM keeps returning near-empty, the real fix is to switch the
+probes from keywords to **NAICS (`ncode`) / PSC (`ccode`) code filters**, which is how defense opportunities
+are actually found. Deferred until the next run shows whether title matching yields useful volume.
+
+**Verification:** +3 tests (404 tolerated → walk continues + 1 record persisted; 403 still fails the source;
+adapter declares 404 empty). Full backend suite 467 green. Live confirmation is the next ingest run.

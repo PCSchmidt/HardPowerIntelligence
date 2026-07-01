@@ -13,9 +13,24 @@ Spec (engine/ingest/runner.py):
 """
 from datetime import datetime, timedelta, timezone
 
+import httpx
 import pytest
 
 from engine.ingest.runner import _breaker_blocks, run_source
+
+
+def _http_status_error(code: int) -> httpx.HTTPStatusError:
+    req = httpx.Request("GET", "https://api.sam.gov/opportunities/v2/search")
+    resp = httpx.Response(code, request=req)
+    return httpx.HTTPStatusError(f"HTTP {code}", request=req, response=resp)
+
+
+def _sam_page(notice_id: str = "n1") -> dict:
+    return {"opportunitiesData": [{
+        "noticeId": notice_id, "title": "Hypersonic Test Range Services",
+        "fullParentPathName": "DEPT OF DEFENSE", "type": "Solicitation",
+        "postedDate": "2026-06-25", "uiLink": f"https://sam.gov/opp/{notice_id}/view",
+    }]}
 
 NOW = datetime.now(timezone.utc)
 
@@ -254,3 +269,29 @@ async def test_unknown_source_raises():
     pool = FakePool(conn)
     with pytest.raises(KeyError):
         await run_source("nope", pool, fetcher=FakeFetcher([]), embed=False)
+
+
+async def test_empty_response_status_is_tolerated_and_walk_continues():
+    # SAM returns 404 for a probe with no title match (D114). The adapter declares 404 as
+    # empty, so the FIRST probe's 404 must NOT fail the source — the walk continues and a
+    # later probe's real results are persisted.
+    conn = FakeConn(make_source(id="sam_gov"), raw_returns=["id1"])
+    pool = FakePool(conn)
+    fetcher = FakeFetcher([_http_status_error(404), _sam_page("n1")])
+
+    result = await run_source("sam_gov", pool, fetcher=fetcher, embed=False, max_pages=2)
+
+    assert result.status == "success"
+    assert result.records_new == 1        # page 1 (404) empty, page 2 opportunity persisted
+    assert fetcher.calls == 2             # did not stop after the 404
+
+
+async def test_non_empty_4xx_still_fails_the_source():
+    # A status NOT in empty_response_statuses (e.g. 403 auth) is a real failure, not "no match".
+    conn = FakeConn(make_source(id="sam_gov"), raw_returns=[])
+    pool = FakePool(conn)
+    fetcher = FakeFetcher([_http_status_error(403)])
+
+    result = await run_source("sam_gov", pool, fetcher=fetcher, embed=False, max_pages=2)
+
+    assert result.status == "failed"

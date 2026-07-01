@@ -29,6 +29,7 @@ from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 
 import asyncpg
+import httpx
 import structlog
 
 from engine.adapters.registry import get_adapter
@@ -235,18 +236,33 @@ async def run_source(
             # min_request_interval, space its requests so the probe walk can't trip HTTP 429 and
             # zero the source (D109). First request is immediate; only subsequent ones wait.
             throttle = float(getattr(adapter, "min_request_interval", 0) or 0)
+            # Some APIs signal "no results for this query" with a 4xx instead of an empty
+            # 200 — notably SAM.gov returns 404 when no opportunity matches the probe's
+            # title (D114). An adapter can declare those statuses as EMPTY so one barren
+            # probe yields no records and the walk continues, instead of the fetch raising
+            # and failing the whole source on its first probe.
+            empty_statuses = frozenset(getattr(adapter, "empty_response_statuses", ()) or ())
             buffer: list = []
             while page <= max_pages:
                 if throttle and page > 1:
                     await asyncio.sleep(throttle)
                 payload = adapter.build_request_payload(cursor, page)
                 kwargs = {"json": payload} if adapter.http_method == "POST" else {"params": payload}
-                response = await fetcher.fetch_json(
-                    adapter.http_method, adapter.base_url,
-                    headers=getattr(adapter, "headers", None),  # e.g. EDGAR User-Agent
-                    response_format=getattr(adapter, "response_format", "json"),  # arXiv → "text"
-                    **kwargs,
-                )
+                try:
+                    response = await fetcher.fetch_json(
+                        adapter.http_method, adapter.base_url,
+                        headers=getattr(adapter, "headers", None),  # e.g. EDGAR User-Agent
+                        response_format=getattr(adapter, "response_format", "json"),  # arXiv → "text"
+                        **kwargs,
+                    )
+                except httpx.HTTPStatusError as exc:
+                    if exc.response.status_code not in empty_statuses:
+                        raise
+                    log.info(
+                        "fetch_empty_status", source_id=source_id,
+                        status=exc.response.status_code, page=page,
+                    )
+                    response = {}  # documented "no match" → empty page; keep walking probes
                 records = adapter.parse(response)
                 # Optional best-effort enrichment (e.g. EDGAR fetches filing bodies and
                 # mines facts, D078). Never drops records; failures keep the metadata.
