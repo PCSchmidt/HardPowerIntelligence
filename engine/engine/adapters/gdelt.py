@@ -170,8 +170,17 @@ class GDELTAdapter:
     http_method: str = "GET"
     response_format: str = "json"
     # GDELT rate-limits ~1 request / 5s; the runner spaces our requests by this many seconds so
-    # the consolidated query walk can't trip HTTP 429 (D109). Honored via getattr in the runner.
-    min_request_interval: float = 5.0
+    # the consolidated query walk can't trip HTTP 429 (D109). Widened 5→12s to match SITREP's
+    # 10–30s spacing envelope, which pulls GDELT cleanly every day (D117). Honored via getattr.
+    min_request_interval: float = 12.0
+    # Patient 429 backoff (D117). GDELT's throttle penalty takes ~20s+ to clear; the generic
+    # fetcher default (~1s first retry) just re-trips it, so we 429-fail in seconds while SITREP —
+    # which waits 20/40/60s and retries the same query — succeeds. multiplier=20 with min=20/max=60
+    # gives 20 → 40 → 60s across the retries. The runner reads these via getattr.
+    retry_max_attempts: int = 4        # initial + 3 patient retries
+    retry_wait_min: float = 20.0
+    retry_wait_max: float = 60.0
+    retry_wait_multiplier: float = 20.0
 
     @property
     def headers(self) -> dict:

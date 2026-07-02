@@ -27,6 +27,13 @@ live ingestion runner, with Supabase auth and Lemon Squeezy subscriptions. Built
 
 ### Fixed
 
+- **GDELT gets SITREP's patient 429 backoff (the actual fix)** (2026-07-02, D117): the persistent-IP move
+  (D116) didn't help — the worker 429'd too. SITREP pulls the same API daily and succeeds because it *waits*:
+  20/40/60s on a 429 (retry the same query) vs our fetcher's ~1s, which just re-trips GDELT's ~20s throttle
+  penalty. Made the fetcher's retry backoff per-call tunable; GDELT now declares a patient schedule
+  (`retry_wait_min/max/multiplier` = 20/60/20 → 20→40→60s) and wider request spacing (5→12s), forwarded by the
+  runner via getattr. Only GDELT gets the patient schedule; other sources keep the fast default. +5 tests;
+  backend suite 482 green.
 - **GDELT ingestion moved off CI onto a persistent Fly worker** (2026-07-02, D116): GDELT 429s the shared
   GitHub Actions IP regardless of User-Agent (the D110 UA fix held one day, then 7/2 failed again). Stood up
   the long-scaffolded `hpi-worker` as an always-on Fly machine (persistent IAD IP, like SITREP) that ingests

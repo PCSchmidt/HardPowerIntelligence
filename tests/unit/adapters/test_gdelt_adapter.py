@@ -173,7 +173,17 @@ class TestConsolidatedQueries:
 
     def test_throttle_hint_present(self):
         # The runner spaces GDELT requests by this interval to stay under the rate limit.
-        assert GDELTAdapter().min_request_interval >= 5.0
+        # Widened toward SITREP's 10–30s envelope (D117), so still comfortably ≥ 10.
+        assert GDELTAdapter().min_request_interval >= 10.0
+
+    def test_declares_patient_429_backoff(self):
+        # GDELT's throttle needs ~20s+ to clear; a fast retry just re-trips it. Match SITREP's
+        # 20/40/60s patient schedule (D117) so the runner passes it to the fetcher.
+        a = GDELTAdapter()
+        assert a.retry_wait_min >= 20.0
+        assert a.retry_wait_max >= 60.0
+        assert a.retry_wait_multiplier >= 20.0     # multiplier·2^n → 20, 40, 60(capped)
+        assert a.retry_max_attempts >= 2
 
     def test_sends_descriptive_user_agent(self):
         # GDELT 429s anonymous/default library agents; we must send a real UA (D110).

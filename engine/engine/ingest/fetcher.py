@@ -64,6 +64,10 @@ class HttpFetcher:
         params: dict | None = None,
         headers: dict | None = None,
         response_format: str = "json",
+        max_attempts: int | None = None,
+        wait_min: float | None = None,
+        wait_max: float | None = None,
+        wait_multiplier: float = 1.0,
     ) -> dict | str:
         """Issue one logical request (with retries) and return the body.
 
@@ -71,11 +75,19 @@ class HttpFetcher:
         raw response text instead, for sources that speak XML/Atom (e.g. arXiv).
         Retries transport errors, 429, and 5xx with exponential backoff; raises
         on non-retryable 4xx immediately and after the final retry attempt.
+
+        The backoff is per-call tunable so a source that punishes impatience can be given
+        a patient schedule (GDELT wants ~20s+ between retries or it stays 429'd — the CI
+        default of ~1s just re-trips it; D117). ``wait_multiplier`` scales the exponential
+        base, so e.g. multiplier=20, min=20, max=60 yields 20 → 40 → 60s (SITREP's pattern).
         """
+        attempts = max_attempts or self._max_attempts
+        wmin = self._wait_min if wait_min is None else wait_min
+        wmax = self._wait_max if wait_max is None else wait_max
 
         @retry(
-            stop=stop_after_attempt(self._max_attempts),
-            wait=wait_exponential(multiplier=1, min=self._wait_min, max=self._wait_max),
+            stop=stop_after_attempt(attempts),
+            wait=wait_exponential(multiplier=wait_multiplier, min=wmin, max=wmax),
             retry=retry_if_exception_type(
                 (httpx.TransportError, RetryableHTTPError)
             ),

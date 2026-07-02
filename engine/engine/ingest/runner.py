@@ -253,6 +253,12 @@ async def run_source(
                         adapter.http_method, adapter.base_url,
                         headers=getattr(adapter, "headers", None),  # e.g. EDGAR User-Agent
                         response_format=getattr(adapter, "response_format", "json"),  # arXiv → "text"
+                        # Per-source retry backoff (D117): a source can declare a patient schedule
+                        # (GDELT → 20/40/60s) so a 429 isn't re-tripped by the ~1s CI default.
+                        max_attempts=getattr(adapter, "retry_max_attempts", None),
+                        wait_min=getattr(adapter, "retry_wait_min", None),
+                        wait_max=getattr(adapter, "retry_wait_max", None),
+                        wait_multiplier=getattr(adapter, "retry_wait_multiplier", 1.0),
                         **kwargs,
                     )
                 except httpx.HTTPStatusError as exc:

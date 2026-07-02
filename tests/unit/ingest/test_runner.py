@@ -295,3 +295,43 @@ async def test_non_empty_4xx_still_fails_the_source():
     result = await run_source("sam_gov", pool, fetcher=fetcher, embed=False, max_pages=2)
 
     assert result.status == "failed"
+
+
+class _RecordingFetcher:
+    def __init__(self, response):
+        self.response = response
+        self.kwargs = None
+
+    async def fetch_json(self, method, url, **kwargs):
+        self.kwargs = kwargs
+        return self.response
+
+
+async def test_gdelt_patient_backoff_hints_reach_the_fetcher():
+    # D117: GDELT declares a patient 20/40/60s schedule; the runner must forward it so the
+    # fetcher doesn't re-trip the 429 with its ~1s CI default.
+    conn = FakeConn(make_source(id="gdelt"), raw_returns=[])
+    pool = FakePool(conn)
+    fetcher = _RecordingFetcher({"articles": []})
+
+    await run_source("gdelt", pool, fetcher=fetcher, embed=False, max_pages=1)
+
+    assert fetcher.kwargs["wait_min"] == 20.0
+    assert fetcher.kwargs["wait_max"] == 60.0
+    assert fetcher.kwargs["wait_multiplier"] == 20.0
+    assert fetcher.kwargs["max_attempts"] == 4
+
+
+async def test_ordinary_source_gets_default_backoff():
+    # A source that declares no retry hints passes the neutral defaults (multiplier 1.0, no
+    # min/max override) — so only GDELT gets the patient schedule.
+    conn = FakeConn(make_source(id="usaspending"), raw_returns=[])
+    pool = FakePool(conn)
+    fetcher = _RecordingFetcher(make_response([]))
+
+    await run_source("usaspending", pool, fetcher=fetcher, embed=False, max_pages=1)
+
+    assert fetcher.kwargs["wait_min"] is None
+    assert fetcher.kwargs["wait_max"] is None
+    assert fetcher.kwargs["wait_multiplier"] == 1.0
+    assert fetcher.kwargs["max_attempts"] is None
