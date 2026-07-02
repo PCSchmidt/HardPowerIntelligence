@@ -8,8 +8,40 @@ from engine.brief.generator import (
     GeneratedBrief,
     _is_home_desk,
     _license_class_for,
+    _overflow_wire,
     persist_brief,
 )
+
+
+def _cand(rid: str, score: float = 0.5):
+    row = {
+        "rr_id": rid, "source_id": "gdelt", "record_type": "news",
+        "url": f"https://x/{rid}", "native_id": rid, "text_chunk": f"item {rid}",
+        "_sd": {},
+    }
+    return (row, score)
+
+
+class TestOverflowWire:
+    """Full Wire supply = material candidates minus significance froth (D112). Froth is
+    computed by DIFFERENCE (selected − kept), because the significance gate's `dropped`
+    list carries descriptions, not records — indexing it as a record was the D115 crash
+    ("string indices must be integers") that darkened all three desks."""
+
+    def test_froth_computed_by_difference_and_beyond_selection_kept(self):
+        A, B, C, D = _cand("A", 0.9), _cand("B", 0.8), _cand("C", 0.7), _cand("D", 0.6)
+        candidates = [A, B, C, D]
+        selected = [A, B, C]          # top-N chosen as synthesis input
+        facts = [A, C]                # significance dropped B as froth
+        wire = _overflow_wire(candidates, selected, facts)
+        ids = {w["record_id"] for w in wire}
+        assert ids == {"A", "C", "D"}  # B (froth) excluded; D (below the fact cut) still surfaced
+        assert "B" not in ids
+
+    def test_no_froth_keeps_every_candidate(self):
+        A, B = _cand("A"), _cand("B")
+        wire = _overflow_wire([A, B], [A, B], [A, B])
+        assert {w["record_id"] for w in wire} == {"A", "B"}
 
 
 class TestLicenseClassForSource:

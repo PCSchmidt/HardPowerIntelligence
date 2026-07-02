@@ -308,14 +308,14 @@ async def generate_brief(desk: str, pool: asyncpg.Pool) -> GeneratedBrief:
 
     # Step 4: Choose the fact set — top by materiality, with an advancement floor so
     # capital flow doesn't crowd out the technology leg (D063/D068).
-    facts = _select_facts(
+    selected = _select_facts(
         candidates, settings.brief_max_items * 2, settings.brief_advancement_floor
     )
 
     # Step 4b: Significance gate (D085) — drop true-but-trivial items (routine commodity
     # procurement, filings with no material event, stale actions) so the brief isn't
     # padded with filler. Fail-open and never empties; the publish gate handles thin days.
-    facts, dropped = await filter_significant(facts, desk)
+    facts, dropped = await filter_significant(selected, desk)
     if dropped:
         log.info(
             "significance_filtered", desk=desk, kept=len(facts), dropped=len(dropped),
@@ -326,12 +326,13 @@ async def generate_brief(desk: str, pool: asyncpg.Pool) -> GeneratedBrief:
     # candidate the significance gate did NOT reject as froth, ranked by score. This is
     # the supply; persist_brief subtracts whatever the published brief features and writes
     # the remainder, so a heavy news day's overflow stays accessible instead of discarded.
-    froth_rrids = {str(d[0]["rr_id"]) for d in dropped}
-    wire_pool = [
-        _wire_signal(row, score)
-        for row, score in candidates
-        if str(row["rr_id"]) not in froth_rrids
-    ]
+    # Wrapped best-effort: the wire is supplementary and must NEVER dark a brief (D089 posture)
+    # — a bug here darkened all three desks on 2026-07-02 (D115).
+    try:
+        wire_pool = _overflow_wire(candidates, selected, facts)
+    except Exception as exc:  # noqa: BLE001 — the wire is supplementary; never dark a brief on it
+        log.warning("wire_pool_skipped", desk=desk, error=str(exc))
+        wire_pool = []
 
     # Step 5: Build the citation pool. Fact passages (built straight from the facts)
     # are ALWAYS citable; RAG passages add semantic context, seeded by the material
@@ -419,6 +420,29 @@ def _item_raw_record_ids(item: dict, passages: list[PassageContext]) -> list[str
     """The source raw_record ids behind a brief item, via its [CITE:N] passage indices."""
     cited = set(item.get("citation_indices", []))
     return [p.raw_record_id for p in passages if p.index in cited and p.raw_record_id]
+
+
+def _overflow_wire(
+    candidates: list[tuple[dict, float]],
+    selected: list[tuple[dict, float]],
+    facts: list[tuple[dict, float]],
+) -> list[dict]:
+    """Full Wire supply (D112): material home-desk candidates minus significance froth.
+
+    The significance gate judged only the SELECTED facts, and its ``dropped`` list carries
+    item *descriptions* (not records) — so froth is computed by difference: the selected
+    records the gate did not keep. ``persist_brief`` later subtracts whatever the published
+    brief features. (Computing froth from ``dropped`` directly was the D115 crash: its
+    elements are ``(description_str, score, reason)``, not candidate dicts.)"""
+    kept_rrids = {str(c["rr_id"]) for c, _ in facts}
+    froth_rrids = {
+        str(c["rr_id"]) for c, _ in selected if str(c["rr_id"]) not in kept_rrids
+    }
+    return [
+        _wire_signal(row, score)
+        for row, score in candidates
+        if str(row["rr_id"]) not in froth_rrids
+    ]
 
 
 def _wire_signal(row: dict, score: float) -> dict:

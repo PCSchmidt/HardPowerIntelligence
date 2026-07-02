@@ -27,6 +27,12 @@ live ingestion runner, with Supabase auth and Lemon Squeezy subscriptions. Built
 
 ### Fixed
 
+- **Fixed a Full Wire bug that darkened all three desks** (2026-07-02, D115): the first run to execute the
+  wire code (D112) crashed every desk with `string indices must be integers` — the froth-exclusion set was
+  built from the significance gate's `dropped` list assuming it held records, but it holds `(description,
+  score, reason)` tuples. Compute froth by difference (selected − kept) instead, extract it into a testable
+  `_overflow_wire` helper (+2 regression tests), and wrap the wire build best-effort so a supplementary
+  feature can never dark a brief again. Note: D113's parallelization worked — the run finished in ~10m, not 45.
 - **Daily brief desks now run in parallel — the last desk stops getting cut off** (2026-07-01, D113): the 7/1
   run was cancelled at the 45-min timeout with Energy never published (same shape as 6/29). The three desks were
   generated sequentially in one job, so their times summed and a slow-LLM day starved the last one. Split the

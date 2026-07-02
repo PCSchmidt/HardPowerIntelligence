@@ -2928,3 +2928,31 @@ are actually found. Deferred until the next run shows whether title matching yie
 
 **Verification:** +3 tests (404 tolerated → walk continues + 1 record persisted; 403 still fails the source;
 adapter declares 404 empty). Full backend suite 467 green. Live confirmation is the next ingest run.
+
+
+## D115 — Full Wire crash darkened all three desks (7/2): froth computed from the wrong structure
+
+**Context:** the 2026-07-02 run was the FIRST to execute D111/D112/D114 (they were pushed after the 7/1 run).
+D113 parallelization worked perfectly — ingest ran once (4m27s), then all three desks ran CONCURRENTLY in
+~5m each (no more 45-min timeout). But every desk's brief job crashed, all 3 regen attempts, with the same
+error: **`string indices must be integers, not 'str'`**. So no desk published; the site stayed stale.
+
+**Root cause:** the D112 wire pool built its froth-exclusion set as `{str(d[0]["rr_id"]) for d in dropped}`,
+assuming the significance gate's `dropped` list held `(candidate_dict, ...)`. It does not — `apply_significance`
+returns `(description_str, score, reason)` tuples (engine/brief/significance.py). So `d[0]["rr_id"]` indexed a
+*string* → crash. Worse, the wire-pool build ran INLINE in `generate_brief` (before synthesis), so a
+supplementary-feature bug took down the whole brief — violating the never-dark-a-brief principle (D082/D089).
+
+**Fix (three parts):**
+1. Compute froth by DIFFERENCE — froth = SELECTED facts the gate did not keep (`selected − facts`), both of
+   which are `(dict, score)` lists. `dropped` (descriptions) is no longer used for ids.
+2. Extract the logic into a pure `_overflow_wire(candidates, selected, facts)` helper — unit-testable in
+   isolation (the crash had NO test because the wire logic was inline in the un-unit-tested generate_brief).
+3. Wrap the wire-pool build best-effort (`try/except → wire_pool=[]`), so any future wire bug degrades to an
+   empty wire instead of darking the brief — matching signal_series (D089).
+
+**Verification:** +2 regression tests on `_overflow_wire` (froth-by-difference; below-cut candidates still
+surface); full backend suite **469 green**. Manually re-triggered the workflow to un-stale the site.
+
+**Lesson:** D112 shipped with the wire logic inline and untested; a pure helper + a test would have caught it
+pre-merge. Supplementary/decorative brief features must be both best-effort-wrapped AND unit-tested.
