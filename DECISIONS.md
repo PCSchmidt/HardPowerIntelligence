@@ -2956,3 +2956,37 @@ surface); full backend suite **469 green**. Manually re-triggered the workflow t
 
 **Lesson:** D112 shipped with the wire logic inline and untested; a pure helper + a test would have caught it
 pre-merge. Supplementary/decorative brief features must be both best-effort-wrapped AND unit-tested.
+
+
+## D116 — GDELT off CI onto a persistent Fly worker (the 429 is an IP problem, not a UA problem)
+
+**Context:** GDELT 429'd the daily ingest again on 2026-07-02 (`status=failed`) despite the D110 browser
+User-Agent — which had worked exactly one day (7/1: 10 records). Pattern confirmed: GDELT rate-limits the
+**shared GitHub Actions IP** regardless of UA. SITREP pulls GDELT cleanly every night because it runs from a
+**persistent server IP** (its always-on APScheduler), not a rotating CI IP. So the cure is a persistent IP,
+not more retries.
+
+**Decision:** stand up the long-scaffolded `hpi-worker` (fly.worker.toml, Dockerfile.worker — both were
+"NOT YET DEPLOYABLE" placeholders) as the persistent home for GDELT. It ingests the worker-owned sources into
+the **shared** Supabase DB on an interval; brief generation stays in CI and reads the fresh news from the DB.
+
+- **worker/tasks/app.py** — a deliberately minimal **plain asyncio interval loop** (pull → sleep 3h → repeat,
+  ingest-on-boot), NOT procrastinate. The pyproject's procrastinate/asyncpg/pydantic-settings deps were
+  dropped (engine already provides them; there is no distributed queue to run). `ingest_once` never raises —
+  a bad pull is logged and swallowed so the always-on process can't crash into a Fly restart-loop.
+- **GDELT removed from CI** (`run_ingest.py --exclude gdelt`, wired into daily-brief.yml). Not just to silence
+  the 429: the circuit breaker is keyed by `source_id` in the shared `source_registry`, so repeated CI
+  failures would OPEN GDELT's breaker and block the worker too. One owner only.
+- **Single always-on machine** (`fly scale count 1`); >1 would double-ingest (harmless dedup, wasted calls).
+
+**Why a whole worker vs. reusing hpi-api:** the API machine auto-stops when idle (cost) — an auto-stopping
+machine can't host a reliable scheduler. The worker is always-on by design (no [http_service], no auto-stop).
+
+**Deploy (operator-run — outward + ~$2-4/mo always-on machine):** `fly deploy --config fly.worker.toml
+--depot=false` → `fly secrets set DATABASE_URL=… OPENAI_API_KEY=… --config fly.worker.toml` → `fly scale
+count 1 --config fly.worker.toml`. Verify with `fly logs` showing `worker_ingest source=gdelt status=success`.
+
+**Verification:** +8 tests (worker owns gdelt-only; interval floor/default; ingest_once runs each source and
+swallows a failing one; run_ingest `--exclude` drops the source, honors comma-lists, keeps an explicit
+`--source`). Full backend suite **477 green**. Live proof is `fly logs` after deploy + GDELT rows re-appearing
+in the DB while CI no longer lists gdelt.

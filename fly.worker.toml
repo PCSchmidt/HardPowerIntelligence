@@ -1,10 +1,14 @@
-# Fly.io config — hpi-worker (persistent ingestion/scheduler, D004/D009).
-# Deploy:  fly deploy --config fly.worker.toml
+# Fly.io config — hpi-worker (persistent ingestion, D004/D009/D116).
+# Deploy:  fly deploy --config fly.worker.toml --depot=false
+#          fly scale count 1 --config fly.worker.toml
 #
-# ⚠️ NOT YET DEPLOYABLE — worker/tasks is empty (no procrastinate App). See
-#    docker/Dockerfile.worker header. This config is ready for when the worker lands.
+# Owns GDELT ingestion off CI (persistent IAD IP clears the 429 that the shared GitHub
+# Actions IP hits). worker/tasks/app.py is a plain asyncio interval loop.
 #
-# Secrets (via `fly secrets set`): DATABASE_URL, OPENROUTER_API_KEY, SENTRY_DSN.
+# Secrets (via `fly secrets set --config fly.worker.toml`):
+#   DATABASE_URL       — shared Supabase DB (writes raw/normalized records)
+#   OPENAI_API_KEY     — embeddings for the ingested news (else records land un-embedded)
+#   SENTRY_DSN         — optional error reporting
 
 app = "hpi-worker"
 primary_region = "iad"
@@ -15,10 +19,10 @@ primary_region = "iad"
 [env]
   ENVIRONMENT = "production"
 
-# Background worker: NO [http_service]. The schedule lives in the process (procrastinate
-# @app.periodic, D004), so it must stay running — do not enable auto-stop. A single
-# always-on machine owns the ingestion schedule; running >1 would double-fire periodic
-# jobs unless procrastinate locking is configured.
+# Background worker: NO [http_service]. The schedule lives IN the process (the asyncio
+# interval loop, D116), so it must stay running — do not enable auto-stop. Exactly one
+# always-on machine owns ingestion; running >1 would double-ingest (harmless dedup, wasted
+# calls) so keep the count at 1.
 [[vm]]
   size = "shared-cpu-1x"
   memory = "512mb"

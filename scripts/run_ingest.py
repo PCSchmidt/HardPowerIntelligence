@@ -43,9 +43,20 @@ def decide_exit_code(statuses: list[str]) -> int:
     return 1 if all(s == "failed" for s in statuses) else 0
 
 
-async def main(source: str | None, embed: bool, prune: bool, reset_cursor: bool) -> None:
-    pool = await create_pool()
+def _resolve_sources(source: str | None, exclude: str) -> list[str]:
+    """The sources to ingest: one (--source) or all registered, minus any --exclude set.
+
+    CI excludes ``gdelt`` — a persistent-IP worker owns it (D116), and leaving it in CI would
+    also keep tripping its shared circuit breaker on the 429s."""
     sources = [source] if source else registered_source_ids()
+    excluded = {s.strip() for s in exclude.split(",") if s.strip()}
+    return [s for s in sources if s not in excluded]
+
+
+async def main(source: str | None, embed: bool, prune: bool, reset_cursor: bool,
+               exclude: str = "") -> None:
+    pool = await create_pool()
+    sources = _resolve_sources(source, exclude)
     print(f"Ingesting: {', '.join(sources)}")
 
     if reset_cursor:
@@ -98,5 +109,7 @@ if __name__ == "__main__":
     parser.add_argument("--no-prune", dest="prune", action="store_false")
     parser.add_argument("--reset-cursor", dest="reset_cursor", action="store_true",
                         help="clear the cursor first to re-pull the full lookback window")
+    parser.add_argument("--exclude", default="",
+                        help="comma-separated source_ids to skip (e.g. gdelt — owned by the worker, D116)")
     args = parser.parse_args()
-    asyncio.run(main(args.source, args.embed, args.prune, args.reset_cursor))
+    asyncio.run(main(args.source, args.embed, args.prune, args.reset_cursor, args.exclude))

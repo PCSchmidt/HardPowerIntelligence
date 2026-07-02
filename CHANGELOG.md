@@ -27,6 +27,14 @@ live ingestion runner, with Supabase auth and Lemon Squeezy subscriptions. Built
 
 ### Fixed
 
+- **GDELT ingestion moved off CI onto a persistent Fly worker** (2026-07-02, D116): GDELT 429s the shared
+  GitHub Actions IP regardless of User-Agent (the D110 UA fix held one day, then 7/2 failed again). Stood up
+  the long-scaffolded `hpi-worker` as an always-on Fly machine (persistent IAD IP, like SITREP) that ingests
+  GDELT into the shared DB on a 3h interval loop; brief generation stays in CI and reads the fresh news. GDELT
+  is now excluded from the CI ingest (`run_ingest.py --exclude gdelt`) — leaving it there would also keep
+  tripping GDELT's shared circuit breaker and block the worker. Dropped the worker's unused procrastinate dep
+  for a plain asyncio loop. +8 tests; backend suite 477 green. Deploy: `fly deploy --config fly.worker.toml`
+  + `fly scale count 1` (operator-run; new always-on machine).
 - **Fixed a Full Wire bug that darkened all three desks** (2026-07-02, D115): the first run to execute the
   wire code (D112) crashed every desk with `string indices must be integers` — the froth-exclusion set was
   built from the significance gate's `dropped` list assuming it held records, but it holds `(description,

@@ -15,9 +15,9 @@ cadence via GitHub Actions. Architecture per [DEPLOYMENT_CONFIG.md](DEPLOYMENT_C
 
 > **Scope of this deploy.** Web + API + a brief generated from data already in the DB.
 > This validates the whole serving + auth + payments path end-to-end. A production ingestion
-> runner now exists (`scripts/run_ingest.py`, D057) and pulls fresh USAspending data; the
-> durable always-on `hpi-worker` (D004) is still unbuilt — the GitHub Actions job is the
-> interim cadence. See [§6](#6-the-cadence-honestly) for what the scheduled job does.
+> runner (`scripts/run_ingest.py`, D057) pulls fresh data in the GitHub Actions job (§6). The
+> always-on `hpi-worker` (D116) is now built and owns **GDELT** ingestion off CI (persistent
+> IP — see [§2.5](#25-flyio--deploy-hpi-worker-gdelt)); every other source runs in CI.
 
 > **Cost note.** `run_brief.py` calls paid LLMs (OpenRouter + OpenAI embeddings, D006).
 > A daily run is a few cents; don't enable the schedule until you have data worth briefing.
@@ -175,6 +175,29 @@ curl -s -o /dev/null -w "%{http_code}\n" https://hpi-api.fly.dev/v1/briefs/lates
 # → 401
 ```
 Record the API base URL: **`https://hpi-api.fly.dev/v1`** (note the `/v1`; `/health` has no prefix).
+
+### 2.5 Fly.io — deploy `hpi-worker` (GDELT)
+
+The always-on worker (D116) owns **GDELT** ingestion: a persistent IAD IP clears the HTTP 429 that
+the shared GitHub Actions IP hits. It ingests into the same DB on a 3h loop; CI runs every other
+source (`run_ingest.py --exclude gdelt`). New always-on machine — ~$2–4/mo.
+
+```bash
+fly apps create hpi-worker                        # if taken, update `app` in fly.worker.toml
+fly secrets set --config fly.worker.toml \
+  DATABASE_URL='<same pooled URL as hpi-api>' \
+  OPENAI_API_KEY='<embeddings key>'               # else news lands un-embedded (no RAG)
+fly deploy --config fly.worker.toml --depot=false # Depot DNS gotcha: same as §2.3
+fly scale count 1 --config fly.worker.toml        # exactly one — >1 double-ingests
+```
+
+**Verify:**
+```bash
+fly logs --config fly.worker.toml                 # look for: worker_ingest source=gdelt status=success
+# and confirm GDELT rows re-appear in the DB while CI's ingest no longer lists gdelt.
+```
+> If the first pulls log `status=skipped`, GDELT's circuit breaker may still be open from earlier CI
+> 429s — it clears on the cooldown's trial run (D077). CI no longer touches GDELT, so it stays closed.
 
 ---
 

@@ -3,10 +3,11 @@ name = "hpi-worker"
 version = "0.1.0"
 requires-python = ">=3.12"
 dependencies = [
+    # The worker reuses the engine's adapters/runner/fetcher/db wholesale (D116); it needs no
+    # task-queue framework — a plain asyncio interval loop owns the schedule (tasks/app.py).
+    # procrastinate/asyncpg/pydantic-settings were dropped: engine already provides asyncpg +
+    # settings, and there is no distributed queue to run.
     "hpi-engine",
-    "procrastinate[aiopg]>=2.6",
-    "asyncpg>=0.30",
-    "pydantic-settings>=2.3",
     "sentry-sdk>=2.5",
     "python-dotenv>=1.0",
     "structlog>=24.1",
