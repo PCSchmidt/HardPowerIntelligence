@@ -2990,3 +2990,37 @@ count 1 --config fly.worker.toml`. Verify with `fly logs` showing `worker_ingest
 swallows a failing one; run_ingest `--exclude` drops the source, honors comma-lists, keeps an explicit
 `--source`). Full backend suite **477 green**. Live proof is `fly logs` after deploy + GDELT rows re-appearing
 in the DB while CI no longer lists gdelt.
+
+
+## D117 — What SITREP gets right about GDELT that we get wrong (diagnosis, corrects D116's premise)
+
+**Context:** D116 moved GDELT to a persistent Fly worker on the theory that the 429 was a shared-CI-IP
+reputation problem. WRONG — the freshly-deployed Fly worker's very first GDELT request 429'd too. But SITREP
+pulls the SAME GDELT DOC 2.0 API **daily** (CronTrigger hour=6) and succeeds, returning quality global sources
+(Bloomberg, BBC World, Brookings…). So the difference is not cadence and not a magic IP — it is **request
+discipline**. Read SITREP's api/scrapers/gdelt_scraper.py against ours line for line:
+
+| Dimension | SITREP (works, daily) | HPI (429s) |
+|---|---|---|
+| 429 backoff | **20s → 40s → 60s** (explicit `20*(attempt+1)`, retries same query) | ~1s → 2s → 4s (fetcher `wait_exponential` min=1/max=20, 4 attempts) |
+| Queries / run | 3 | 8 (D109 consolidated) |
+| Spacing between queries | 10–30s (`DELAY_BETWEEN_QUERIES`) | 5s (`min_request_interval`) |
+| maxrecords / query | 20 | 50 |
+| 429 treatment | a "slow down" signal → wait long, retry | lumped into a generic fail-fast retry budget |
+| Query scoping | keyword OR + `sourcecountry:` filters (purpose-fit) | phrase-OR groups, English-only, no country filter |
+
+**Root cause:** GDELT's per-IP throttle penalty takes ~20s+ to clear. Our fetcher retries after ~1s — GDELT is
+still cooling down, returns 429 again, and we exhaust 4 attempts in ~7s and fail. SITREP waits 20–60s and the
+next request succeeds. We also send ~2.5× the queries at half the spacing, so we trip the limit more easily.
+**SITREP is patient and disciplined; we are aggressive and impatient.**
+
+**Implication (corrects D116):** the fix is almost certainly NOT BigQuery or dropping GDELT — it is to match
+SITREP's discipline: a long, GDELT-specific 429 backoff (20/40/60s), fewer queries, wider spacing (≥10s),
+smaller maxrecords. The generic `HttpFetcher` exponential backoff (min=1s) is wrong for a source that punishes
+impatience. Whether a persistent IP is even needed is now unclear — SITREP's discipline might make GDELT work
+from CI directly; the deployed worker is a ready live testbed. **Keep the worker until we test the disciplined
+pattern.** (This is the 3rd GDELT root-cause revision — D110 UA, D116 IP, D117 discipline — so treat "this will
+fix it" as a hypothesis to verify on the worker's logs, not a certainty.)
+
+**Not yet implemented — this entry is the diagnosis; the fix (a GDELT-specific patient backoff + lighter
+footprint) awaits the operator's go-ahead on approach.**
