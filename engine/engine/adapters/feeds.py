@@ -80,6 +80,23 @@ _FEEDS: tuple[_Feed, ...] = (
     _Feed("https://warontherocks.com/feed/", "War on the Rocks", "defense"),
     _Feed("https://rmi.org/feed/", "RMI", "energy"),
     _Feed("https://cset.georgetown.edu/feed/", "CSET (Georgetown)", "ai"),
+
+    # ── Breadth expansion (operator: "more info as long as it fits the Defense∩AI∩Energy
+    # investment nexus", 2026-07-02). Reliable feed patterns (WordPress /feed/, Substack,
+    # Sightline/Industry-Dive Arc); each is CI-validated and a dead URL isolates itself. ──
+    # Defense
+    _Feed("https://www.defensenews.com/arc/outboundfeeds/rss/?outputType=xml", "Defense News", "defense"),
+    _Feed("https://www.c4isrnet.com/arc/outboundfeeds/rss/?outputType=xml", "C4ISRNET", "defense"),
+    _Feed("https://www.atlanticcouncil.org/feed/", "Atlantic Council", "defense"),
+    # AI / compute
+    _Feed("https://www.nextplatform.com/feed/", "The Next Platform", "ai"),
+    _Feed("https://importai.substack.com/feed", "Import AI", "ai"),
+    _Feed("https://semiwiki.com/feed/", "SemiWiki", "ai"),
+    _Feed("https://www.brookings.edu/feed/", "Brookings", "ai"),
+    # Energy
+    _Feed("https://www.energy-storage.news/feed/", "Energy Storage News", "energy"),
+    _Feed("https://www.latitudemedia.com/feed", "Latitude Media", "energy"),
+    _Feed("https://heatmap.news/feed", "Heatmap News", "energy"),
 )
 
 

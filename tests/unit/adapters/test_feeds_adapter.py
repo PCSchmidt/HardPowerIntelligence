@@ -100,6 +100,12 @@ class TestFeedRegistry:
         for f in _FEEDS:
             assert f.url.startswith("http") and f.name
 
+    def test_no_duplicate_feed_urls(self):
+        # Registry hygiene as the list grows (breadth expansion, D-feeds): a dup URL just
+        # wastes a fetch and double-counts an outlet.
+        urls = [f.url for f in _FEEDS]
+        assert len(urls) == len(set(urls))
+
     def test_base_url_tracks_active_canary_feed(self):
         adapter = FeedsAdapter()
         adapter.build_request_payload(cursor=None, page=1)
