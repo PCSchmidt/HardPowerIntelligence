@@ -114,9 +114,13 @@ jobs:
   brief:
     needs: ingest
     runs-on: ubuntu-latest
-    # Per-desk ceiling. One desk (re-rolls + synthesis + eval) fits comfortably in 30 min;
-    # because desks run in parallel this is the wall-clock cap for the slowest desk, not the sum.
-    timeout-minutes: 30
+    # Per-desk ceiling. A desk = re-rolls + synthesis + eval + a SEQUENTIAL per-item entity
+    # resolution pass (~25s/item, bounded by brief_max_items — not by feed volume). The energy
+    # desk (28 items) blew the old 30-min cap ~12 min into that entity tail on 2026-07-04,
+    # leaving the desk stale. 50 min gives the largest desk headroom; because desks run in
+    # parallel this is the wall-clock cap for the slowest desk, not the sum. Parallelizing the
+    # entity pass is the real fix (tracked) but risks duplicate-entity races in the graph moat.
+    timeout-minutes: 50
     strategy:
       fail-fast: false   # one desk failing must NOT cancel the others (Energy independence)
       matrix:

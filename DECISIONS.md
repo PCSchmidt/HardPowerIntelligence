@@ -3024,3 +3024,34 @@ fix it" as a hypothesis to verify on the worker's logs, not a certainty.)
 
 **Not yet implemented — this entry is the diagnosis; the fix (a GDELT-specific patient backoff + lighter
 footprint) awaits the operator's go-ahead on approach.**
+
+## D118 — Three live-quality fixes from the 7/4 rendered-output review (JSON leak, energy timeout, dead feeds)
+
+**Context:** Reviewing the actual 7/4 PDF output of all three desks surfaced three real defects the logs alone
+had hidden. Fixed together.
+
+**1. Raw JSON leaked into rendered analysis (all three desks).** Items showed literal `{"text": "..."}`,
+`{"analysis": "..."}`, `{"rewritten": "..."}` in the ANALYSIS / WHAT-TO-WATCH boxes. Root cause: `read` / `watch`
+/ `convergence_read` are taken verbatim from the synthesis JSON (`generator.parse` path) with NO downstream
+cleaning — and the JSON-mode model intermittently nests a field value inside a one-key object. (Note: the D073
+`ground_brief_analysis` gate that was *supposed* to post-process analysis is defined but **never wired into the
+pipeline** — a separate gap.) Fix: `_unwrap_analysis_field()` strips a single stray JSON-object wrapper
+(single-value object, or one carrying a known text key), applied to read/watch/convergence_read at generation.
+Ordinary prose passes untouched; doubly-wrapped values collapse. Unit-tested.
+
+**2. Energy desk went stale — the 7/4 brief timed out.** Energy showed "Friday, July 3" while Defense/AI showed
+"Saturday, July 4". The 7/4 energy brief PASSED eval at attempt 1 (07:31), then spent ~12 min in a SEQUENTIAL
+per-item entity-resolution pass (`resolve_item_entities`, ~25s/item × 28 items) and was killed at the 30-min job
+cap before persisting. This loop is bounded by `brief_max_items` (NOT by feed volume), and it's sequential by
+design (minting/deduping graph entities concurrently risks duplicate-entity races in the moat). Fix: raise the
+per-desk job cap 30 -> 50 min (bounded work needs headroom) + log the entity-pass `elapsed_s`. Parallelizing the
+pass safely (per-entity locking / dedup) is a tracked follow-up, deliberately NOT rushed into an outage fix.
+
+**3. Feed-health sweep: fixed 2 moved feeds, dropped 2 dead ones, made zero-yield visible.** The 20 feeds added
+2026-07-04 (batches 1+2) had never run in a scheduled brief (both commits landed ~11:26-11:47 UTC, after the
+07:07 UTC run) — so their zero counts were "not deployed yet," not deaths. IP-independent probing found: OpenAI
+`/blog/rss.xml` -> `/news/rss.xml` (307 moved, fixed); ANS `/news/rss/` -> `/news/feed/` (404 -> fixed); Brookings
+(RSS retired, every path 302->HTML) and Heatmap News (all paths 404) dropped. Also: three ORIGINAL feeds
+(SemiAnalysis, CSIS, RMI) went dark 2026-06-29 — flagged for a follow-up probe. Added a `feed_yielded_zero`
+warning in `enrich()` so a 200-empty / redirect / moved feed is a log grep, not DB archaeology (this sweep needed
+the DB because zero-yield feeds were silent). Registry 40 -> 38 (balance def 11 / ai 16 / energy 11).

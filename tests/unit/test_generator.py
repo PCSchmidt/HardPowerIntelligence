@@ -9,8 +9,47 @@ from engine.brief.generator import (
     _is_home_desk,
     _license_class_for,
     _overflow_wire,
+    _unwrap_analysis_field,
     persist_brief,
 )
+
+
+class TestUnwrapAnalysisField:
+    """The synthesis model occasionally nests an analysis field inside a JSON object
+    ({"text": ...} / {"rewritten": ...}); it then rendered verbatim on all three desks
+    (7/4). The unwrapper strips a single such layer while leaving real prose untouched."""
+
+    def test_plain_prose_passes_through(self):
+        prose = "The new credit facility boosts liquidity for the LNG platform."
+        assert _unwrap_analysis_field(prose) == prose
+
+    def test_single_key_text_wrapper_is_unwrapped(self):
+        wrapped = '{"text": "This use-it-or-lose-it scenario boosts backlog."}'
+        assert _unwrap_analysis_field(wrapped) == "This use-it-or-lose-it scenario boosts backlog."
+
+    def test_rewritten_and_analysis_keys_are_unwrapped(self):
+        assert _unwrap_analysis_field('{"rewritten": "OXMIQ could accelerate licensing."}') == (
+            "OXMIQ could accelerate licensing."
+        )
+        assert _unwrap_analysis_field('{"analysis": "Millennium builds small satellites."}') == (
+            "Millennium builds small satellites."
+        )
+
+    def test_doubly_wrapped_collapses(self):
+        assert _unwrap_analysis_field('{"text": "{\\"analysis\\": \\"nested\\"}"}') == "nested"
+
+    def test_multi_key_object_without_text_key_left_alone(self):
+        # No recognizable text key + not a single value → leave verbatim rather than guess.
+        raw = '{"a": 1, "b": 2}'
+        assert _unwrap_analysis_field(raw) == raw
+
+    def test_empty_and_none_safe(self):
+        assert _unwrap_analysis_field("") == ""
+        assert _unwrap_analysis_field(None) == ""
+
+    def test_prose_with_leading_brace_not_json_is_untouched(self):
+        raw = "{not json} but analyst prose about the grid"
+        assert _unwrap_analysis_field(raw) == raw
 
 
 def _cand(rid: str, score: float = 0.5):

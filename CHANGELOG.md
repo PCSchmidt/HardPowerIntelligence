@@ -36,6 +36,19 @@ live ingestion runner, with Supabase auth and Lemon Squeezy subscriptions. Built
 
 ### Fixed
 
+- **Raw JSON no longer leaks into rendered analysis** (2026-07-04, D118): the ANALYSIS / WHAT-TO-WATCH
+  boxes intermittently showed literal `{"text": "..."}` / `{"analysis": ...}` / `{"rewritten": ...}` across all
+  three desks. `read`/`watch`/`convergence_read` are taken verbatim from the synthesis JSON, and the model
+  sometimes nests the value in a one-key object. `_unwrap_analysis_field()` now strips a single stray wrapper at
+  generation (prose untouched; double-wraps collapse). +7 tests.
+- **Energy desk no longer goes stale from a brief timeout** (2026-07-04, D118): the 7/4 energy brief passed eval
+  then spent ~12 min in the sequential per-item entity-resolution pass and was killed at the 30-min job cap
+  before persisting (site kept serving the prior day). Raised the per-desk cap 30 -> 50 min (the pass is bounded
+  by `brief_max_items`, not feed volume) and log its `elapsed_s`. Safe parallelization is a tracked follow-up.
+- **Feed-health sweep: 2 moved feeds fixed, 2 dead dropped, zero-yield now logged** (2026-07-04, D118): OpenAI
+  `/blog/rss.xml` -> `/news/rss.xml` and ANS `/news/rss/` -> `/news/feed/` (both moved; runner doesn't follow
+  redirects); Brookings (RSS retired) and Heatmap News (all paths 404) dropped. Added a `feed_yielded_zero`
+  warning in `enrich()` so a moved/empty feed is a log grep, not DB archaeology. Registry 40 -> 38.
 - **GDELT gets SITREP's patient 429 backoff (the actual fix)** (2026-07-02, D117): the persistent-IP move
   (D116) didn't help — the worker 429'd too. SITREP pulls the same API daily and succeeds because it *waits*:
   20/40/60s on a 429 (retry the same query) vs our fetcher's ~1s, which just re-trips GDELT's ~20s throttle

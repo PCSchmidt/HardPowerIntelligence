@@ -92,11 +92,12 @@ _FEEDS: tuple[_Feed, ...] = (
     _Feed("https://www.nextplatform.com/feed/", "The Next Platform", "ai"),
     _Feed("https://importai.substack.com/feed", "Import AI", "ai"),
     _Feed("https://semiwiki.com/feed/", "SemiWiki", "ai"),
-    _Feed("https://www.brookings.edu/feed/", "Brookings", "ai"),
+    # Brookings dropped 2026-07-04: /feed/ (and every topic feed) 302-redirects to HTML — the
+    # site retired RSS, so it can never yield here. Heatmap News dropped same day: all feed
+    # paths 404. Both confirmed IP-independently in the feed-health sweep.
     # Energy
     _Feed("https://www.energy-storage.news/feed/", "Energy Storage News", "energy"),
     _Feed("https://www.latitudemedia.com/feed", "Latitude Media", "energy"),
-    _Feed("https://heatmap.news/feed", "Heatmap News", "energy"),
 
     # ── Breadth expansion II (operator-supplied source lists, 2026-07-04). RSS-viable, on-thesis
     # picks only; paywalled/no-RSS (The Information, BNEF, FT, Reuters, Axios, Semafor) and
@@ -107,13 +108,16 @@ _FEEDS: tuple[_Feed, ...] = (
     _Feed("https://venturebeat.com/category/ai/feed/", "VentureBeat AI", "ai"),
     _Feed("https://www.technologyreview.com/topic/artificial-intelligence/feed/", "MIT Technology Review AI", "ai"),
     _Feed("https://huggingface.co/blog/feed.xml", "Hugging Face", "ai"),
-    _Feed("https://openai.com/blog/rss.xml", "OpenAI", "ai"),
+    # Live-validated 2026-07-04: the /blog/rss.xml path 307-redirects (feed moved); the runner
+    # doesn't follow redirects, so point at the final target /news/rss.xml (verified 200 + XML).
+    _Feed("https://openai.com/news/rss.xml", "OpenAI", "ai"),
     _Feed("https://thegradient.pub/rss/", "The Gradient", "ai"),
     # Energy
     _Feed("https://www.power-eng.com/feed/", "Power Engineering", "energy"),
     _Feed("https://www.ess-news.com/feed/", "ESS News", "energy"),
     _Feed("https://carbontracker.org/feed/", "Carbon Tracker", "energy"),
-    _Feed("https://www.ans.org/news/rss/", "Nuclear Newswire (ANS)", "energy"),
+    # Live-validated 2026-07-04: /news/rss/ 404s; the working feed is /news/feed/ (200 + XML).
+    _Feed("https://www.ans.org/news/feed/", "Nuclear Newswire (ANS)", "energy"),
 )
 
 
@@ -235,7 +239,13 @@ class FeedsAdapter:
                 body = await fetcher.fetch_json(
                     "GET", feed.url, headers=self.headers, response_format="text",
                 )
-                out.extend(parse_feed(body if isinstance(body, str) else "", feed))
+                recs = parse_feed(body if isinstance(body, str) else "", feed)
+                out.extend(recs)
+                if not recs:
+                    # A 200-but-empty body, an unfollowed redirect, or a moved feed yields zero
+                    # SILENTLY otherwise — surfacing it turns dead-feed detection from DB
+                    # archaeology into a log grep (2026-07-04 feed-health sweep).
+                    log.warning("feed_yielded_zero", feed=feed.name, url=feed.url)
             except Exception as exc:  # noqa: BLE001 — one dead feed must not abort the rest
                 log.warning("feed_fetch_skipped", feed=feed.name, url=feed.url, error=str(exc))
         return out

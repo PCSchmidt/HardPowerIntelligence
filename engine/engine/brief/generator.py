@@ -24,6 +24,39 @@ from engine.settings import settings
 
 log = structlog.get_logger()
 
+# The analysis layer (read / watch / convergence_read) is free-form model output that gets
+# no downstream cleaning. Occasionally the synthesis model (or a JSON-mode retry) nests a
+# field value inside a JSON object — e.g. {"text": "..."} or {"rewritten": "..."} — and it
+# then renders verbatim on the desk page (observed on all three desks, 7/4). This unwraps a
+# single stray wrapper so only prose reaches the reader; ordinary prose passes untouched.
+_ANALYSIS_WRAPPER_KEYS = (
+    "text", "analysis", "read", "watch", "rewritten", "body", "content", "convergence_read",
+)
+
+
+def _unwrap_analysis_field(value: str) -> str:
+    """Strip a stray JSON-object wrapper from a free-form analysis field, if present."""
+    text = (value or "").strip()
+    if not (text.startswith("{") and text.endswith("}")):
+        return text
+    try:
+        obj = json.loads(text)
+    except (ValueError, TypeError):
+        return text
+    if not isinstance(obj, dict):
+        return text
+    inner = None
+    if len(obj) == 1:
+        (inner,) = obj.values()
+    else:
+        for key in _ANALYSIS_WRAPPER_KEYS:
+            if isinstance(obj.get(key), str):
+                inner = obj[key]
+                break
+    if isinstance(inner, str):
+        return _unwrap_analysis_field(inner)  # collapse a doubly-wrapped value too
+    return text
+
 
 @dataclass
 class GeneratedBrief:
@@ -394,6 +427,8 @@ async def generate_brief(desk: str, pool: asyncpg.Pool) -> GeneratedBrief:
             continue
         item["body"] = cleaned
         item["citation_indices"] = extract_citation_indices(cleaned)
+        item["read"] = _unwrap_analysis_field(item.get("read", ""))
+        item["watch"] = _unwrap_analysis_field(item.get("watch", ""))
         items.append(item)
 
     metadata = {
@@ -411,7 +446,7 @@ async def generate_brief(desk: str, pool: asyncpg.Pool) -> GeneratedBrief:
         passages=passages,
         synthesis_model=synthesis_model,
         model_waterfall_metadata=metadata,
-        convergence_read=parsed.get("convergence_read", "") or "",
+        convergence_read=_unwrap_analysis_field(parsed.get("convergence_read", "") or ""),
         wire=wire_pool,
     )
 
@@ -513,12 +548,20 @@ async def persist_brief(
     # brief, so it runs on its own connection and any failure falls back to empty entity_ids.
     item_entity_ids: list[list[str]] = [[] for _ in surviving_items]
     try:
+        # Sequential by design: resolution mints/dedupes graph entities, so it must serialize
+        # to avoid duplicate-entity races. It's the slowest post-pass (~25s/item) — timed here
+        # because it is what blew the energy desk's job cap on 2026-07-04 (see daily-brief.yml).
+        entity_started = datetime.now(timezone.utc)
         async with pool.acquire() as conn:
             for i, item in enumerate(surviving_items):
                 rrids = _item_raw_record_ids(item, brief.passages)
                 item_entity_ids[i] = await resolve_item_entities(conn, rrids)
         linked = sum(1 for ids in item_entity_ids if ids)
-        log.info("entities_linked", desk=desk, items=len(surviving_items), items_with_entities=linked)
+        log.info(
+            "entities_linked", desk=desk, items=len(surviving_items),
+            items_with_entities=linked,
+            elapsed_s=round((datetime.now(timezone.utc) - entity_started).total_seconds(), 1),
+        )
     except Exception as exc:  # noqa: BLE001 — moat enrichment must never dark a brief
         log.warning("entity_resolution_skipped", desk=desk, error=str(exc))
         item_entity_ids = [[] for _ in surviving_items]
