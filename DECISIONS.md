@@ -3055,3 +3055,31 @@ pass safely (per-entity locking / dedup) is a tracked follow-up, deliberately NO
 (SemiAnalysis, CSIS, RMI) went dark 2026-06-29 — flagged for a follow-up probe. Added a `feed_yielded_zero`
 warning in `enrich()` so a 200-empty / redirect / moved feed is a log grep, not DB archaeology (this sweep needed
 the DB because zero-yield feeds were silent). Registry 40 -> 38 (balance def 11 / ai 16 / energy 11).
+
+## D119 — Batch the analysis-grounding gate: ~50x fewer eval tokens + fixes the energy timeout (corrects D118)
+
+**Corrects D118 on two points** (found while implementing the follow-up): (1) the 12-min tail that timed out the
+7/4 energy brief was NOT entity resolution — `resolve_item_entities` is pure DB work (identifier lookup + trigram
+match, no LLM). It was the **analysis-grounding gate** (`ground_brief_analysis`, D073). (2) D118 said that gate
+was "defined but never wired in" — WRONG; it runs at `scripts/run_brief.py:108`. It was live AND the bottleneck.
+
+**Root cause of the cost:** the gate grounded each analysis field (`convergence_read` + every item's
+`read`/`watch`) with its own `eval_analysis` call, and **each call re-sent the entire facts block** (all item
+headlines + bodies + passages, several thousand tokens). A 28-item desk = ~56+ sequential eval calls, all
+re-transmitting the same large context → ~200k redundant input tokens/desk/day (~20M/mo across 3 desks), and the
+serial latency that blew the 30-min job cap.
+
+**Fix (token-efficiency is primary, operator directive):** `CitationEvaluator.eval_analyses_batch(fields, facts)`
+grounds ALL fields in ONE call — facts sent once, per-label verdicts returned (`{"results":[{"label","new_facts"}]}`);
+a label the model omits fails OPEN (grounded), since the analysis layer is decorative/best-effort (D085). Only the
+rare FLAGGED field then takes the per-field regenerate-then-omit path (`_reground`). Net: grounding drops from ~56
+calls to 1-3/desk (~50x fewer input tokens) AND from ~12 min to seconds — so the D118 timeout bump was **reverted
+50 -> 35 min** rather than paying for a bigger ceiling. `ground_field` kept for the single-field/standalone path.
+
+**Also folded in:** the D118 JSON-unwrap missed the regen branch — `_regenerate` can return `{"rewritten": "..."}`,
+which overwrites the field AFTER generation-time unwrap, so it still leaked. `_reground` now unwraps regen output
+too (closes the OXMIQ `{"rewritten":...}` case specifically). +7 tests; backend 494 green.
+
+**Design note:** parallelizing the old per-field loop (the naive follow-up) would have saved LATENCY but ZERO
+tokens — wrong axis once token cost is primary. Batching wins both. Parallelism was reserved for genuinely
+independent I/O; here the calls were redundant, not just serial.

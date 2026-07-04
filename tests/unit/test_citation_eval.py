@@ -295,6 +295,45 @@ class TestEvalAnalysis:
         assert r.new_facts == []
 
 
+class TestEvalAnalysesBatch:
+    """D119: ground many fields in ONE call (facts sent once). Per-label verdicts map back;
+    a label the model omits fails open (grounded), because the analysis layer is decorative."""
+
+    def _ev(self):
+        return CitationEvaluator(eval_model="m")
+
+    @pytest.mark.asyncio
+    async def test_per_label_verdicts_mapped_in_one_call(self):
+        reply = json.dumps({"results": [
+            {"label": "convergence_read", "new_facts": []},
+            {"label": "item0.read", "new_facts": ["invents a $2B award"]},
+        ]})
+        with patch("engine.eval.citation_eval.llm_client") as mock_client:
+            mock_client.complete = AsyncMock(return_value=reply)
+            out = await self._ev().eval_analyses_batch(
+                [("convergence_read", "conv"), ("item0.read", "bad read")], "facts",
+            )
+            assert mock_client.complete.await_count == 1     # ONE call for all fields
+        assert out["convergence_read"].grounded
+        assert not out["item0.read"].grounded
+        assert out["item0.read"].new_facts == ["invents a $2B award"]
+
+    @pytest.mark.asyncio
+    async def test_omitted_label_fails_open_grounded(self):
+        # Model returns nothing for item1.watch → default grounded, not silently dropped.
+        with patch("engine.eval.citation_eval.llm_client") as mock_client:
+            mock_client.complete = AsyncMock(return_value=json.dumps({"results": []}))
+            out = await self._ev().eval_analyses_batch([("item1.watch", "a watch")], "facts")
+        assert out["item1.watch"].grounded
+
+    @pytest.mark.asyncio
+    async def test_no_fields_makes_no_call(self):
+        with patch("engine.eval.citation_eval.llm_client") as mock_client:
+            mock_client.complete = AsyncMock(side_effect=AssertionError("should not call LLM"))
+            out = await self._ev().eval_analyses_batch([("a", "   "), ("b", "")], "facts")
+        assert out == {}
+
+
 class TestCleanedBody:
     """D069: eval_item returns a cleaned_body of only the individually-supported,
     cited sentences, so a partially over-claimed item is trimmed rather than

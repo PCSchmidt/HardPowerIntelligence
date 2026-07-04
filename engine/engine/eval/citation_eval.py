@@ -243,3 +243,66 @@ class CitationEvaluator:
         parsed = parse_json(content) or {}
         new_facts = [str(f) for f in parsed.get("new_facts", []) if str(f).strip()]
         return AnalysisEvalResult(grounded=not new_facts, new_facts=new_facts)
+
+    async def eval_analyses_batch(
+        self, fields: list[tuple[str, str]], facts: str
+    ) -> dict[str, AnalysisEvalResult]:
+        """Ground MANY analysis fields against ONE facts block in a SINGLE call (D119).
+
+        Same flagging contract as :meth:`eval_analysis`, batched: the (large) facts block is
+        sent once instead of re-sent per field, which was the token sink + 12-min timeout tail
+        of the per-field loop (D118). ``fields`` = ``[(label, text), ...]``; returns
+        ``{label: AnalysisEvalResult}``. A label the model omits from its reply defaults to
+        grounded — fail-open, because the analysis layer is decorative/best-effort (D085) and a
+        parse miss should keep a field, not silently omit it."""
+        fields = [(label, text) for label, text in fields if text and text.strip()]
+        if not fields:
+            return {}
+        blocks = "\n\n".join(f"[{label}]\n{text}" for label, text in fields)
+        messages = [
+            {
+                "role": "system",
+                "content": (
+                    "You review MULTIPLE labeled ANALYSES, each written for an investment-research "
+                    "brief by a domain analyst, against ONE shared set of VERIFIED FACTS. The "
+                    "analyst is EXPECTED to add what the facts alone don't: interpretation, "
+                    "real-world domain context (naming actual government programs, agencies, or "
+                    "end-use applications), comparisons, and clearly-hedged forward-looking "
+                    "inference ('could', 'may', 'likely'). All of that is allowed and good. For "
+                    "EACH analysis, flag ONLY a claim that fabricates a SPECIFIC, checkable fact "
+                    "about the cited subjects: a dollar amount, date, or quantity that contradicts "
+                    "or isn't in the facts, or stating as definite that a particular contract, "
+                    "award, partnership, or event has occurred when the facts don't support it. Do "
+                    "NOT flag general domain knowledge, real program/agency names used as context "
+                    "or possibility, or hedged speculation. Return only JSON: "
+                    '{"results": [{"label": "<the exact label>", "new_facts": ["..."]}, ...]} '
+                    "with one entry per analysis label given (empty new_facts if grounded)."
+                ),
+            },
+            {
+                "role": "user",
+                "content": (
+                    f"VERIFIED FACTS:\n{facts}\n\n"
+                    f"ANALYSES (review each independently; keep the [label] tags):\n\n{blocks}"
+                ),
+            },
+        ]
+        content = await llm_client.complete(
+            model=self.eval_model,
+            messages=messages,
+            json_mode=True,
+            temperature=settings.llm_temperature,
+        )
+        parsed = parse_json(content) or {}
+        out: dict[str, AnalysisEvalResult] = {}
+        for entry in parsed.get("results", []) or []:
+            if not isinstance(entry, dict):
+                continue
+            label = str(entry.get("label", "")).strip()
+            if not label:
+                continue
+            nf = [str(f) for f in (entry.get("new_facts") or []) if str(f).strip()]
+            out[label] = AnalysisEvalResult(grounded=not nf, new_facts=nf)
+        for label, _ in fields:  # fail-open for any field the model didn't return
+            out.setdefault(label, AnalysisEvalResult(grounded=True, new_facts=[]))
+        return out

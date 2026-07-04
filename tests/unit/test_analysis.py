@@ -13,16 +13,27 @@ from engine.eval.citation_eval import AnalysisEvalResult
 
 
 class FakeEvaluator:
-    """eval_analysis pops successive (grounded, new_facts) verdicts."""
+    """Supports both grounding entry points: ``eval_analysis`` pops successive
+    (grounded, new_facts) verdicts (single-field path + post-regen re-eval); ``eval_analyses_batch``
+    returns a per-label verdict from ``batch`` (label → (grounded, new_facts), default grounded)."""
 
-    def __init__(self, verdicts):
-        self.verdicts = list(verdicts)
+    def __init__(self, verdicts=None, batch=None):
+        self.verdicts = list(verdicts or [])
+        self.batch = batch or {}
         self.calls: list[str] = []
+        self.batch_calls = 0
 
     async def eval_analysis(self, analysis, facts):
         self.calls.append(analysis)
         grounded, new_facts = self.verdicts.pop(0)
         return AnalysisEvalResult(grounded=grounded, new_facts=new_facts)
+
+    async def eval_analyses_batch(self, fields, facts):
+        self.batch_calls += 1
+        return {
+            label: AnalysisEvalResult(*self.batch.get(label, (True, [])))
+            for label, _ in fields
+        }
 
 
 def _patch_regen(return_value="REWRITTEN grounded analysis."):
@@ -112,8 +123,7 @@ class TestGroundBriefAnalysis:
     @pytest.mark.asyncio
     async def test_all_grounded_mutates_in_place(self):
         brief = self._brief()
-        # 4 non-empty fields evaluated: convergence, i0.read, i1.read, i1.watch
-        ev = FakeEvaluator([(True, [])] * 4)
+        ev = FakeEvaluator(batch={})   # every field defaults to grounded
         report = await ground_brief_analysis(
             brief, brief.items, "facts", ev, max_regen=1,
         )
@@ -127,17 +137,25 @@ class TestGroundBriefAnalysis:
         assert statuses["item0.watch"] == "empty"
 
     @pytest.mark.asyncio
+    async def test_grounding_uses_a_single_batched_eval_call(self):
+        # The efficiency guarantee (D119): all fields grounded in ONE call, facts sent once —
+        # not a per-field eval that re-transmits the facts block.
+        brief = self._brief()
+        ev = FakeEvaluator(batch={})
+        await ground_brief_analysis(brief, brief.items, "facts", ev, max_regen=1)
+        assert ev.batch_calls == 1
+        assert ev.calls == []   # no per-field eval_analysis when nothing is flagged
+
+    @pytest.mark.asyncio
     async def test_omitted_field_blanked_in_place(self):
         brief = self._brief()
-        # convergence ok; i0.read flagged + regen still bad → omit; i1.read/watch ok
-        ev = FakeEvaluator([
-            (True, []),                 # convergence
-            (False, ["fab"]),           # i0.read original
-            (False, ["fab"]),           # i0.read after regen
-            (True, []),                 # i1.read
-            (True, []),                 # i1.watch
-        ])
+        # batch flags i0.read; regen still bad on re-eval → omit. Others grounded by default.
+        ev = FakeEvaluator(
+            verdicts=[(False, ["fab again"])],       # post-regen re-eval of i0.read
+            batch={"item0.read": (False, ["fab"])},
+        )
         with _patch_regen("still bad"):
             await ground_brief_analysis(brief, brief.items, "facts", ev, max_regen=1)
         assert brief.items[0]["read"] == ""        # omitted
         assert brief.items[1]["read"] == "R1"
+        assert ev.batch_calls == 1                 # still a single batched eval up front

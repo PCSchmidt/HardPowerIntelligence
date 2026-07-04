@@ -36,13 +36,20 @@ live ingestion runner, with Supabase auth and Lemon Squeezy subscriptions. Built
 
 ### Fixed
 
+- **Analysis grounding batched — ~50x fewer eval tokens, and the energy timeout is fixed for real** (2026-07-04,
+  D119, corrects D118): the 12-min tail that timed out the energy desk was the analysis-grounding gate (D073,
+  live at run_brief.py:108), NOT entity resolution as D118 stated. It grounded each field with its own LLM call
+  that re-sent the whole facts block (~56 calls/desk, ~200k redundant tokens/desk/day). `eval_analyses_batch`
+  now grounds every field in ONE call (facts sent once; a field the model omits fails open). Grounding drops to
+  seconds, so the D118 30->50 min bump was reverted to 35. Also unwraps the regen branch's `{"rewritten":...}`
+  the D118 fix missed. +7 tests, 494 green.
 - **Raw JSON no longer leaks into rendered analysis** (2026-07-04, D118): the ANALYSIS / WHAT-TO-WATCH
   boxes intermittently showed literal `{"text": "..."}` / `{"analysis": ...}` / `{"rewritten": ...}` across all
   three desks. `read`/`watch`/`convergence_read` are taken verbatim from the synthesis JSON, and the model
   sometimes nests the value in a one-key object. `_unwrap_analysis_field()` now strips a single stray wrapper at
   generation (prose untouched; double-wraps collapse). +7 tests.
 - **Energy desk no longer goes stale from a brief timeout** (2026-07-04, D118): the 7/4 energy brief passed eval
-  then spent ~12 min in the sequential per-item entity-resolution pass and was killed at the 30-min job cap
+  then spent ~12 min in the sequential analysis-grounding pass (D073) and was killed at the 30-min job cap
   before persisting (site kept serving the prior day). Raised the per-desk cap 30 -> 50 min (the pass is bounded
   by `brief_max_items`, not feed volume) and log its `elapsed_s`. Safe parallelization is a tracked follow-up.
 - **Feed-health sweep: 2 moved feeds fixed, 2 dead dropped, zero-yield now logged** (2026-07-04, D118): OpenAI
