@@ -24,11 +24,15 @@ live ingestion runner, with Supabase auth and Lemon Squeezy subscriptions. Built
   as the current desk). Written best-effort after the brief commits, so it can never dark a brief;
   degrades to empty if the migration isn't applied. +10 tests; backend 464 green, web 18 green.
   Goes live after the migration push + API/web redeploy.
-- **RSS feed registry expanded 20 → 30, scoped to the Defense∩AI∩Energy investment nexus** (2026-07-02):
-  added Defense News, C4ISRNET, Atlantic Council (defense); The Next Platform, Import AI, SemiWiki, Brookings
-  (AI); Energy Storage News, Latitude Media, Heatmap News (energy) — rebalancing coverage to 11/11/8. Feeds are
-  the reliable, rate-limit-free news backbone (no GDELT IP problem), so more on-thesis breadth is a direct win.
-  Each URL is validated on the next CI run; a dead feed isolates itself (per-feed try/except). +1 dup-URL guard.
+- **RSS feed registry expanded 20 → 40, scoped to the Defense∩AI∩Energy investment nexus** (2026-07-02/07-04):
+  batch 1 — Defense News, C4ISRNET, Atlantic Council; The Next Platform, Import AI, SemiWiki, Brookings; Energy
+  Storage News, Latitude Media, Heatmap News. Batch 2 (operator source lists) — TechCrunch AI, VentureBeat AI,
+  MIT Tech Review AI, Hugging Face, OpenAI, The Gradient (AI); Power Engineering, ESS News, Carbon Tracker,
+  Nuclear Newswire/ANS (energy). Coverage now 11/17/12; the AI weighting is deliberate — the primary-lab feeds
+  (Hugging Face, OpenAI) fill the private-lab news gap the AI desk was missing. Feeds are the reliable,
+  rate-limit-free news backbone (no GDELT IP problem). Each URL validates on the next CI run; a dead feed
+  isolates itself (per-feed try/except). +1 dup-URL guard. Note: doubling the firehose raises froth/volume, so
+  the deferred value-model work (materiality/significance for no-$ news) matters more as this grows.
 
 ### Fixed
 

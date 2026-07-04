@@ -97,6 +97,23 @@ _FEEDS: tuple[_Feed, ...] = (
     _Feed("https://www.energy-storage.news/feed/", "Energy Storage News", "energy"),
     _Feed("https://www.latitudemedia.com/feed", "Latitude Media", "energy"),
     _Feed("https://heatmap.news/feed", "Heatmap News", "energy"),
+
+    # ── Breadth expansion II (operator-supplied source lists, 2026-07-04). RSS-viable, on-thesis
+    # picks only; paywalled/no-RSS (The Information, BNEF, FT, Reuters, Axios, Semafor) and
+    # froth-risk enthusiast feeds (CleanTechnica, TDS/KDnuggets) intentionally omitted. The
+    # primary-lab AI feeds directly fill the private-lab coverage hole (desk-coverage-overhaul). ──
+    # AI / compute
+    _Feed("https://techcrunch.com/category/artificial-intelligence/feed/", "TechCrunch AI", "ai"),
+    _Feed("https://venturebeat.com/category/ai/feed/", "VentureBeat AI", "ai"),
+    _Feed("https://www.technologyreview.com/topic/artificial-intelligence/feed/", "MIT Technology Review AI", "ai"),
+    _Feed("https://huggingface.co/blog/feed.xml", "Hugging Face", "ai"),
+    _Feed("https://openai.com/blog/rss.xml", "OpenAI", "ai"),
+    _Feed("https://thegradient.pub/rss/", "The Gradient", "ai"),
+    # Energy
+    _Feed("https://www.power-eng.com/feed/", "Power Engineering", "energy"),
+    _Feed("https://www.ess-news.com/feed/", "ESS News", "energy"),
+    _Feed("https://carbontracker.org/feed/", "Carbon Tracker", "energy"),
+    _Feed("https://www.ans.org/news/rss/", "Nuclear Newswire (ANS)", "energy"),
 )
 
 
