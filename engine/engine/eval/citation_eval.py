@@ -12,6 +12,34 @@ log = structlog.get_logger()
 _CITE_RE = re.compile(r"\[CITE:(\d+)\]")
 _SENTENCE_RE = re.compile(r"(?<=[.!?])\s+(?=[A-Z])")
 
+# Abbreviations that end in a period but do NOT end a sentence. The naive period-space-capital
+# split above otherwise severs a sentence at "U.S. Space Force" or "Gen. Dagvin Anderson"; the
+# leading half then loses its [CITE:N] and gets dropped by strip_uncited_sentences, publishing a
+# broken fragment ("Space Force portfolio.", "Dagvin Anderson as a model…") — 7/5 Defense desk, D121.
+_ABBREV = frozenset({
+    "u.s", "u.k", "u.n", "e.u", "d.c", "gen", "lt", "col", "adm", "sen", "rep", "gov",
+    "capt", "sgt", "maj", "brig", "cmdr", "corp", "inc", "ltd", "co", "dr", "mr", "mrs",
+    "ms", "st", "no", "jr", "sr", "vs", "etc", "e.g", "i.e", "a.m", "p.m", "ph.d",
+})
+
+
+def _split_sentences(body: str) -> list[str]:
+    """Split ``body`` into sentences without breaking after a known abbreviation.
+
+    Re-merges any split whose preceding piece ends in an abbreviation (see ``_ABBREV``),
+    so "…across the U.S. Space Force portfolio [CITE:35]" stays one cited sentence instead
+    of losing its leading, uncited half to the citation gate (D121)."""
+    pieces = _SENTENCE_RE.split(body.strip())
+    merged: list[str] = []
+    for piece in pieces:
+        if merged:
+            last_word = merged[-1].rsplit(" ", 1)[-1].rstrip(".").lower()
+            if last_word in _ABBREV:
+                merged[-1] = f"{merged[-1]} {piece}"
+                continue
+        merged.append(piece)
+    return merged
+
 
 @dataclass
 class Claim:
@@ -62,7 +90,7 @@ def strip_uncited_sentences(body: str) -> str:
     body (possibly empty if nothing was cited)."""
     if not body:
         return ""
-    sentences = _SENTENCE_RE.split(body.strip())
+    sentences = _split_sentences(body)
     kept = [s.strip() for s in sentences if s.strip() and _CITE_RE.search(s)]
     return " ".join(kept)
 
@@ -70,7 +98,7 @@ def strip_uncited_sentences(body: str) -> str:
 def extract_claims(body: str) -> list[Claim]:
     if not body:
         return []
-    sentences = _SENTENCE_RE.split(body.strip())
+    sentences = _split_sentences(body)
     claims = []
     for i, sentence in enumerate(sentences):
         sentence = sentence.strip()

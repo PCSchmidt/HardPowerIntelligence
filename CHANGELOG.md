@@ -37,6 +37,7 @@ live ingestion runner, with Supabase auth and Lemon Squeezy subscriptions. Built
 
 ### Fixed
 
+- **Truncated brief lead sentences — the sentence splitter no longer breaks on abbreviations** (2026-07-05, D121): the 7/5 Defense desk shipped two items with severed leads ("Dagvin Anderson as a model for future security cooperation."; "Space Force portfolio. The report also noted…"). The sentence splitter broke on any period-space-capital, so "Gen. Dagvin Anderson" and "U.S. Space Force" were cut at the abbreviation; the leading half lost its `[CITE:N]` and was dropped by the citation gate. Added an abbreviation guard (`_split_sentences`) used by both `strip_uncited_sentences` and `extract_claims` — a pure-text fix, zero added LLM calls. +3 regression tests; 501 green.
 - **Analysis grounding batched — ~50x fewer eval tokens, and the energy timeout is fixed for real** (2026-07-04,
   D119, corrects D118): the 12-min tail that timed out the energy desk was the analysis-grounding gate (D073,
   live at run_brief.py:108), NOT entity resolution as D118 stated. It grounded each field with its own LLM call

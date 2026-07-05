@@ -41,6 +41,24 @@ class TestStripUncitedSentences:
         cleaned = strip_uncited_sentences(body)
         assert all(c.is_cited for c in extract_claims(cleaned))
 
+    def test_abbreviation_midsentence_not_severed(self):
+        # D121: "U.S. Space Force" must not split into an uncited "…across the U.S." half
+        # that gets dropped, leaving the fragment "Space Force portfolio.". Regression from
+        # the 7/5 Defense GAO item.
+        body = "The GAO warned of growing satellite costs across the U.S. Space Force portfolio [CITE:35]."
+        assert strip_uncited_sentences(body) == body
+
+    def test_military_rank_abbreviation_not_severed(self):
+        # D121: "Gen. Dagvin Anderson" must not split into an uncited lead that gets dropped,
+        # leaving "Dagvin Anderson…". Regression from the 7/5 Defense AFRICOM item.
+        body = "AFRICOM withdrew forces from Nigeria alongside Gen. Dagvin Anderson as a model for cooperation [CITE:37]."
+        assert strip_uncited_sentences(body) == body
+
+    def test_abbreviation_sentence_still_splits_real_boundary(self):
+        # The guard must not fuse two genuinely separate cited sentences.
+        body = "SAIC won a $474M GSA contract [CITE:1]. HII secured $638M from GSA [CITE:2]."
+        assert strip_uncited_sentences(body) == body
+
 
 class TestExtractClaims:
     def test_single_sentence(self):

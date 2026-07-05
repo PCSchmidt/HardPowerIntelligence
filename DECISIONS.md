@@ -3098,3 +3098,22 @@ desk + tier; no timestamp, so an unchanged regen is a no-op diff). A drift guard
 fails if any wired source_id/feed isn't present in the doc, forcing a regen on any source change. `SOURCE_LANDSCAPE.md`
 re-labeled at the top as the CANDIDATE universe/roadmap pointing to SOURCES.md for the live list. Also gave
 usaspending a module docstring (was blank → the generator fell back to the class name). 498 tests green.
+
+
+## D121 — Sentence splitter must not break on abbreviations (fixes truncated brief leads)
+
+**Context:** the 7/5 Defense desk published two items with broken lead sentences: the AFRICOM item
+rendered as "Dagvin Anderson as a model for future security cooperation." and the GAO item as
+"Space Force portfolio. The report also noted...". Root-caused to `_SENTENCE_RE` in
+`eval/citation_eval.py` = `(?<=[.!?])\s+(?=[A-Z])`, which splits on ANY period-space-capital.
+So "...alongside Gen. Dagvin Anderson..." and "...across the U.S. Space Force portfolio [CITE:35]"
+were each severed at the abbreviation; the leading half carried no [CITE:N] and was dropped by
+`strip_uncited_sentences` (the D058 citation invariant), leaving a fragment on the flagship brief.
+The same over-split silently inflated `extract_claims` counts.
+
+**Decision:** add an abbreviation guard. `_split_sentences()` runs the same regex, then re-merges any
+split whose preceding piece ends in a known abbreviation (`_ABBREV`: U.S., U.K., U.N., ranks Gen./Lt./
+Col./..., Corp./Inc., Dr./Mr./..., e.g./i.e., etc.). Both `strip_uncited_sentences` and `extract_claims`
+use it. Zero added LLM calls — a pure-text fix, consistent with the token-efficiency steer (D119). Accepts a
+rare benign over-merge (an abbreviation at a true sentence boundary fuses two sentences) in exchange for never
+publishing a severed, uncited fragment. +3 regression tests pinning the two real 7/5 cases; 501 tests green.
