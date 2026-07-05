@@ -8,8 +8,10 @@ from engine.brief.generator import (
     GeneratedBrief,
     _is_home_desk,
     _license_class_for,
+    _outlet_key,
     _overflow_wire,
     _unwrap_analysis_field,
+    apply_outlet_diversity,
     persist_brief,
 )
 
@@ -81,6 +83,53 @@ class TestOverflowWire:
         A, B = _cand("A"), _cand("B")
         wire = _overflow_wire([A, B], [A, B], [A, B])
         assert {w["record_id"] for w in wire} == {"A", "B"}
+
+
+def _feed_cand(rid: str, outlet: str, score: float):
+    row = {
+        "rr_id": rid, "source_id": "feeds", "record_type": "news",
+        "url": f"https://x/{rid}", "native_id": rid, "text_chunk": f"item {rid}",
+        "_sd": {"outlet": outlet, "title": f"item {rid}"},
+    }
+    return (row, score)
+
+
+class TestOutletDiversity:
+    """D124: one prolific feed outlet (a lab's own blog) can otherwise own a desk. Beyond the
+    cap, the outlet's items are demoted so the overflow sinks to the wire, not the brief."""
+
+    def test_excess_from_one_outlet_demoted_below_other_outlets(self):
+        # OpenAI floods with 5 items; the 4th/5th must fall below a lower-scored rival outlet.
+        cands = [
+            _feed_cand("o1", "OpenAI", 0.90),
+            _feed_cand("o2", "OpenAI", 0.88),
+            _feed_cand("o3", "OpenAI", 0.86),
+            _feed_cand("o4", "OpenAI", 0.84),
+            _feed_cand("o5", "OpenAI", 0.82),
+            _feed_cand("r1", "The Register", 0.50),
+        ]
+        out = apply_outlet_diversity(cands, cap=3, penalty=0.5)
+        ranked = [r["rr_id"] for r, _ in out]
+        # First three OpenAI items keep their rank; the rival outlet now outranks the excess.
+        assert ranked[:3] == ["o1", "o2", "o3"]
+        assert ranked.index("r1") < ranked.index("o4")
+        assert ranked.index("r1") < ranked.index("o5")
+
+    def test_structured_sources_never_capped(self):
+        # Distinct awards from source_id!=feeds must not be diversity-limited.
+        cands = [_cand(f"a{i}", 0.9 - i * 0.01) for i in range(5)]
+        out = apply_outlet_diversity(cands, cap=3, penalty=0.5)
+        assert [r["rr_id"] for r, _ in out] == [r["rr_id"] for r, _ in cands]
+
+    def test_disabled_by_cap_or_penalty(self):
+        cands = [_feed_cand(f"o{i}", "OpenAI", 0.9 - i * 0.01) for i in range(5)]
+        assert apply_outlet_diversity(cands, cap=0, penalty=0.5) == cands
+        assert apply_outlet_diversity(cands, cap=3, penalty=1.0) == cands
+
+    def test_outlet_key_only_for_feeds(self):
+        assert _outlet_key({"source_id": "feeds", "_sd": {"outlet": "OpenAI"}}) == "OpenAI"
+        assert _outlet_key({"source_id": "usaspending", "_sd": {"outlet": "OpenAI"}}) is None
+        assert _outlet_key({"source_id": "feeds", "_sd": {}}) is None
 
 
 class TestLicenseClassForSource:

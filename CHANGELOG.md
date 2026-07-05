@@ -14,6 +14,7 @@ live ingestion runner, with Supabase auth and Lemon Squeezy subscriptions. Built
 
 ### Added
 
+- **Outlet-diversity cap — one prolific feed can no longer own a desk** (2026-07-05, D124): the 7/5 AI desk read ~⅓ OpenAI because the OpenAI blog is a high-volume feed and curation had no per-source diversity control. Beyond 3 items from one feed outlet, the excess is demoted (materiality × 0.5) so it sinks to the wire instead of the brief — applied before fact selection so demoted items still reach the wire, never discarded. Feed outlets only; structured awards/filings (distinct events) are untouched. Demote-not-drop and fail-soft on thin desks. +4 tests.
 - **Authoritative wired-source inventory, auto-generated** (2026-07-04, D120): `docs/SOURCES.md` now lists exactly what ingests (7 adapters + 38 feed outlets by desk + epistemic tier), generated from the code registries by `scripts/dump_sources.py` — no hand-maintained list to rot. A drift-guard test fails if a wired source isn't in the doc. `SOURCE_LANDSCAPE.md` re-labeled as the candidate universe (not the live list).
 - **Full Wire: the material overflow the brief drops for space is now accessible** (2026-06-30,
   D112): the curated brief is space-capped, so on a heavy news day material, on-thesis items that

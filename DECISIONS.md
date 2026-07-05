@@ -3151,3 +3151,24 @@ cut. Fail-open — a missing or unparseable Start Date keeps the award (never dr
 `parse()` before the record is built. Tradeoff accepted: a genuinely newsworthy NEW task order against a >4y-old
 parent (whose award-level Start Date is the parent's) could be dropped — acceptable for this blunt $-sorted
 feed, and the item still reaches the reader via the news feeds if it's reported. +4 tests; 507 green.
+
+
+## D124 — Outlet-diversity cap so one prolific feed can't own a desk
+
+**Context:** the 7/5 AI desk read like an OpenAI newsletter — ~8 of 25 items were OpenAI-subject
+(GPT-5.6 preview, GeneBench, the EU-workforce map, the 5%%-equity proposal, the Appia standards post),
+several of them corporate-comms fluff. Cause: the OpenAI blog is a prolific feed, each post becomes a
+candidate, and the curation pipeline (materiality -> novelty -> advancement floor -> significance) has
+NO per-source/per-entity diversity control — so one outlet dominates. (The AI news/research *floor* from
+the 7/1 diagnosis is now moot: the feed-breadth expansion already made the AI desk news-led and healthy.)
+
+**Decision:** add `apply_outlet_diversity(candidates, cap, penalty)`, mirroring `apply_novelty_penalty`.
+Walking candidates in score order, the (cap+1)th and later item from the same FEED OUTLET has its
+materiality multiplied by `penalty` and the pool is re-sorted, so the excess sinks below the selection
+line and lands in the wire instead of the brief. Applied BEFORE `_select_facts` (so the demoted items stay
+in `candidates` and reach the wire, rather than being computed as significance-froth and discarded). Scope
+= feed outlets only via `_outlet_key` — structured awards/filings/research are distinct events, not one
+outlet's stream, so they're never capped. Demote-not-drop + fail-soft (a penalized item can still surface on
+a thin desk). Settings: `outlet_diversity_cap=3`, `outlet_diversity_penalty=0.5` (cap 0 / penalty 1.0 disable).
++4 tests; 511 green. Entity-level concentration (OpenAI across multiple outlets) and significance-gate tuning
+for corporate-comms fluff are the logical follow-ups.

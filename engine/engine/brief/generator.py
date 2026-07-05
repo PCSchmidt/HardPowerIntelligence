@@ -257,6 +257,52 @@ def apply_novelty_penalty(
     return sorted(adjusted, key=lambda x: x[1], reverse=True)
 
 
+def _outlet_key(row: dict) -> str | None:
+    """Diversity key: the news OUTLET for feed items; ``None`` for structured sources.
+
+    Awards/filings/research are distinct events, not one outlet's stream — capping them
+    would wrongly suppress unrelated records — so only feed outlets are diversity-limited (D124)."""
+    if row.get("source_id") != "feeds":
+        return None
+    sd = row.get("_sd")
+    if not isinstance(sd, dict):
+        sd = row.get("structured_data") or {}
+        if isinstance(sd, str):
+            try:
+                sd = json.loads(sd)
+            except (ValueError, TypeError):
+                sd = {}
+    outlet = sd.get("outlet") if isinstance(sd, dict) else None
+    return outlet or None
+
+
+def apply_outlet_diversity(
+    candidates: list[tuple[dict, float]],
+    cap: int,
+    penalty: float,
+) -> list[tuple[dict, float]]:
+    """Down-rank a feed outlet's items beyond the first ``cap``, then re-sort (D124).
+
+    A prolific outlet (a lab's own blog, a high-volume trade feed) can otherwise own a
+    large share of a desk brief. Walking candidates in score order, the (cap+1)th and later
+    item from the same outlet has its score multiplied by ``penalty`` (<1) so it sinks below
+    the selection line and lands in the wire instead. Demotes rather than drops (fail-soft:
+    on a thin desk a penalized item can still surface), mirroring ``apply_novelty_penalty``."""
+    if cap <= 0 or penalty >= 1.0:
+        return candidates
+    seen: dict[str, int] = {}
+    adjusted: list[tuple[dict, float]] = []
+    for row, score in candidates:
+        outlet = _outlet_key(row)
+        if outlet is None:
+            adjusted.append((row, score))
+            continue
+        n = seen.get(outlet, 0)
+        seen[outlet] = n + 1
+        adjusted.append((row, score * penalty if n >= cap else score))
+    return sorted(adjusted, key=lambda x: x[1], reverse=True)
+
+
 def _select_facts(
     candidates: list[tuple[dict, float]],
     limit: int,
@@ -334,6 +380,12 @@ async def generate_brief(desk: str, pool: asyncpg.Pool) -> GeneratedBrief:
     featured = await _recently_featured(pool, desk, settings.novelty_window_days)
     candidates = apply_novelty_penalty(candidates, featured, settings.novelty_penalty)
     log.info("novelty_applied", desk=desk, featured_records=len(featured))
+    # Outlet diversity (D124): keep one prolific feed (e.g. a lab's own blog) from owning the
+    # desk — demote its overflow toward the wire. Before _select_facts so the excess stays in
+    # `candidates` (→ wire) rather than being computed as significance-froth and discarded.
+    candidates = apply_outlet_diversity(
+        candidates, settings.outlet_diversity_cap, settings.outlet_diversity_penalty
+    )
     if len(candidates) < settings.brief_min_items:
         raise RuntimeError(
             f"Only {len(candidates)} material candidates — below BRIEF_MIN_ITEMS={settings.brief_min_items}"

@@ -90,6 +90,14 @@ class Settings(BaseSettings):
     novelty_window_days: int = 7
     novelty_penalty: float = 0.5
 
+    # Outlet diversity (D124): a prolific news outlet (e.g. a lab's own blog) can otherwise
+    # own a third of a desk brief. Beyond ``outlet_diversity_cap`` items from one feed outlet,
+    # multiply the excess's materiality by ``outlet_diversity_penalty`` so it sinks toward the
+    # wire, not the brief. Demotes (doesn't drop) and applies ONLY to feed outlets — structured
+    # awards/filings are distinct events, not one source's stream. cap 0 / penalty 1.0 disables.
+    outlet_diversity_cap: int = 3
+    outlet_diversity_penalty: float = 0.5
+
     # Brief generation (D039 → D100). A desk brief is a comprehensive read of the
     # domain, not a 5-minute skim: the cap is the *ceiling* on substantive items the
     # synthesis may surface (one per genuine development, no padding). Real output is
