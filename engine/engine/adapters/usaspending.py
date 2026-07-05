@@ -1,3 +1,4 @@
+"""USASpending.gov awards adapter — federal contract & grant awards (the federal-money leg)."""
 import hashlib
 import json
 from dataclasses import dataclass

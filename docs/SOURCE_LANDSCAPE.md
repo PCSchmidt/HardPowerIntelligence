@@ -1,5 +1,10 @@
 # Source Landscape
 
+> **This is the CANDIDATE universe + roadmap, NOT the live wired list.** For exactly what is
+> ingesting *right now* (7 adapters + the feed registry), see the auto-generated
+> [`SOURCES.md`](SOURCES.md) (`uv run python scripts/dump_sources.py`). Entries below may be
+> queued, aspirational, or since-wired — treat this as the map of the territory, not the inventory.
+
 The full universe of information sources for the Defense / AI / Energy desks — what is
 **searched today**, what is **queued**, and the **complete map of what we are missing**,
 organized by source *type* so coverage gaps are visible by category, not just by name.

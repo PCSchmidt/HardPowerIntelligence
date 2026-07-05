@@ -3085,3 +3085,16 @@ too (closes the OXMIQ `{"rewritten":...}` case specifically). +7 tests; backend 
 **Design note:** parallelizing the old per-field loop (the naive follow-up) would have saved LATENCY but ZERO
 tokens — wrong axis once token cost is primary. Batching wins both. Parallelism was reserved for genuinely
 independent I/O; here the calls were redundant, not just serial.
+
+## D120 — Authoritative source inventory is GENERATED, not hand-maintained (docs/SOURCES.md)
+
+**Context:** "Is the source list documented?" — No single doc listed the *live* wired sources.
+Truth lived only in code (`adapters/registry.py` = 7 adapters, `adapters/feeds.py` = 38 feeds), and
+`SOURCE_LANDSCAPE.md` had DRIFTED into a wishlist (listed unwired outlets; missing every batch-1/2 feed).
+
+**Decision:** don't hand-maintain a source list — it rots (SOURCE_LANDSCAPE is the proof). `scripts/dump_sources.py`
+reads the two registries + the epistemics tier map and generates `docs/SOURCES.md` (adapters table + feeds by
+desk + tier; no timestamp, so an unchanged regen is a no-op diff). A drift guard (`tests/unit/test_sources_doc.py`)
+fails if any wired source_id/feed isn't present in the doc, forcing a regen on any source change. `SOURCE_LANDSCAPE.md`
+re-labeled at the top as the CANDIDATE universe/roadmap pointing to SOURCES.md for the live list. Also gave
+usaspending a module docstring (was blank → the generator fell back to the class name). 498 tests green.

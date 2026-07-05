@@ -14,6 +14,7 @@ live ingestion runner, with Supabase auth and Lemon Squeezy subscriptions. Built
 
 ### Added
 
+- **Authoritative wired-source inventory, auto-generated** (2026-07-04, D120): `docs/SOURCES.md` now lists exactly what ingests (7 adapters + 38 feed outlets by desk + epistemic tier), generated from the code registries by `scripts/dump_sources.py` — no hand-maintained list to rot. A drift-guard test fails if a wired source isn't in the doc. `SOURCE_LANDSCAPE.md` re-labeled as the candidate universe (not the live list).
 - **Full Wire: the material overflow the brief drops for space is now accessible** (2026-06-30,
   D112): the curated brief is space-capped, so on a heavy news day material, on-thesis items that
   cleared scoring fell off and were discarded. They're now persisted (`brief_wire` table) and
