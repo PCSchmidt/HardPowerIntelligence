@@ -76,6 +76,11 @@ you noticed manually, and you've stopped opening the PDFs to check health. Cost/
 - [ ] **B4 — Public teaser (zero-budget top-of-funnel).** One representative brief / "yesterday's
   convergence read," shareable + SEO-able. Doubles as founder-led distribution and a
   portfolio/acquisition artifact; a permanent free surface serving all three success modes.
+- [ ] **B5 — Design *discovery* (low-fidelity, disposable).** Mockup the top 2–3 persona-ranked
+  Phase-C surfaces (`MOCKUPS.md` / Figma / even ASCII) and show them in the interviews — a concrete
+  mockup gets far better feedback than an abstract "convergence graph." These are throwaway
+  validation instruments, NOT committed spec. Committed design *spec* is deferred to Phase C entry
+  (see the note under C1 and `FRONTEND_SPEC.md` §9 Tier 3–4).
 
 ### Target personas (Phase C drivers)
 

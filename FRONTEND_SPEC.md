@@ -617,6 +617,8 @@ inline `[CITE:N]` chips that open the drawer; the layered Convergence + Analysis
 ### Tier 4 — information architecture (later)
 - A cross-desk **front page / feed** and **archive search** — the app-like step (cf. The Information).
 
+> **Phase C â this roadmap:** Tiers 3â4 here ARE the Phase C "differentiated surface" in `docs/PHASE_PLAN.md`. Per that plan, low-fidelity design *discovery* of Phase-C surfaces is a **Phase B** activity (a validation instrument); committed design *spec* (this file + DESIGN_SYSTEM + COMPONENT_REGISTRY) lands at **Phase C entry**, after the hero surface is chosen â don't spec candidate surfaces before the Phase B decision gate.
+
 **Dependency:** Tier 1's at-a-glance + Tier 2's bars are *honest* — a filler item (no $, no event) shows
 an empty row. So significance-filtering (the content gate) should land first or alongside, or the new UI
 will spotlight weak items rather than hide them. Selection quality and visualization reinforce each other.
