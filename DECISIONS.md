@@ -3172,3 +3172,24 @@ outlet's stream, so they're never capped. Demote-not-drop + fail-soft (a penaliz
 a thin desk). Settings: `outlet_diversity_cap=3`, `outlet_diversity_penalty=0.5` (cap 0 / penalty 1.0 disable).
 +4 tests; 511 green. Entity-level concentration (OpenAI across multiple outlets) and significance-gate tuning
 for corporate-comms fluff are the logical follow-ups.
+
+
+## D125 — Adopt a gated phase plan: shift from build to harden+validate (docs/PHASE_PLAN.md)
+
+**Context:** with the content engine production-quality (D121-D124 cleared the last obvious defects)
+the binding constraint moved from "are the briefs good?" (they are) to "can anyone rely on it
+unattended, does anyone want it, does it look worth paying for?" The instinct to keep building
+features (viz, sources) is the solo-builder trap — depth/sizzle before demand signal.
+
+**Decision:** adopt a gated, optionality-first roadmap (`docs/PHASE_PLAN.md`): **A** autonomous
+reliability/observability (stop being the monitor) -> **B** validation (thin real feedback +
+willingness-to-pay), with two design reframes baked in: (1) SEPARATE cohorts — ~20-30 warm contacts
+are a feedback asset, the blind LinkedIn cohort is the clean pay signal (relationship pressure
+contaminates conversion); (2) SYNTHETIC PERSONAS as the Phase-C ranking engine, triangulated against
+the thin real feedback -> **C** ONE hero differentiated surface (the convergence view) behind a
+**30-day trial** (daily product needs habit-formation + cross-day convergence value to accrue; 2wk too
+short, 90d kills urgency) — warm cohort gets permanent "Founding Reader" comp -> **D** depth/retention,
+demand-pulled. Marketing stays founder-led/organic with a HARD gate: no paid acquisition spend until
+cold-cohort conversion %% is known. Each phase has a measurable exit gate + kill/continue decision.
+Robust across all three success modes (income / portfolio-JHU / acquisition); only emphasis tilts once
+the primary mode is fixed. Plan doc is a living tracker (checkboxes). No code change.
