@@ -37,6 +37,7 @@ live ingestion runner, with Supabase auth and Lemon Squeezy subscriptions. Built
 
 ### Fixed
 
+- **Consumer-commerce / retail-deal noise filtered out of feeds** (2026-07-05, D122): the AI-Infrastructure wire was flooded with retail froth from an enthusiast feed (gaming chairs, "% off" July-4 sales, PlayStation novelties). A narrow, feed-agnostic guard now drops retail-deal + consumer-gaming product titles at ingest — before they cost any downstream scoring/synthesis tokens — while preserving the real compute-supply signal from the same feed (DRAM/HBM pricing, fab yields, chip SKUs). +2 tests pinning both the drop and keep sides.
 - **Truncated brief lead sentences — the sentence splitter no longer breaks on abbreviations** (2026-07-05, D121): the 7/5 Defense desk shipped two items with severed leads ("Dagvin Anderson as a model for future security cooperation."; "Space Force portfolio. The report also noted…"). The sentence splitter broke on any period-space-capital, so "Gen. Dagvin Anderson" and "U.S. Space Force" were cut at the abbreviation; the leading half lost its `[CITE:N]` and was dropped by the citation gate. Added an abbreviation guard (`_split_sentences`) used by both `strip_uncited_sentences` and `extract_claims` — a pure-text fix, zero added LLM calls. +3 regression tests; 501 green.
 - **Analysis grounding batched — ~50x fewer eval tokens, and the energy timeout is fixed for real** (2026-07-04,
   D119, corrects D118): the 12-min tail that timed out the energy desk was the analysis-grounding gate (D073,

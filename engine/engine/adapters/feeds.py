@@ -40,6 +40,28 @@ _MAX_ITEMS_PER_FEED = 12   # most-recent items per feed; bounds volume
 _USER_AGENT = "HardPowerIntelligence/1.0 (hardpowerintelligence@gmail.com)"
 _TAG_RE = re.compile(r"<[^>]+>")
 
+# Consumer-commerce / retail-deal noise that enthusiast tech feeds (e.g. Tom's Hardware) mix into
+# real compute-supply reporting. Dropped at parse so it never costs downstream scoring/synthesis
+# tokens (D122). Narrow by design: matches retail-deal + gaming-hardware PRODUCT language, NOT the
+# supply-chain signal we keep (DRAM/HBM pricing, fab yields, chip SKUs, memory-maker lobbying).
+_COMMERCE_NOISE_SUBSTR = (
+    "save up to", "flash sale", "weekend sale", "for only $", "huge discount",
+    "prime day", "black friday", "best deals",
+    "gaming pc", "gaming laptop", "gaming desktop", "gaming chair", "gaming monitor",
+    "gaming keyboard", "gaming mouse", "gaming headset",
+    "steam controller", "steam machine", "steam deck", "dualshock",
+    "playstation", "xbox", "nintendo",
+)
+_COMMERCE_NOISE_RE = re.compile(
+    r"\b\d{1,3}%\s*off\b|\$\d[\d,]*\s*off\b|\bplummets?\s+\$", re.IGNORECASE,
+)
+
+
+def _is_commerce_noise(title: str) -> bool:
+    """True for retail-deal / consumer-gaming froth that should never reach a desk (D122)."""
+    low = title.lower()
+    return any(p in low for p in _COMMERCE_NOISE_SUBSTR) or bool(_COMMERCE_NOISE_RE.search(title))
+
 
 @dataclass(frozen=True)
 class _Feed:
@@ -171,6 +193,8 @@ def parse_feed(xml_text: str, feed: _Feed) -> list[NormalizedRecord]:
         title = title[:_TITLE_CHARS]
         if not title or not (link or guid):
             continue
+        if _is_commerce_noise(title):
+            continue   # retail-deal / consumer-gaming froth — drop before it costs tokens (D122)
         native = guid or link
         snippet = summary[:_SUMMARY_CHARS]
 

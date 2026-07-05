@@ -3117,3 +3117,21 @@ Col./..., Corp./Inc., Dr./Mr./..., e.g./i.e., etc.). Both `strip_uncited_sentenc
 use it. Zero added LLM calls — a pure-text fix, consistent with the token-efficiency steer (D119). Accepts a
 rare benign over-merge (an abbreviation at a true sentence boundary fuses two sentences) in exchange for never
 publishing a severed, uncited fragment. +3 regression tests pinning the two real 7/5 cases; 501 tests green.
+
+
+## D122 — Drop consumer-commerce / retail-deal noise from feeds at ingest
+
+**Context:** the 7/5 AI-Infrastructure full wire was half retail froth from Tom's Hardware —
+"Save up to 47%% on Dell gaming PCs," "gaming chairs," "$349 OLED monitor," "Sony crammed a PS1
+into a DualShock," "Domino's/KFC dunk on PlayStation." It cleared the material-overflow bar into
+the wire, undercutting the "nothing relevant gets thrown away" promise (this IS irrelevant). But the
+same feed carries REAL compute-supply signal (Intel 18A fab yields, DRAM/HBM pricing, SK hynix/Micron
+lobbying) — so dropping the outlet would lose signal.
+
+**Decision:** filter, don't drop the feed. A narrow, feed-agnostic `_is_commerce_noise(title)` guard in
+`parse_feed` drops retail-deal + consumer-gaming PRODUCT language ("save up to", "N%% off", "$N off",
+"flash sale", "for only $", "plummets $", "gaming pc/chair/monitor/...", "dualshock", "playstation/
+xbox/nintendo") BEFORE the record is built — so it never costs downstream scoring/synthesis tokens
+(token-efficiency steer, D119). Precision-first: verified against the real 7/5 junk (dropped) and the real
+supply-chain items (kept, incl. "game-boosting cache" chip SKUs and DRAM/HBM stories). Applies to every
+feed, not just Tom's. +2 tests pinning both sides. Backend green.

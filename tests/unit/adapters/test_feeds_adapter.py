@@ -92,6 +92,42 @@ class TestParseFeed:
         assert len(parse_feed(xml, _DEF_FEED)) == _MAX_ITEMS_PER_FEED
 
 
+class TestCommerceNoiseFilter:
+    # Real 7/5 AI-wire junk (Tom's Hardware) that must be dropped at parse (D122).
+    _JUNK = [
+        "Save up to 47% on Dell and Alienware gaming PCs and laptops in this July 4th flash sale",
+        "Save up to 71% on HP gaming desktops and laptops this July 4",
+        "Up to $129 off Secretlab gaming chairs and desks in July 4 sale",
+        "Get a premium 27-inch 1440p 240 Hz OLED gaming monitor for only $349 — OLED for the price of IPS",
+        "The ultimate 4K RTX 5090 gaming titan plummets $2,580 — huge discount makes the Alienware Area-51 irresistible",
+        "Sony crammed an entire PS1 into a DualShock controller that connects to your TV",
+        "50-feet-long fiber optic HDMI cable and Steam Controller 2 is enthusiasts' answer to the Steam Machine",
+        "AOC U27G4XM 27-inch 4K 160 Hz Dual-Refresh Gaming Monitor Review",
+    ]
+    # Real compute-supply signal from the same feed that MUST survive.
+    _KEEP = [
+        "Intel 18A wafer-to-wafer yield issues fixed, report claims — production up to 15,000 wafers/month",
+        "Memory price surge begins to cool — AI demand still keeps DRAM and NAND prices climbing through Q3 2026",
+        "Inside the history of DRAM price-fixing lawsuits — how HBM allocations could make a difference",
+        "SK hynix, Samsung, Micron among semiconductor industry group lobbying against government intervention",
+        "Intel reportedly adding two new 22-core SKUs with game-boosting cache to Nova Lake-S lineup",
+        "National Grid Ventures invests $1.75bn in gas plant powering 2GW Microsoft data center in Texas",
+    ]
+
+    def _item(self, title: str) -> str:
+        return f"<item><title>{title}</title><link>https://x/1</link></item>"
+
+    def test_commerce_noise_dropped(self):
+        for title in self._JUNK:
+            xml = f'<rss version="2.0"><channel>{self._item(title)}</channel></rss>'
+            assert parse_feed(xml, _AI_FEED) == [], f"should drop: {title}"
+
+    def test_supply_chain_signal_survives(self):
+        for title in self._KEEP:
+            xml = f'<rss version="2.0"><channel>{self._item(title)}</channel></rss>'
+            assert len(parse_feed(xml, _AI_FEED)) == 1, f"should keep: {title}"
+
+
 class TestFeedRegistry:
     def test_registry_spans_all_three_desks(self):
         assert {f.desk for f in _FEEDS} == {"defense", "ai", "energy"}
