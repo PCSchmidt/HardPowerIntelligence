@@ -1,6 +1,6 @@
 # HPI Phase Plan — from content-complete to validated & monetized
 
-**Status:** ADOPTED 2026-07-05 · **Current phase:** Phase A (not started)
+**Status:** ADOPTED 2026-07-05 · **Current phase:** Phase A (in progress — A1 + A5 shipped 2026-07-05, D126)
 **Owner:** operator · **Companion docs:** [ARCHITECTURE.md](ARCHITECTURE.md), [SOURCES.md](SOURCES.md), [SOURCE_LANDSCAPE.md](SOURCE_LANDSCAPE.md), `../DECISIONS.md` (D125)
 
 ## Where we are (macro state, 2026-07-05)
@@ -38,18 +38,20 @@ So this plan moves from *build* mode to *harden + validate* mode.
 
 **Entry:** now. **Objective:** the pipeline runs unattended and alerts you; you stop being the monitor.
 
-- [ ] **A1 — Run-health alerting.** Per run, evaluate `ingestion_runs` + publish outcomes; push
-  a notification (email/Discord/webhook) on: any desk `failed`/`skipped`, a source
-  circuit-breaker `open`, `feed_yielded_zero` past a threshold, publish gate below min
-  items/claims, or a faithfulness-score drop.
-- [ ] **A2 — Output-quality canary.** Post-publish check on the *actual* brief (not just unit
-  tests): item count in expected band, confidence-mix not collapsed (not ~100% speculative), no
-  empty analysis, no leak patterns. Fail → alert.
+- [x] **A1 — Run-health alerting.** ✅ 2026-07-05 (D126). Pure evaluator
+  (`engine/engine/ops/health.py`) + `scripts/run_health.py` + a scheduled-only `health` job in
+  `daily-brief.yml` that inspects `briefs` / `ingestion_runs` / `source_registry` and exits
+  non-zero (→ GitHub failure email, no new infra) on silent degradation: total shutout, stuck/
+  absent brief rows, failed ingest source, open circuit breaker, or a stale source. Correctly
+  treats a thin-day skip (`status='failed'`) as INFO, not an alert. 16 tests.
+- [ ] **A2 — Output-quality canary.** *Partially landed in A1* (item-count floor → `brief_thin`,
+  low-faithfulness guard). Remaining: confidence-mix-not-collapsed and analysis/leak-pattern checks.
 - [ ] **A3 — Daily self-digest.** One-glance per-run summary to self: per-desk item counts,
-  sources up/down, eval scores, token cost. Reuses existing telemetry.
+  sources up/down, eval scores, token cost. Reuses existing telemetry. (A1's report is the seed.)
 - [ ] **A4 — Cost observability.** Daily LLM token/$ per run (honors the token-efficiency
   steer); alert on anomaly so cost can't silently balloon.
-- [ ] **A5 — Dead-man's switch.** No successful publish by a cutoff UTC → page yourself.
+- [x] **A5 — Dead-man's switch.** ✅ 2026-07-05 (D126). Realized as the `no_brief_published`
+  *critical* in the A1 health check — a total publish shutout goes red regardless of exit codes.
 
 **Exit gate:** 7 consecutive unattended days where every degradation surfaced an alert *before*
 you noticed manually, and you've stopped opening the PDFs to check health. Cost/run known and bounded.

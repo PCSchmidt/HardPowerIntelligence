@@ -3193,3 +3193,27 @@ demand-pulled. Marketing stays founder-led/organic with a HARD gate: no paid acq
 cold-cohort conversion %% is known. Each phase has a measurable exit gate + kill/continue decision.
 Robust across all three success modes (income / portfolio-JHU / acquisition); only emphasis tilts once
 the primary mode is fixed. Plan doc is a living tracker (checkboxes). No code change.
+
+
+## D126 — Phase A/A1: run-health alerting catches silent degradation (not just crashes)
+
+**Context:** the daily cron's only alarm was GitHub's native "workflow failed" email, which fires ONLY
+on a hard crash (a brief job exiting non-zero). Silent degradation — a failed ingest source, an open
+circuit breaker, a stale source, or a total publish shutout that still exits cleanly — never paged the
+operator, who had to open the rendered desks each morning to notice. First Phase-A gate (see
+docs/PHASE_PLAN.md).
+
+**Decision:** a pure health evaluator (`engine/engine/ops/health.py` `evaluate_health`) turns one day's
+telemetry (briefs + ingestion_runs + source_registry) into a verdict; `scripts/run_health.py` queries the
+DB and exits non-zero on degraded/critical so the EXISTING GitHub email channel fires (no new infra — a
+webhook can come later). A scheduled-only `health` job runs after ingest+brief with `always()`.
+
+**Key semantics nailed (from run_brief.py):** a published desk -> `status='published'`; a **clean thin-day
+skip** (below the provable-claim floor — normal) persists `status='failed'`; a **hard crash** returns
+BEFORE persist -> **no row**. So `status='failed'` is a NORMAL skip and must not page — it's INFO. The real
+signals: **critical** = no desk published (total shutout / stale reader content, also realizes the A5
+dead-man's switch); **warn** = missing/stuck brief row, an anomalously thin published brief, low
+faithfulness, a failed ingest source, an open circuit breaker, or an active source gone stale (>30h).
+Never-run seeded sources (last_successful_fetch_at NULL) don't false-alarm. Thresholds tunable
+(`HealthThresholds`). +16 tests; suite 527 green. Remaining Phase A: A2 confidence-mix canary, A3
+self-digest, A4 cost observability.

@@ -162,3 +162,31 @@ jobs:
             exit 1
           fi
           exit 0
+
+  # ── Phase 3: post-run health check (Phase A / A1) ────────────────────────────────
+  # The per-desk jobs above only go red on a hard CRASH. This job inspects the run's own
+  # telemetry (briefs, ingestion_runs, source_registry) and goes red on SILENT degradation
+  # the crash-only alarm misses: a total publish shutout, stuck/absent rows, a failed ingest
+  # source, an open circuit breaker, or a stale source. `always()` so it still runs if a desk
+  # crashed. Scheduled-only: a manual single-desk dispatch would look like a shutout of the
+  # other two desks and false-alarm. Red here fires GitHub's native failure email (no new infra).
+  health:
+    needs: [ingest, brief]
+    if: ${{ always() && github.event_name == 'schedule' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          version: "0.8.0"
+
+      - name: Sync workspace
+        run: uv sync --all-packages --all-extras
+
+      - name: Evaluate run health
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: uv run python scripts/run_health.py
