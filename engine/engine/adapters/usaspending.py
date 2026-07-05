@@ -14,6 +14,14 @@ _BASE_URL = "https://api.usaspending.gov/api/v2/search/spending_by_award/"
 # (D057) drops the repeats. 45 days balances catching lagged awards against page volume.
 _LOOKBACK_DAYS = 45
 
+# An award whose period of performance STARTED years ago is a pre-existing/parent award
+# resurfacing on a recent administrative modification — not "material today." spending_by_award
+# returns these (a 1993-dated $22B Boeing/NASA ceiling appeared in the 7/5 Defense wire) because a
+# recent mod lands in the action-date window while Start Date stays decades back. Drop awards whose
+# start date predates this horizon — a coarse recency floor, generous (4y) so normal multi-year
+# awards stay while legacy ceilings are cut (D123).
+_MAX_AWARD_AGE_DAYS = 4 * 365
+
 # award_type_codes are segregated by group in spending_by_award (you cannot mix contract
 # and assistance types in one query). Defense capital is procurement *contracts* (A–D);
 # AI/Energy capital formation (DOE/NSF/ARPA-E research + buildout) flows as *grants /
@@ -94,6 +102,19 @@ def _sha256(data: dict) -> str:
     return hashlib.sha256(canonical.encode()).hexdigest()
 
 
+def _award_too_old(start_date: str | None) -> bool:
+    """True if the award's period started before the recency floor (D123).
+
+    Fail-open: a missing/unparseable date keeps the award (never drop on ambiguity)."""
+    if not start_date:
+        return False
+    try:
+        start = date.fromisoformat(start_date[:10])
+    except ValueError:
+        return False
+    return start < date.today() - timedelta(days=_MAX_AWARD_AGE_DAYS)
+
+
 def _normalize_name(name: str) -> str:
     suffixes = {" INC", " CORP", " LLC", " LTD", " LP", " CO", " CORPORATION",
                 " INCORPORATED", " LIMITED", " COMPANY"}
@@ -139,6 +160,8 @@ class USASpendingAdapter:
             award_id = row.get("Award ID", "")
             if not award_id:
                 continue
+            if _award_too_old(row.get("Start Date")):
+                continue   # legacy/parent ceiling resurfacing on a recent mod — not news (D123)
 
             structured = {
                 "award_id": award_id,

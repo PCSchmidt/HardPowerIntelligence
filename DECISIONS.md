@@ -3135,3 +3135,19 @@ xbox/nintendo") BEFORE the record is built — so it never costs downstream scor
 (token-efficiency steer, D119). Precision-first: verified against the real 7/5 junk (dropped) and the real
 supply-chain items (kept, incl. "game-boosting cache" chip SKUs and DRAM/HBM stories). Applies to every
 feed, not just Tom's. +2 tests pinning both sides. Backend green.
+
+
+## D123 — Recency floor on federal awards (stop decades-old ceilings surfacing as news)
+
+**Context:** the 7/5 Defense wire carried a $22.4B Boeing award with a period of performance starting
+**1993** (to 2026-09-30). `spending_by_award` returned it because a recent administrative modification
+fell inside our 45-day action-date lookback, even though the award itself is a 33-year-old parent/IDIQ
+ceiling — zero news value today, and its size would dominate any $-ranked view.
+
+**Decision:** add a coarse recency floor in the usaspending adapter. `_award_too_old(start_date)` drops any
+award whose period-of-performance START predates a horizon (`_MAX_AWARD_AGE_DAYS = 4y`). Generous on purpose:
+a normal multi-year contract (start within a few years) stays; only legacy ceilings resurfacing on a mod are
+cut. Fail-open — a missing or unparseable Start Date keeps the award (never drop on ambiguity). Applied in
+`parse()` before the record is built. Tradeoff accepted: a genuinely newsworthy NEW task order against a >4y-old
+parent (whose award-level Start Date is the parent's) could be dropped — acceptable for this blunt $-sorted
+feed, and the item still reaches the reader via the news feeds if it's reported. +4 tests; 507 green.

@@ -91,6 +91,31 @@ class TestParse:
         assert records[0].structured_data.get("recipient_uei") is None
 
 
+class TestRecencyGuard:
+    """D123: a decades-old parent/ceiling award resurfacing on a recent mod is not news today."""
+
+    def _row(self, award_id: str, start: str) -> dict:
+        return {"Award ID": award_id, "Recipient Name": "THE BOEING COMPANY",
+                "Award Amount": 22_000_000_000.0, "Start Date": start, "End Date": "2026-09-30"}
+
+    def test_legacy_award_dropped(self):
+        # The real 7/5 case: a 1993-dated $22B NASA ceiling.
+        resp = {"results": [self._row("LEGACY", "1993-11-15")]}
+        assert USASpendingAdapter().parse(resp) == []
+
+    def test_recent_award_kept(self):
+        resp = {"results": [self._row("FRESH", "2026-02-01")]}
+        assert len(USASpendingAdapter().parse(resp)) == 1
+
+    def test_missing_start_date_fails_open(self):
+        row = self._row("NODATE", "")
+        row.pop("Start Date")
+        assert len(USASpendingAdapter().parse({"results": [row]})) == 1
+
+    def test_unparseable_start_date_fails_open(self):
+        assert len(USASpendingAdapter().parse({"results": [self._row("BAD", "None")]})) == 1
+
+
 class TestContentHash:
     def test_content_hash_is_deterministic(self, usaspending_response):
         adapter = USASpendingAdapter()
