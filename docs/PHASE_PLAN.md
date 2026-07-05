@@ -1,6 +1,6 @@
 # HPI Phase Plan — from content-complete to validated & monetized
 
-**Status:** ADOPTED 2026-07-05 · **Current phase:** Phase A (in progress — A1 + A5 shipped 2026-07-05, D126)
+**Status:** ADOPTED 2026-07-05 · **Current phase:** Phase A — all workstreams (A1–A5) shipped 2026-07-05 (D126/D127); **exit gate pending: 7 clean unattended days**
 **Owner:** operator · **Companion docs:** [ARCHITECTURE.md](ARCHITECTURE.md), [SOURCES.md](SOURCES.md), [SOURCE_LANDSCAPE.md](SOURCE_LANDSCAPE.md), `../DECISIONS.md` (D125)
 
 ## Where we are (macro state, 2026-07-05)
@@ -44,12 +44,18 @@ So this plan moves from *build* mode to *harden + validate* mode.
   non-zero (→ GitHub failure email, no new infra) on silent degradation: total shutout, stuck/
   absent brief rows, failed ingest source, open circuit breaker, or a stale source. Correctly
   treats a thin-day skip (`status='failed'`) as INFO, not an alert. 16 tests.
-- [ ] **A2 — Output-quality canary.** *Partially landed in A1* (item-count floor → `brief_thin`,
-  low-faithfulness guard). Remaining: confidence-mix-not-collapsed and analysis/leak-pattern checks.
-- [ ] **A3 — Daily self-digest.** One-glance per-run summary to self: per-desk item counts,
-  sources up/down, eval scores, token cost. Reuses existing telemetry. (A1's report is the seed.)
-- [ ] **A4 — Cost observability.** Daily LLM token/$ per run (honors the token-efficiency
-  steer); alert on anomaly so cost can't silently balloon.
+- [x] **A2 — Output-quality canary.** ✅ 2026-07-05 (D126 item-count/faithfulness + D127). Adds a
+  **confidence-mix** check (`confidence_collapsed` — a published brief with zero confirmed/reported
+  items) and a **content-leak** canary (`content_leak` — catches a D118 JSON-leak regression in
+  prod via `looks_like_content_leak`).
+- [x] **A3 — Daily self-digest.** ✅ 2026-07-05 (D127). `HealthReport.digest` — always-shown run
+  picture: per-desk published item count + attribution mix, per-source ingest volume, and the
+  run's LLM token/cost total. Emitted to stdout + the GitHub step summary alongside the anomalies.
+- [x] **A4 — Cost observability.** ✅ 2026-07-05 (D127). Process-level token accumulator in the LLM
+  client (`usage_snapshot`); `run_brief.py` prints per-desk usage and stamps it onto the brief
+  metadata; the health check aggregates it into the digest and warns (`cost_anomaly`) above
+  `llm_run_token_budget`. *Deferred (revisit after runs):* anomaly detection vs. a rolling baseline
+  (current guard is an absolute per-run ceiling).
 - [x] **A5 — Dead-man's switch.** ✅ 2026-07-05 (D126). Realized as the `no_brief_published`
   *critical* in the A1 health check — a total publish shutout goes red regardless of exit codes.
 

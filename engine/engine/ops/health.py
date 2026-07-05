@@ -20,11 +20,23 @@ added later).
 """
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
 
 _EXPECTED_DESKS: tuple[str, ...] = ("defense", "ai", "energy")
+_ATTRIBUTIONS = ("confirmed", "reported", "analysis", "speculative")
 _LEVEL_ORDER = {"critical": 0, "warn": 1, "info": 2}
+
+# The D118 JSON-leak signature: an item body / analysis field that IS (or opens as) a JSON
+# wrapper object rather than prose. A leading brace alone is too loose (prose can start "{...}"),
+# so we also require a known wrapper key — conservative, to avoid false positives (A2 canary).
+_LEAK_MARKERS = ('"rewritten"', '"analysis"', '"convergence_read"', '"text"', '"body"', '"read"', '"watch"')
+
+
+def looks_like_content_leak(text: str) -> bool:
+    """True if ``text`` looks like leaked synthesis JSON (a D118 regression) rather than prose."""
+    t = (text or "").strip()
+    return t.startswith("{") and any(m in t for m in _LEAK_MARKERS)
 
 
 @dataclass(frozen=True)
@@ -33,6 +45,7 @@ class HealthThresholds:
     min_items_per_brief: int = 4     # a PUBLISHED brief thinner than this is anomalously starved
     min_faithfulness: float = 0.98   # a published brief below the eval bar is a data smell
     source_stale_hours: int = 30     # an active source that once fetched but hasn't within this window
+    run_token_budget: int = 0        # total completion tokens across desks above which cost warns (0=off)
 
 
 @dataclass(frozen=True)
@@ -47,6 +60,7 @@ class HealthReport:
     verdict: str            # "ok" | "degraded" | "critical"
     findings: list[Finding]
     summary: str
+    digest: list[str] = field(default_factory=list)   # always-shown run picture (A3)
 
     @property
     def exit_code(self) -> int:
@@ -109,6 +123,23 @@ def evaluate_health(
                     "warn", "brief_low_faithfulness",
                     f"{desk}: published at faithfulness {faith:.3f} (< {t.min_faithfulness}).",
                 ))
+            # A2 — confidence-mix canary: a healthy brief is grounded (confirmed/reported). Zero
+            # of both means it's entirely analysis/speculative — the sourcing collapsed.
+            ac = b.get("attribution_counts") or {}
+            if ac and (ac.get("confirmed", 0) + ac.get("reported", 0)) == 0:
+                findings.append(Finding(
+                    "warn", "confidence_collapsed",
+                    f"{desk}: no confirmed/reported items — brief is entirely analysis/speculative.",
+                ))
+            # A2 — content-leak canary: catch a D118 JSON-leak regression in prod.
+            texts = list(b.get("item_texts") or [])
+            if b.get("convergence_read"):
+                texts.append(b["convergence_read"])
+            if any(looks_like_content_leak(x) for x in texts):
+                findings.append(Finding(
+                    "warn", "content_leak",
+                    f"{desk}: an item body/analysis field looks like leaked JSON (D118 regression?).",
+                ))
         elif status == "failed":
             # A clean thin-day skip (below the claim floor). Normal — surface, don't alarm.
             findings.append(Finding(
@@ -146,6 +177,38 @@ def evaluate_health(
                     f"source '{s.get('id')}' last fetched {age_h:.0f}h ago (> {t.source_stale_hours}h).",
                 ))
 
+    # ── Cost (A4) — total completion tokens stamped on each brief by run_brief.py ─────
+    tokens = [b.get("tokens") or {} for b in briefs]
+    total_tokens = sum(int(tk.get("total_tokens", 0) or 0) for tk in tokens)
+    total_calls = sum(int(tk.get("calls", 0) or 0) for tk in tokens)
+    total_cost = sum(float(tk.get("est_cost_usd", 0.0) or 0.0) for tk in tokens)
+    if t.run_token_budget and total_tokens > t.run_token_budget:
+        findings.append(Finding(
+            "warn", "cost_anomaly",
+            f"run used {total_tokens:,} tokens (> budget {t.run_token_budget:,}) — a loop or regression?",
+        ))
+
+    # ── A3 digest — the always-shown daily picture (informational, separate from alerts) ─
+    digest: list[str] = []
+    for desk in expected_desks:
+        b = by_desk.get(desk)
+        if b and b.get("status") == "published":
+            ac = b.get("attribution_counts") or {}
+            mix = " / ".join(f"{ac.get(k, 0)} {k}" for k in _ATTRIBUTIONS)
+            digest.append(f"{desk}: {b.get('item_count') or 0} items ({mix})")
+        elif b and b.get("status") == "failed":
+            digest.append(f"{desk}: skipped (thin day)")
+        else:
+            digest.append(f"{desk}: no brief")
+    vol = sorted(
+        ((r.get("source_id"), int(r.get("records_new", 0) or 0)) for r in ingest_runs),
+        key=lambda x: -x[1],
+    )
+    vol_items = [f"{sid} +{n}" for sid, n in vol if n]
+    digest.append("ingest: " + (", ".join(vol_items) if vol_items else "no new records"))
+    if total_tokens:
+        digest.append(f"LLM: {total_calls} calls, {total_tokens:,} tokens (~${total_cost:.2f} approx)")
+
     verdict = (
         "critical" if any(f.level == "critical" for f in findings)
         else "degraded" if any(f.level == "warn" for f in findings)
@@ -158,4 +221,4 @@ def evaluate_health(
         f"{crits} critical, {warns} warnings"
     )
     ordered = sorted(findings, key=lambda f: _LEVEL_ORDER.get(f.level, 9))
-    return HealthReport(verdict=verdict, findings=ordered, summary=summary)
+    return HealthReport(verdict=verdict, findings=ordered, summary=summary, digest=digest)

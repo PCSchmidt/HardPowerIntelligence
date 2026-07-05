@@ -26,6 +26,7 @@ from engine.brief.publish import generate_publishable_brief
 from engine.db import create_pool
 from engine.eval.citation_eval import CitationEvaluator
 from engine.ingest.fetcher import HttpFetcher
+from engine.llm.client import llm_client
 from engine.settings import settings
 from engine.signal.gdelt import compute_brief_signal
 
@@ -148,6 +149,17 @@ async def main(desk: str, brief_date: str) -> int:
     brief.signal_series = gdelt_signal.series_json()   # lead-theme series for the sparkline (D089)
     if brief.signal:
         print(f"\nSIGNAL: {brief.signal}")
+
+    # Cost observability (A4): stamp this desk-run's total LLM token spend onto the brief's
+    # metadata (persisted) so the post-run health digest can aggregate cost across desks, and
+    # print it for immediate CI-log visibility. Completion calls only (embeddings run separately).
+    usage = llm_client.usage_snapshot()
+    brief.model_waterfall_metadata["tokens"] = usage
+    print(
+        f"\nLLM usage: {usage['calls']} calls, {usage['total_tokens']:,} tokens "
+        f"(prompt {usage['prompt_tokens']:,} / completion {usage['completion_tokens']:,}), "
+        f"~${usage['est_cost_usd']} approx"
+    )
 
     brief_id = await persist_brief(
         brief=brief,

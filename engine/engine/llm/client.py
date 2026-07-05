@@ -58,6 +58,45 @@ def parse_json(text: str) -> dict | list | None:
 
 
 class LLMClient:
+    """Wraps litellm with retry/backoff and a process-level token accumulator (A4).
+
+    Each desk's brief runs in its own process (the CI matrix), so the singleton's counters
+    naturally scope to one desk-run: `usage_snapshot()` at the end reports that desk's total
+    LLM spend. Covers completion calls only — embeddings go through a separate OpenAI path."""
+
+    def __init__(self) -> None:
+        self._calls = 0
+        self._prompt_tokens = 0
+        self._completion_tokens = 0
+
+    def reset_usage(self) -> None:
+        self._calls = self._prompt_tokens = self._completion_tokens = 0
+
+    def usage_snapshot(self) -> dict:
+        """Cumulative token usage since process start (or last reset) + an APPROXIMATE cost.
+
+        Token counts are the real signal; the dollar figure is a coarse blended estimate (the
+        pipeline mixes models), useful only for eyeballing anomalies — never billing."""
+        total = self._prompt_tokens + self._completion_tokens
+        return {
+            "calls": self._calls,
+            "prompt_tokens": self._prompt_tokens,
+            "completion_tokens": self._completion_tokens,
+            "total_tokens": total,
+            "est_cost_usd": round(total / 1_000_000 * settings.llm_cost_per_1m_tokens_usd, 4),
+        }
+
+    def _record_usage(self, model: str, response) -> None:
+        usage = getattr(response, "usage", None)
+        if usage is None:
+            return
+        pt = getattr(usage, "prompt_tokens", 0) or 0
+        ct = getattr(usage, "completion_tokens", 0) or 0
+        self._calls += 1
+        self._prompt_tokens += pt
+        self._completion_tokens += ct
+        log.info("llm_call", model=model, prompt_tokens=pt, completion_tokens=ct)
+
     async def _acompletion_with_retry(self, **kwargs):
         """Call litellm with exponential backoff + jitter on transient errors (D076).
 
@@ -107,14 +146,7 @@ class LLMClient:
 
         response = await self._acompletion_with_retry(**kwargs)
         content = response.choices[0].message.content
-
-        usage = response.usage
-        log.info(
-            "llm_call",
-            model=model,
-            prompt_tokens=usage.prompt_tokens,
-            completion_tokens=usage.completion_tokens,
-        )
+        self._record_usage(model, response)
 
         if json_mode:
             if parse_json(content) is None:
@@ -126,6 +158,7 @@ class LLMClient:
                 repair_kwargs = {**kwargs, "messages": repair_messages}
                 response = await self._acompletion_with_retry(**repair_kwargs)
                 content = response.choices[0].message.content
+                self._record_usage(model, response)
                 if parse_json(content) is None:
                     raise LLMError(f"JSON parse failed after repair retry for model={model}")
 

@@ -34,6 +34,12 @@ class Settings(BaseSettings):
     llm_max_retries: int = 4               # retries after the first try (5 attempts total)
     llm_backoff_base_seconds: float = 2.0  # first backoff; doubles each retry
     llm_backoff_max_seconds: float = 30.0  # cap per-retry sleep
+    # Cost observability (Phase A / A4). The pipeline mixes models, so token COUNTS are the real
+    # signal; this coarse blended $/1M-token rate is only for eyeballing anomalies, never billing.
+    llm_cost_per_1m_tokens_usd: float = 0.60
+    # A single desk-run burning more than this many completion tokens is almost certainly a loop
+    # or regression, not a busy news day — the health check warns above it. 0 disables.
+    llm_run_token_budget: int = 3_000_000
 
     # Anthropic
     anthropic_api_key: str = ""

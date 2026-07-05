@@ -8,7 +8,7 @@ Verdict semantics under test:
 """
 from datetime import datetime, timedelta, timezone
 
-from engine.ops.health import HealthThresholds, evaluate_health
+from engine.ops.health import HealthThresholds, evaluate_health, looks_like_content_leak
 
 NOW = datetime(2026, 7, 6, 7, 0, tzinfo=timezone.utc)
 
@@ -157,3 +157,99 @@ class TestReportShape:
             briefs=_all_published(), ingest_runs=[], sources=[], now=NOW
         )
         assert "3/3 desks published" in report.summary
+
+
+class TestConfidenceMixCanary:  # A2
+    def test_collapsed_confidence_warns(self):
+        # A published brief with zero confirmed/reported items — sourcing collapsed.
+        b = _brief("defense")
+        b["attribution_counts"] = {"analysis": 3, "speculative": 5}
+        report = evaluate_health(
+            briefs=[b, _brief("ai"), _brief("energy")], ingest_runs=[], sources=[], now=NOW
+        )
+        assert "confidence_collapsed" in _codes(report)
+        assert report.verdict == "degraded"
+
+    def test_healthy_mix_does_not_warn(self):
+        b = _brief("defense")
+        b["attribution_counts"] = {"confirmed": 4, "reported": 18, "analysis": 0, "speculative": 0}
+        report = evaluate_health(
+            briefs=[b, _brief("ai"), _brief("energy")], ingest_runs=[], sources=[], now=NOW
+        )
+        assert "confidence_collapsed" not in _codes(report)
+
+    def test_absent_attribution_counts_no_false_alarm(self):
+        # When counts aren't supplied (older path), don't warn.
+        report = evaluate_health(briefs=_all_published(), ingest_runs=[], sources=[], now=NOW)
+        assert "confidence_collapsed" not in _codes(report)
+
+
+class TestContentLeakCanary:  # A2
+    def test_leaked_json_item_warns(self):
+        b = _brief("defense")
+        b["item_texts"] = ["A normal cited fact.", '{"rewritten": "leaked analysis text"}']
+        report = evaluate_health(
+            briefs=[b, _brief("ai"), _brief("energy")], ingest_runs=[], sources=[], now=NOW
+        )
+        assert "content_leak" in _codes(report)
+
+    def test_leaked_convergence_read_warns(self):
+        b = _brief("defense")
+        b["convergence_read"] = '{"convergence_read": "wrapped"}'
+        report = evaluate_health(
+            briefs=[b, _brief("ai"), _brief("energy")], ingest_runs=[], sources=[], now=NOW
+        )
+        assert "content_leak" in _codes(report)
+
+    def test_clean_prose_does_not_warn(self):
+        b = _brief("defense")
+        b["item_texts"] = ["The DOE committed $17.5B to finance AP1000 reactors.",
+                           "{not json} but analyst prose about the grid."]
+        b["convergence_read"] = "AI compute demand is pulling nuclear forward."
+        report = evaluate_health(
+            briefs=[b, _brief("ai"), _brief("energy")], ingest_runs=[], sources=[], now=NOW
+        )
+        assert "content_leak" not in _codes(report)
+
+    def test_looks_like_content_leak_helper(self):
+        assert looks_like_content_leak('{"rewritten": "x"}')
+        assert looks_like_content_leak('  {"text": "y"}  ')
+        assert not looks_like_content_leak("plain prose")
+        assert not looks_like_content_leak("{just braces, no json key}")
+        assert not looks_like_content_leak("")
+
+
+class TestCostAndDigest:  # A3 / A4
+    def _with_tokens(self, desk, total):
+        b = _brief(desk)
+        b["tokens"] = {"calls": 40, "total_tokens": total, "est_cost_usd": total / 1e6 * 0.6}
+        return b
+
+    def test_cost_anomaly_warns_over_budget(self):
+        briefs = [self._with_tokens("defense", 4_000_000), _brief("ai"), _brief("energy")]
+        report = evaluate_health(
+            briefs=briefs, ingest_runs=[], sources=[], now=NOW,
+            thresholds=HealthThresholds(run_token_budget=3_000_000),
+        )
+        assert "cost_anomaly" in _codes(report)
+
+    def test_cost_budget_zero_disables(self):
+        briefs = [self._with_tokens("defense", 9_000_000), _brief("ai"), _brief("energy")]
+        report = evaluate_health(
+            briefs=briefs, ingest_runs=[], sources=[], now=NOW,
+            thresholds=HealthThresholds(run_token_budget=0),
+        )
+        assert "cost_anomaly" not in _codes(report)
+
+    def test_digest_lists_desks_and_ingest_and_cost(self):
+        b = self._with_tokens("defense", 1_000_000)
+        b["attribution_counts"] = {"confirmed": 3, "reported": 17}
+        runs = [{"source_id": "usaspending", "status": "success", "records_new": 106},
+                {"source_id": "feeds", "status": "success", "records_new": 97}]
+        report = evaluate_health(
+            briefs=[b, _brief("ai"), _brief("energy")], ingest_runs=runs, sources=[], now=NOW
+        )
+        joined = " | ".join(report.digest)
+        assert "defense: 20 items" in joined
+        assert "usaspending +106" in joined
+        assert "tokens" in joined  # cost line present when tokens stamped

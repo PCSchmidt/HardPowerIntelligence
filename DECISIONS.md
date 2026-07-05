@@ -3217,3 +3217,29 @@ faithfulness, a failed ingest source, an open circuit breaker, or an active sour
 Never-run seeded sources (last_successful_fetch_at NULL) don't false-alarm. Thresholds tunable
 (`HealthThresholds`). +16 tests; suite 527 green. Remaining Phase A: A2 confidence-mix canary, A3
 self-digest, A4 cost observability.
+
+
+## D127 — Phase A/A2-A4: confidence + leak canaries, daily digest, cost observability
+
+**Context:** A1 (D126) gave crash-and-degradation alerting. A2-A4 finish Phase A observability so the
+operator gets the full daily picture and cost stays visible under the token-efficiency steer.
+
+**A2 — output-quality canaries** (in `engine/engine/ops/health.py`): (1) **confidence_collapsed** — a
+PUBLISHED brief whose items are entirely analysis/speculative (zero confirmed+reported, from the
+`brief_items.attribution` column) means the sourcing collapsed -> warn; (2) **content_leak** — a pure
+`looks_like_content_leak` scans published item bodies + read/watch + the brief convergence_read for the
+D118 JSON-wrapper signature (leading brace + a known wrapper key), a prod regression guard for D118/D121.
+Conservative to avoid false positives (needs both brace AND key).
+
+**A4 — cost observability**: the LLM client (`engine/llm/client.py`) now keeps a process-level token
+accumulator (calls / prompt / completion), scoped naturally to one desk-run (CI matrix = one process per
+desk). `run_brief.py` prints per-desk usage and stamps `usage_snapshot()` onto `briefs.model_waterfall_metadata['tokens']`
+(persisted). New settings: `llm_cost_per_1m_tokens_usd` (coarse blended $ — token COUNTS are the real
+signal, the $ is only for eyeballing) and `llm_run_token_budget` (a per-run absolute ceiling; the health
+check warns `cost_anomaly` above it — rolling-baseline anomaly detection deferred).
+
+**A3 — daily self-digest**: `HealthReport.digest` (separate from anomaly findings) — per-desk item count +
+attribution mix, per-source ingest volume, and the aggregated LLM token/cost — emitted every run so a GREEN
+day still gives a one-glance picture. `run_health.py` enriches the brief dicts (attribution counts, item
+texts, tokens) so the evaluator stays pure. +14 tests; suite 541 green. Phase A build complete (A1-A5);
+exit gate = 7 clean unattended days.
