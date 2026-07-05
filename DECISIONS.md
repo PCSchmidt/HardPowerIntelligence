@@ -3027,6 +3027,8 @@ footprint) awaits the operator's go-ahead on approach.**
 
 ## D118 — Three live-quality fixes from the 7/4 rendered-output review (JSON leak, energy timeout, dead feeds)
 
+**CORRECTED by D119 (read that first):** §2 below mis-attributed the energy timeout to entity resolution and claimed the D073 grounding gate was never wired in — BOTH WRONG. The tail was the analysis-grounding gate (live at `run_brief.py:108`); D119 batched it and reverted the 30→50 min bump below to 35. §1 (JSON leak) and §3 (feeds) stand.
+
 **Context:** Reviewing the actual 7/4 PDF output of all three desks surfaced three real defects the logs alone
 had hidden. Fixed together.
 

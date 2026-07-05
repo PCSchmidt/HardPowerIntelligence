@@ -50,8 +50,9 @@ live ingestion runner, with Supabase auth and Lemon Squeezy subscriptions. Built
   generation (prose untouched; double-wraps collapse). +7 tests.
 - **Energy desk no longer goes stale from a brief timeout** (2026-07-04, D118): the 7/4 energy brief passed eval
   then spent ~12 min in the sequential analysis-grounding pass (D073) and was killed at the 30-min job cap
-  before persisting (site kept serving the prior day). Raised the per-desk cap 30 -> 50 min (the pass is bounded
-  by `brief_max_items`, not feed volume) and log its `elapsed_s`. Safe parallelization is a tracked follow-up.
+  before persisting (site kept serving the prior day). Bumped the cap and added `elapsed_s` logging; then D119
+  batched the gate (see above), so the tail is gone and the cap was set to 35 min (batching, not parallelization,
+  was the right fix).
 - **Feed-health sweep: 2 moved feeds fixed, 2 dead dropped, zero-yield now logged** (2026-07-04, D118): OpenAI
   `/blog/rss.xml` -> `/news/rss.xml` and ANS `/news/rss/` -> `/news/feed/` (both moved; runner doesn't follow
   redirects); Brookings (RSS retired) and Heatmap News (all paths 404) dropped. Added a `feed_yielded_zero`

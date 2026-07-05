@@ -159,7 +159,7 @@ verified brief per desk**.
 **Refinements (2026-06-16).** The eval gate (step 4) evolved into a two-layer, self-healing
 publisher: the brief is now **layered** — cited `body` facts plus a `read`/`watch`/`convergence_read`
 *analysis* layer held to a separate **grounding** gate (regenerate-then-omit, never per-sentence
-citation, D071/D073). Publication **no longer gates on a provable-claim floor** — the old D070
+citation, D071/D073; the grounding eval is batched into one call per brief for token efficiency — D119). Publication **no longer gates on a provable-claim floor** — the old D070
 floor was retired by **D099** (widen-the-net): grounding became a per-item confidence label, not
 suppression, so a brief ships with ≥1 honest item rather than going dark on a thin day; only
 fabrication is excluded (D069). The generate→eval loop still **regenerates on an empty draw or a
