@@ -45,9 +45,12 @@ class LLMError(Exception):
     pass
 
 
-def parse_json(text: str) -> dict | list | None:
-    """Return parsed JSON from text, stripping markdown fences if present."""
-    text = text.strip()
+def parse_json(text: str | None) -> dict | list | None:
+    """Return parsed JSON from text, stripping markdown fences if present.
+
+    None-safe: a provider can return null content (finish_reason='error'); treat it as
+    unparseable rather than crashing on ``None.strip()`` (darkened the Defense desk, D128)."""
+    text = (text or "").strip()
     fence = _FENCE_RE.search(text)
     if fence:
         text = fence.group(1).strip()
@@ -147,6 +150,28 @@ class LLMClient:
         response = await self._acompletion_with_retry(**kwargs)
         content = response.choices[0].message.content
         self._record_usage(model, response)
+
+        # A provider-side error can return finish_reason='error' with NULL content and NO
+        # exception — so litellm's own `fallbacks` never fire, and the None crashes downstream
+        # (`'NoneType' has no attribute 'strip'` darkened the Defense desk 2026-07-06, D128). This
+        # hits the largest desk first: a bigger synthesis prompt is likelier to trip the provider.
+        # Treat empty content as a failure: try the fallback model(s) explicitly, then raise a
+        # clean LLMError the caller's re-roll (D072) can handle instead of an opaque AttributeError.
+        if not content:
+            log.warning("llm_empty_content", model=model, fallbacks=fallbacks or [])
+            for fb in fallbacks or []:
+                fb_kwargs = {k: v for k, v in kwargs.items() if k != "fallbacks"}
+                fb_kwargs["model"] = fb
+                response = await self._acompletion_with_retry(**fb_kwargs)
+                content = response.choices[0].message.content
+                self._record_usage(fb, response)
+                if content:
+                    break
+            if not content:
+                raise LLMError(
+                    f"Empty content from model={model} and fallbacks "
+                    f"{fallbacks or []} (provider finish_reason=error?)"
+                )
 
         if json_mode:
             if parse_json(content) is None:

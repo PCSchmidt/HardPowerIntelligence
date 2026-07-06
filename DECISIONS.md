@@ -3243,3 +3243,24 @@ attribution mix, per-source ingest volume, and the aggregated LLM token/cost —
 day still gives a one-glance picture. `run_health.py` enriches the brief dicts (attribution counts, item
 texts, tokens) so the evaluator stays pure. +14 tests; suite 541 green. Phase A build complete (A1-A5);
 exit gate = 7 clean unattended days.
+
+
+## D128 — Null provider content no longer crashes a desk (fallback + clean error)
+
+**Context:** the 7/6 scheduled run FAILED — the Defense desk crashed all 3 re-roll attempts with
+`'NoneType' object has no attribute 'strip'`, each preceded by LiteLLM `Unmapped finish_reason
+'error'`. The synthesis provider returned finish_reason='error' with **null content** and NO
+exception, so litellm's own `fallbacks` never fired and the None hit `parse_json`'s `.strip()`.
+It hit DEFENSE specifically because it's the largest desk (significance kept 33-35 items vs
+Energy 23 / AI 24) — the bigger synthesis prompt is likelier to trip the provider. Energy + AI
+published fine; Defense served stale (7/5). **The A1 health check (D126) CAUGHT it on its first
+live run** — the health job went red and emailed. Root-caused via the GitHub Actions logs.
+
+**Decision:** make the LLM client robust to null content (D128). (1) `parse_json` is None-safe
+(`(text or "").strip()`) — never crash on None. (2) `complete()` detects empty content (the
+finish_reason='error' case litellm swallows) and explicitly tries the configured fallback model(s),
+then raises a clean `LLMError` the D072 re-roll can handle — instead of an opaque AttributeError.
+So a provider hiccup now (a) gets a real shot at the fallback model and (b) degrades to a clean
+skip at worst, never a hard crash. +7 tests; suite 548 green. FOLLOW-UP if it recurs: cap the
+synthesis candidate count for the largest desk (the prompt size is the trigger); the fix makes it
+survivable but doesn't shrink the prompt. Defense needs a re-run to un-stale (workflow_dispatch).
