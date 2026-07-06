@@ -115,6 +115,8 @@ def extract_claims(body: str) -> list[Claim]:
 class CitationEvaluator:
     def __init__(self, eval_model: str | None = None):
         self.eval_model = eval_model or settings.llm_model_eval
+        # Fallback so an eval-model provider error degrades instead of failing the desk (D130).
+        self._fallbacks = [settings.llm_model_eval_fallback] if settings.llm_model_eval_fallback else None
 
     async def eval_item(
         self,
@@ -167,6 +169,7 @@ class CitationEvaluator:
                 model=self.eval_model,
                 messages=messages,
                 json_mode=True,
+                fallbacks=self._fallbacks,
                 temperature=settings.llm_temperature,
             )
             parsed = parse_json(content) or {}
@@ -266,6 +269,7 @@ class CitationEvaluator:
             model=self.eval_model,
             messages=messages,
             json_mode=True,
+            fallbacks=self._fallbacks,
             temperature=settings.llm_temperature,
         )
         parsed = parse_json(content) or {}
@@ -319,6 +323,7 @@ class CitationEvaluator:
             model=self.eval_model,
             messages=messages,
             json_mode=True,
+            fallbacks=self._fallbacks,
             temperature=settings.llm_temperature,
         )
         parsed = parse_json(content) or {}

@@ -273,6 +273,17 @@ class TestEvalAnalysis:
         return CitationEvaluator(eval_model="m")
 
     @pytest.mark.asyncio
+    async def test_eval_passes_fallback_model(self):
+        # D130: eval calls must carry a fallback so a provider error on the eval model
+        # degrades instead of darkening the desk (Defense 7/6 had fallbacks=[]).
+        ev = self._ev()
+        assert ev._fallbacks  # a fallback is configured
+        with patch("engine.eval.citation_eval.llm_client") as mock_client:
+            mock_client.complete = AsyncMock(return_value=json.dumps({"new_facts": []}))
+            await ev.eval_analysis("Analyst read.", "A cited fact.")
+        assert mock_client.complete.call_args.kwargs["fallbacks"] == ev._fallbacks
+
+    @pytest.mark.asyncio
     async def test_grounded_interpretation_passes(self):
         with patch("engine.eval.citation_eval.llm_client") as mock_client:
             mock_client.complete = AsyncMock(return_value=json.dumps({"new_facts": []}))

@@ -23,6 +23,11 @@ class Settings(BaseSettings):
     llm_model_synthesis: str = "openrouter/deepseek/deepseek-v4-pro"
     llm_model_eval: str = "openrouter/qwen/qwen3.7-max"
     llm_model_synthesis_fallback: str = "openrouter/qwen/qwen3.7-max"
+    # Eval/significance run on qwen3.7-max, which returns finish_reason='error' with null content
+    # under a large desk's higher call volume (OpenRouter pooled-quota) — unlike synthesis, these
+    # calls had NO fallback, so the whole desk failed (Defense, D130). Fall back to a different
+    # provider path (the synthesis model) so an eval hiccup degrades instead of darkening the desk.
+    llm_model_eval_fallback: str = "openrouter/deepseek/deepseek-v4-pro"
     llm_model_fallback_last_resort: str = "claude-sonnet-4-6"
 
     # LLM transient-failure resilience (D076). The daily run fires several calls per

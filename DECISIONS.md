@@ -3264,3 +3264,22 @@ So a provider hiccup now (a) gets a real shot at the fallback model and (b) degr
 skip at worst, never a hard crash. +7 tests; suite 548 green. FOLLOW-UP if it recurs: cap the
 synthesis candidate count for the largest desk (the prompt size is the trigger); the fix makes it
 survivable but doesn't shrink the prompt. Defense needs a re-run to un-stale (workflow_dispatch).
+
+
+## D130 — Eval/significance calls get a fallback model (the Defense fix D128 exposed)
+
+**Context:** D128 stopped the null-content CRASH but the 7/6 Defense re-run still failed — the logs
+showed `llm_empty_content model=openrouter/qwen/qwen3.7-max fallbacks=[]`. Synthesis (deepseek)
+SUCCEEDED; the CITATION-EVAL model (qwen3.7-max) returned finish_reason='error' with null content
+under Defense's higher eval-call volume (OpenRouter POOLED-quota, the D078 issue) — and unlike
+synthesis, the eval/significance/analysis calls passed NO fallback, so D128's fallback path had
+nothing to try and the desk failed all 3 attempts. Only Defense (largest desk, 30-33 kept
+candidates → most eval calls) trips it; Energy/AI publish fine.
+
+**Decision:** give the eval-model calls a fallback, mirroring synthesis. New setting
+`llm_model_eval_fallback = deepseek-v4-pro` (a different provider path). `CitationEvaluator` holds
+`self._fallbacks` and passes it in all three `complete()` calls (eval_item, eval_analysis,
+eval_analyses_batch); the significance gate passes it too. So an eval-model provider error now
+degrades to the fallback instead of darkening the desk. +1 test; suite 567 green. If it STILL
+recurs, the next lever is capping Defense's synthesis/eval candidate count (prompt size is the
+trigger) or BYOK for qwen (dedicated quota, D078).
