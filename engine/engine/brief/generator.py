@@ -13,6 +13,7 @@ from engine.brief.rag import (
     PassageContext,
     build_query_vector,
     embed_pending_records,
+    extract_published_at,
     fetch_passages,
 )
 from engine.brief.significance import filter_significant
@@ -335,6 +336,9 @@ def _candidate_passages(facts: list[tuple[dict, float]]) -> list[PassageContext]
             fetched_at=c["fetched_at"],
             native_id=c.get("native_id") or "",
             excerpt=c.get("text_chunk") or "",
+            published_at=extract_published_at(
+                c["source_id"], c.get("_sd") if c.get("_sd") is not None else c.get("structured_data")
+            ),
         )
         for c, _ in facts
     ]
@@ -675,12 +679,14 @@ async def persist_brief(
                         """
                         INSERT INTO citations (
                             brief_id, brief_item_id, raw_record_id,
-                            source_id, url, fetched_at, native_id, license_class
-                        ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
+                            source_id, url, fetched_at, native_id, license_class,
+                            published_at
+                        ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
                         """,
                         brief_id, item_id, passage.raw_record_id,
                         passage.source_id, passage.url, passage.fetched_at,
                         passage.native_id, _license_class_for(passage.source_id),
+                        passage.published_at,
                     )
 
         # Best-effort, AFTER the brief commits: the GDELT sparkline series (D082/D089) is

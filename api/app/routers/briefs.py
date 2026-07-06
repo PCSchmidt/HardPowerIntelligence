@@ -65,7 +65,7 @@ async def _assemble_brief(conn: asyncpg.Connection, brief: asyncpg.Record, stale
     citations = await conn.fetch(
         """
         SELECT id, brief_item_id, source_id, url, fetched_at, native_id,
-               license_class, title, excerpt
+               license_class, title, excerpt, published_at
         FROM citations WHERE brief_id = $1
         """,
         brief["id"],
@@ -127,6 +127,7 @@ async def _assemble_brief(conn: asyncpg.Connection, brief: asyncpg.Record, stale
                 "source_id": c["source_id"],
                 "url": c["url"],
                 "fetched_at": c["fetched_at"],
+                "published_at": c["published_at"],
                 "native_id": c["native_id"],
                 "license_class": c["license_class"],
                 "title": c["title"],

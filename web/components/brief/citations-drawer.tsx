@@ -45,7 +45,13 @@ export function CitationsDrawer({
               <div className="flex items-center gap-2 text-ui-xs uppercase tracking-wide text-muted-foreground">
                 <span className="font-medium">{sourceName(c.source_id)}</span>
                 <span>·</span>
-                <span>{new Date(c.fetched_at).toLocaleDateString("en-US", { timeZone: "UTC" })}</span>
+                {/* Show the SOURCE's publication date (staleness signal); fall back to our
+                    retrieval date, clearly labelled, when the source has no usable date (D129). */}
+                <span>
+                  {c.published_at
+                    ? `Published ${new Date(c.published_at).toLocaleDateString("en-US", { timeZone: "UTC" })}`
+                    : `Retrieved ${new Date(c.fetched_at).toLocaleDateString("en-US", { timeZone: "UTC" })}`}
+                </span>
               </div>
               {c.title && <p className="font-body text-body-sm font-medium text-foreground">{c.title}</p>}
               {c.excerpt && <p className="font-body text-body-sm text-muted-foreground">{c.excerpt}</p>}

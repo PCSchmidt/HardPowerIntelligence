@@ -18,6 +18,7 @@ export interface Citation {
   source_id: string;
   url: string;
   fetched_at: string;
+  published_at: string | null; // source's own publication/action date; null when unknown (D129)
   native_id: string;
   license_class: string;
   title: string | null;

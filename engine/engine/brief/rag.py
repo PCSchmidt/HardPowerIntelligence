@@ -1,5 +1,7 @@
+import json
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timezone
+from email.utils import parsedate_to_datetime
 
 import asyncpg
 import openai
@@ -16,9 +18,73 @@ class PassageContext:
     raw_record_id: str
     source_id: str
     url: str
-    fetched_at: datetime
+    fetched_at: datetime               # when WE retrieved it (always ~today for a daily run)
     native_id: str
     excerpt: str
+    published_at: datetime | None = None   # when the SOURCE published/acted — for staleness (D129)
+
+
+# Per-source: which structured_data key holds the item's real publication/action date, in
+# preference order. Surfaced to the reader as "Published <date>" so staleness is visible; a
+# missing/unparseable date degrades to the fetch date labelled "Retrieved" — the item is never
+# dropped for lacking a date (operator directive, D129).
+_PUBLISHED_KEYS: dict[str, tuple[str, ...]] = {
+    "feeds": ("published",),
+    "arxiv": ("published", "updated"),
+    "gdelt": ("seendate",),
+    "usaspending": ("start_date", "last_modified"),   # the award's own date = an honest staleness cue
+    "edgar": ("file_date",),
+    "nrc": ("publication_date",),
+    "sam_gov": ("posted_date", "published"),
+}
+# Tried after the source-specific keys, for any source whose shape we don't special-case.
+_FALLBACK_KEYS = ("published", "publication_date", "posted_date", "file_date", "date", "start_date", "seendate")
+_COMPACT_FORMATS = ("%Y%m%dT%H%M%SZ", "%Y%m%d%H%M%S", "%Y%m%d")   # GDELT-style compact stamps
+
+
+def _parse_published(value) -> datetime | None:
+    """Parse one heterogeneous date value (ISO, RFC-822 RSS, compact GDELT) → aware datetime."""
+    if not value:
+        return None
+    s = str(value).strip()
+    if not s:
+        return None
+    try:  # ISO: "2026-01-15", "2026-01-15T12:00:00Z"
+        dt = datetime.fromisoformat(s.replace("Z", "+00:00"))
+        return dt if dt.tzinfo else dt.replace(tzinfo=timezone.utc)
+    except ValueError:
+        pass
+    try:  # RFC-822: RSS pubDate "Mon, 28 Jun 2026 12:00:00 GMT"
+        dt = parsedate_to_datetime(s)
+        if dt is not None:
+            return dt if dt.tzinfo else dt.replace(tzinfo=timezone.utc)
+    except (TypeError, ValueError):
+        pass
+    for fmt in _COMPACT_FORMATS:
+        try:
+            return datetime.strptime(s, fmt).replace(tzinfo=timezone.utc)
+        except ValueError:
+            continue
+    return None
+
+
+def extract_published_at(source_id: str, structured_data) -> datetime | None:
+    """Best-effort canonical publication/action date for a record; ``None`` if unknown (D129).
+
+    Never raises and never signals "drop me" — an unknown date just means the reader shows the
+    retrieval date instead."""
+    if isinstance(structured_data, str):
+        try:
+            structured_data = json.loads(structured_data)
+        except (ValueError, TypeError):
+            return None
+    if not isinstance(structured_data, dict):
+        return None
+    for key in _PUBLISHED_KEYS.get(source_id, ()) + _FALLBACK_KEYS:
+        dt = _parse_published(structured_data.get(key))
+        if dt is not None:
+            return dt
+    return None
 
 
 async def embed_pending_records(pool: asyncpg.Pool, since: datetime) -> int:
@@ -124,6 +190,7 @@ async def fetch_passages(
                 nr.id            AS nr_id,
                 nr.source_id,
                 nr.text_chunk    AS excerpt,
+                nr.structured_data,
                 rr.id            AS rr_id,
                 rr.url,
                 rr.fetched_at,
@@ -151,6 +218,7 @@ async def fetch_passages(
             fetched_at=row["fetched_at"],
             native_id=row["native_id"],
             excerpt=row["excerpt"] or "",
+            published_at=extract_published_at(row["source_id"], row["structured_data"]),
         )
         for i, row in enumerate(rows)
     ]

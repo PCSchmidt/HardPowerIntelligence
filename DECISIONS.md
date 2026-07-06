@@ -3283,3 +3283,24 @@ eval_analyses_batch); the significance gate passes it too. So an eval-model prov
 degrades to the fallback instead of darkening the desk. +1 test; suite 567 green. If it STILL
 recurs, the next lever is capping Defense's synthesis/eval candidate count (prompt size is the
 trigger) or BYOK for qwen (dedicated quota, D078).
+
+
+## D129 — Source publication date on citations (staleness is now visible)
+
+**Context (operator, 7/6):** the reader showed only `fetched_at` — WHEN WE RETRIEVED a source,
+always ~today for a daily run — so a two-year-old article and this-morning's news looked equally
+fresh. We already CAPTURE source dates (feeds/arxiv `published`, edgar `file_date`, nrc
+`publication_date`, usaspending `start_date`, gdelt `seendate`) in `structured_data`, but they
+never reached the citation/reader.
+
+**Decision:** surface each source's own publication/action date. `engine.brief.rag.extract_published_at`
+normalizes the heterogeneous per-source date keys/formats (ISO, RFC-822 RSS pubDate, compact GDELT)
+to one aware datetime; `PassageContext` gains `published_at`, populated in both passage builders;
+a new nullable `citations.published_at` column (migration 20260706000001) is written at persist; the
+API serializes it; the reader's source card shows **"Published <date>"**, falling back to
+**"Retrieved <date>"** (the fetch date, clearly labelled) when unknown — NEVER dropping an item for
+lacking a date (operator directive). +18 tests; suite 567 green.
+
+**Deploy order (matters):** the migration auto-applies via the daily-brief reconcile step (or manual
+`supabase db push`) BEFORE the citation write references the column; the API + web must be redeployed
+AFTER the migration for the display to light up (old API ignores the new column safely until then).
