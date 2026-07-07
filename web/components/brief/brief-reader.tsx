@@ -32,7 +32,7 @@ export function BriefReader({ brief }: { brief: Brief }) {
         );
       })()}
       <BriefHeader brief={brief} />
-      <BriefGlance items={brief.items} />
+      <BriefGlance items={brief.items} citations={brief.citations} />
       {brief.convergence_read && (
         <section className="mt-8 rounded-md border border-brand-secondary/30 bg-muted/40 p-5">
           <div className="mb-2 flex items-center gap-2 text-ui-xs font-medium uppercase tracking-wide text-brand-secondary">

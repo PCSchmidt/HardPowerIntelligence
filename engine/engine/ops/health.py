@@ -25,7 +25,13 @@ from datetime import datetime
 
 _EXPECTED_DESKS: tuple[str, ...] = ("defense", "ai", "energy")
 _ATTRIBUTIONS = ("confirmed", "reported", "analysis", "speculative")
-_LEVEL_ORDER = {"critical": 0, "warn": 1, "info": 2}
+# Severity tiers. "critical"/"warn" flip the verdict (→ non-zero exit → GitHub failure email);
+# "notice" surfaces in the report/digest but does NOT fail the run; "info" is normal-state context.
+# "notice" (D132) exists so transient upstream flakiness — a source 500ing, a tripped breaker, a
+# stale source — is visible without hard-failing every run and perpetually resetting the Phase-A
+# "clean unattended days" gate. When such flakiness actually degrades output, the desk-level gates
+# (brief_thin / confidence_collapsed / no_brief_published) still fire as warn/critical.
+_LEVEL_ORDER = {"critical": 0, "warn": 1, "notice": 2, "info": 3}
 
 # The D118 JSON-leak signature: an item body / analysis field that IS (or opens as) a JSON
 # wrapper object rather than prose. A leading brace alone is too loose (prose can start "{...}"),
@@ -50,7 +56,7 @@ class HealthThresholds:
 
 @dataclass(frozen=True)
 class Finding:
-    level: str      # "critical" | "warn" | "info"
+    level: str      # "critical" | "warn" | "notice" | "info"
     code: str       # stable machine code, e.g. "no_brief_published"
     message: str    # human-readable one-liner
 
@@ -153,10 +159,13 @@ def evaluate_health(
             ))
 
     # ── Ingest-source health (the workflow never surfaces this) ──────────────────────
+    # These are "notice" not "warn" (D132): a single source 500ing / timing out / going stale is
+    # routine upstream flakiness that shouldn't fail an otherwise-healthy run. If it actually
+    # starves a desk, the desk-level gates above escalate it to warn/critical.
     for run in ingest_runs:
         if run.get("status") == "failed":
             findings.append(Finding(
-                "warn", "source_failed",
+                "notice", "source_failed",
                 f"ingest source '{run.get('source_id')}' failed{_err(run)}.",
             ))
 
@@ -165,7 +174,7 @@ def evaluate_health(
             continue
         if s.get("circuit_breaker_state") == "open":
             findings.append(Finding(
-                "warn", "circuit_open",
+                "notice", "circuit_open",
                 f"source '{s.get('id')}' circuit breaker is OPEN (auto-tripped after repeated failures).",
             ))
         last = s.get("last_successful_fetch_at")
@@ -173,7 +182,7 @@ def evaluate_health(
             age_h = (now - last).total_seconds() / 3600
             if age_h > t.source_stale_hours:
                 findings.append(Finding(
-                    "warn", "source_stale",
+                    "notice", "source_stale",
                     f"source '{s.get('id')}' last fetched {age_h:.0f}h ago (> {t.source_stale_hours}h).",
                 ))
 
@@ -216,9 +225,10 @@ def evaluate_health(
     )
     crits = sum(1 for f in findings if f.level == "critical")
     warns = sum(1 for f in findings if f.level == "warn")
+    notices = sum(1 for f in findings if f.level == "notice")
     summary = (
         f"{verdict.upper()} - {len(published)}/{len(expected_desks)} desks published; "
-        f"{crits} critical, {warns} warnings"
+        f"{crits} critical, {warns} warnings, {notices} notices"
     )
     ordered = sorted(findings, key=lambda f: _LEVEL_ORDER.get(f.level, 9))
     return HealthReport(verdict=verdict, findings=ordered, summary=summary, digest=digest)

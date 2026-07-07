@@ -3,8 +3,9 @@
 Verdict semantics under test:
 - a clean thin-day skip persists status='failed' → INFO, must NOT page (normal sparse day);
 - a total publish shutout → CRITICAL (readers see stale content);
-- ingest-source failures / open breakers / stale sources → WARN (the workflow never surfaces these);
-- verdict maps to exit code (0 only when ok).
+- ingest-source failures / open breakers / stale sources → NOTICE (D132): surfaced but must NOT
+  fail an otherwise-healthy run (transient upstream flakiness shouldn't reset the Phase-A gate);
+- verdict maps to exit code (0 only when ok; notices keep it ok).
 """
 from datetime import datetime, timedelta, timezone
 
@@ -29,6 +30,10 @@ def _all_published():
 
 def _codes(report):
     return {f.code for f in report.findings}
+
+
+def _level(report, code):
+    return next((f.level for f in report.findings if f.code == code), None)
 
 
 class TestHealthyDay:
@@ -99,29 +104,47 @@ class TestBriefDegradation:
 
 
 class TestIngestAndSourceHealth:
-    def test_failed_ingest_source_warns(self):
+    def test_failed_ingest_source_is_notice_not_failure(self):
+        # Routine upstream flakiness (a source 500ing) surfaces but must NOT fail an otherwise-
+        # healthy run (D132) — else transient hiccups perpetually reset the Phase-A gate clock.
         runs = [{"source_id": "edgar", "status": "failed", "error_message": "EFTS 500"}]
         report = evaluate_health(
             briefs=_all_published(), ingest_runs=runs, sources=[], now=NOW
         )
         assert "source_failed" in _codes(report)
-        assert report.verdict == "degraded"
+        assert _level(report, "source_failed") == "notice"
+        assert report.verdict == "ok"
+        assert report.exit_code == 0
 
-    def test_open_circuit_breaker_warns(self):
+    def test_open_circuit_breaker_is_notice(self):
         sources = [{"id": "gdelt", "is_active": True, "circuit_breaker_state": "open",
                     "last_successful_fetch_at": NOW - timedelta(hours=1)}]
         report = evaluate_health(
             briefs=_all_published(), ingest_runs=[], sources=sources, now=NOW
         )
         assert "circuit_open" in _codes(report)
+        assert _level(report, "circuit_open") == "notice"
+        assert report.verdict == "ok"
 
-    def test_stale_source_warns(self):
+    def test_stale_source_is_notice(self):
         sources = [{"id": "usaspending", "is_active": True, "circuit_breaker_state": "closed",
                     "last_successful_fetch_at": NOW - timedelta(hours=48)}]
         report = evaluate_health(
             briefs=_all_published(), ingest_runs=[], sources=sources, now=NOW
         )
         assert "source_stale" in _codes(report)
+        assert _level(report, "source_stale") == "notice"
+        assert report.verdict == "ok"
+
+    def test_source_flakiness_that_starves_a_desk_still_degrades(self):
+        # The safety net: source notices don't fail the run, but if the outage actually thins a
+        # desk below the floor, the desk-level gate escalates to warn → degraded → fail.
+        briefs = [_brief("defense", item_count=2), _brief("ai"), _brief("energy")]
+        runs = [{"source_id": "edgar", "status": "failed", "error_message": "EFTS 500"}]
+        report = evaluate_health(briefs=briefs, ingest_runs=runs, sources=[], now=NOW)
+        assert _level(report, "source_failed") == "notice"
+        assert "brief_thin" in _codes(report)
+        assert report.verdict == "degraded"
 
     def test_never_run_source_does_not_warn_stale(self):
         # Seeded-but-unwired source (last_successful_fetch_at NULL) must not false-alarm.

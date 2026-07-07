@@ -12,29 +12,16 @@ import {
   ATTRIBUTION_TOOLTIP,
   attributionOf,
 } from "@/lib/attribution";
+import { distinctOutlets } from "@/lib/sources";
 import { CitationsDrawer } from "./citations-drawer";
 import { EntityChips } from "./entity-chips";
-
-// Bare outlet host (drop www.) so the card footer names the actual publication —
-// e.g. "navalnews.com" — not the internal source_id ("feeds"). Bad/relative URLs → "".
-function hostOf(url: string): string {
-  try {
-    return new URL(url).hostname.replace(/^www\./, "");
-  } catch {
-    return "";
-  }
-}
 
 // At-a-glance provenance for a card footer: which publications, and how fresh — without
 // opening the drawer. Distinct outlets (first two + "+N") and the most recent date, labelled
 // "Published" when the source dated itself, else "Retrieved" (its fetch time) so a missing
 // publication date degrades rather than hides (never drop a source for lacking a date).
 function sourceSummary(cites: Citation[]): { outlets: string; dateLabel: string | null } {
-  const domains: string[] = [];
-  for (const c of cites) {
-    const h = hostOf(c.url);
-    if (h && !domains.includes(h)) domains.push(h);
-  }
+  const domains = distinctOutlets(cites);
   const outlets =
     domains.length <= 2
       ? domains.join(", ")

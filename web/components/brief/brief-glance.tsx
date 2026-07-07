@@ -1,19 +1,23 @@
-import type { BriefItem } from "@/lib/types";
+import type { BriefItem, Citation } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { formatUsd, keyAmount } from "@/lib/amounts";
 import { ITEM_BG, ITEM_ICON, ITEM_LABEL, ITEM_TEXT } from "@/lib/item-types";
+import { distinctOutlets } from "@/lib/sources";
 
 // "Today at a glance" (D084): a scannable ledger above the long read so a busy analyst
 // gets the day in ~10 seconds. Each row links to its item; a type icon (D087) and a
 // normalized magnitude bar answer "what kind?" and "compared to what?". Server
 // Component — hash links scroll natively, no JS.
 
-export function BriefGlance({ items }: { items: BriefItem[] }) {
+export function BriefGlance({ items, citations = [] }: { items: BriefItem[]; citations?: Citation[] }) {
   if (items.length === 0) return null;
 
   const rows = items.map((item) => ({ item, amount: keyAmount(item.headline, item.body) }));
   const maxAmount = Math.max(0, ...rows.map((r) => r.amount ?? 0));
   const total = rows.reduce((sum, r) => sum + (r.amount ?? 0), 0);
+  // Source diversity (D133): distinct outlets across the brief, not the raw citation count —
+  // a signal of how broadly the day was reported, shown alongside the item/$ totals.
+  const sourceCount = distinctOutlets(citations).length;
 
   return (
     <section aria-label="At a glance" className="mt-8 rounded-md border border-border bg-card">
@@ -21,6 +25,7 @@ export function BriefGlance({ items }: { items: BriefItem[] }) {
         At a glance
         <span className="ml-auto font-normal normal-case">
           {items.length} item{items.length === 1 ? "" : "s"}
+          {sourceCount > 0 && <> · {sourceCount} source{sourceCount === 1 ? "" : "s"}</>}
           {total > 0 && <> · ≈{formatUsd(total)} tracked</>} · 100% cited
         </span>
       </div>

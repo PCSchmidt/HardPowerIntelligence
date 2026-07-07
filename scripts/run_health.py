@@ -3,9 +3,12 @@
 Queries today's run telemetry (briefs + their items, ingestion_runs, source_registry),
 evaluates it (`engine.ops.health.evaluate_health`), prints a **digest** (the daily picture) plus
 any **findings** (anomalies), and **exits non-zero on ``degraded``/``critical``** so the workflow
-goes red and GitHub's failure email fires. Catches silent degradation — source failures, open
-breakers, stale sources, a total shutout (A1) — plus a collapsed confidence-mix / leaked-JSON
-regression (A2) and a token-cost anomaly (A4). Runs as the final job after ingest + brief.
+goes red and GitHub's failure email fires. Fails on genuine degradation — a total shutout (A1),
+a thin/low-faithfulness brief, a collapsed confidence-mix / leaked-JSON regression (A2), a
+token-cost anomaly (A4). Transient upstream source flakiness (failures, open breakers, stale
+sources) is surfaced as a non-failing **notice** (D132) so it doesn't reset the Phase-A gate;
+it still escalates to a failure via the desk gates if it actually starves a desk. Runs as the
+final job after ingest + brief.
 
 Usage:
     python scripts/run_health.py [YYYY-MM-DD]   # defaults to today (UTC)
@@ -23,7 +26,7 @@ from engine.db import create_pool
 from engine.ops.health import HealthReport, HealthThresholds, evaluate_health
 from engine.settings import settings
 
-_ICON = {"critical": "[CRITICAL]", "warn": "[WARN]", "info": "[info]"}
+_ICON = {"critical": "[CRITICAL]", "warn": "[WARN]", "notice": "[notice]", "info": "[info]"}
 
 
 def _as_dict(meta) -> dict:
