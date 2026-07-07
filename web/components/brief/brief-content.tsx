@@ -15,6 +15,40 @@ import {
 import { CitationsDrawer } from "./citations-drawer";
 import { EntityChips } from "./entity-chips";
 
+// Bare outlet host (drop www.) so the card footer names the actual publication —
+// e.g. "navalnews.com" — not the internal source_id ("feeds"). Bad/relative URLs → "".
+function hostOf(url: string): string {
+  try {
+    return new URL(url).hostname.replace(/^www\./, "");
+  } catch {
+    return "";
+  }
+}
+
+// At-a-glance provenance for a card footer: which publications, and how fresh — without
+// opening the drawer. Distinct outlets (first two + "+N") and the most recent date, labelled
+// "Published" when the source dated itself, else "Retrieved" (its fetch time) so a missing
+// publication date degrades rather than hides (never drop a source for lacking a date).
+function sourceSummary(cites: Citation[]): { outlets: string; dateLabel: string | null } {
+  const domains: string[] = [];
+  for (const c of cites) {
+    const h = hostOf(c.url);
+    if (h && !domains.includes(h)) domains.push(h);
+  }
+  const outlets =
+    domains.length <= 2
+      ? domains.join(", ")
+      : `${domains.slice(0, 2).join(", ")} +${domains.length - 2}`;
+
+  const fmt = (d: string) => new Date(d).toLocaleDateString("en-US", { timeZone: "UTC" });
+  const latest = (ds: string[]) => ds.reduce((a, b) => (a > b ? a : b)); // ISO-8601 → lexical max
+  const published = cites.map((c) => c.published_at).filter((d): d is string => Boolean(d));
+  if (published.length > 0) return { outlets, dateLabel: `Published ${fmt(latest(published))}` };
+  const fetched = cites.map((c) => c.fetched_at).filter(Boolean);
+  if (fetched.length > 0) return { outlets, dateLabel: `Retrieved ${fmt(latest(fetched))}` };
+  return { outlets, dateLabel: null };
+}
+
 // Splits a body string on [CITE:N] markers and renders each as a clickable chip.
 function CitedBody({ body, onCite }: { body: string; onCite: () => void }) {
   const parts = body.split(/(\[CITE:\d+\])/g);
@@ -104,21 +138,21 @@ export function BriefContent({
   // Inline magnitude bars (D087): each item's key dollar figure, normalized to the
   // largest in the brief, so a number reads "compared to what?" right at the item.
   const rows = useMemo(
-    () => items.map((item) => ({ item, amount: keyAmount(item.headline, item.body) })),
-    [items],
+    () =>
+      items.map((item) => ({
+        item,
+        amount: keyAmount(item.headline, item.body),
+        cites: item.citation_ids
+          .map((id) => citationById.get(id))
+          .filter((c): c is Citation => Boolean(c)),
+      })),
+    [items, citationById],
   );
   const maxAmount = Math.max(0, ...rows.map((r) => r.amount ?? 0));
 
-  function openForItem(item: BriefItem) {
-    const list = item.citation_ids
-      .map((id) => citationById.get(id))
-      .filter((c): c is Citation => Boolean(c));
-    setDrawer(list);
-  }
-
   return (
     <div className="divide-y divide-border">
-      {rows.map(({ item, amount }) => {
+      {rows.map(({ item, amount, cites }) => {
         const Icon = ITEM_ICON[item.item_type];
         const attribution = attributionOf(item.attribution);
         return (
@@ -151,20 +185,31 @@ export function BriefContent({
           </div>
           <h2 className="font-display text-display-sm text-foreground">{item.headline}</h2>
           <EntityChips entityIds={item.entity_ids} entities={entityById} />
-          <CitedBody body={item.body} onCite={() => openForItem(item)} />
+          <CitedBody body={item.body} onCite={() => setDrawer(cites)} />
           {(item.read || item.watch) && (
             <AnalysisDisclosure read={item.read} watch={item.watch} />
           )}
-          {item.citation_ids.length > 0 && (
-            <button
-              type="button"
-              onClick={() => openForItem(item)}
-              className="inline-flex items-center gap-1.5 text-ui-sm font-medium text-primary hover:underline"
-            >
-              <FileText size={14} />
-              Sources ({item.citation_ids.length})
-            </button>
-          )}
+          {cites.length > 0 &&
+            (() => {
+              // At-a-glance provenance line: outlet(s) + freshness on the card itself, so the
+              // reader judges "what publication / how stale" without opening the drawer. Whole
+              // row still opens the drawer for the claim-level (per-sentence) citations.
+              const { outlets, dateLabel } = sourceSummary(cites);
+              return (
+                <button
+                  type="button"
+                  onClick={() => setDrawer(cites)}
+                  className="group flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-left text-ui-sm text-muted-foreground"
+                >
+                  <FileText size={14} className="shrink-0 text-primary" />
+                  <span className="font-medium text-primary group-hover:underline">
+                    Sources ({cites.length})
+                  </span>
+                  {outlets && <span>· {outlets}</span>}
+                  {dateLabel && <span>· {dateLabel}</span>}
+                </button>
+              );
+            })()}
         </article>
         );
       })}
