@@ -1,6 +1,6 @@
 # HPI Phase Plan — from content-complete to validated & monetized
 
-**Status:** ADOPTED 2026-07-05 · **Current phase:** Phase A — all workstreams (A1–A5) shipped 2026-07-05 (D126/D127); **exit gate pending: 7 clean unattended days**
+**Status:** ADOPTED 2026-07-05 · **Current phase:** Phase A — all workstreams (A1–A5) shipped 2026-07-05 (D126/D127); **exit gate pending: 7 clean unattended days** · B0/B5 draft groundwork pulled forward 2026-07-09 (no-run-dependency work during the wait)
 **Owner:** operator · **Companion docs:** [ARCHITECTURE.md](ARCHITECTURE.md), [SOURCES.md](SOURCES.md), [SOURCE_LANDSCAPE.md](SOURCE_LANDSCAPE.md), `../DECISIONS.md` (D125)
 
 ## Where we are (macro state, 2026-07-05)
@@ -73,6 +73,9 @@ you noticed manually, and you've stopped opening the PDFs to check health. Cost/
 - [ ] **B0 — Synthetic persona framework (do first; it's the ranking engine).** See the persona
   table below. The Phase C option list *is* the union of the surfaces it points to, ranked by
   which personas the real 8–10 conversations most resemble.
+  **Drafted 2026-07-09 → [PERSONAS.md](PERSONAS.md)** — the 5 personas as interview-ready instruments
+  (JTBD, aha, kill-signal, probes) + a ranking worksheet. Still `[ ]`: the exit gate is *validation
+  against the real conversations*, not the draft.
 - [ ] **B1 — Instrumentation (light, privacy-respecting).** Page views per desk, wire clicks,
   return visits, trial start/end, plus a one-click in-product feedback affordance.
 - [ ] **B2 — Warm cohort (~20–30) = "Founding Readers."** Permanent/extended comp in exchange
@@ -89,6 +92,9 @@ you noticed manually, and you've stopped opening the PDFs to check health. Cost/
   mockup gets far better feedback than an abstract "convergence graph." These are throwaway
   validation instruments, NOT committed spec. Committed design *spec* is deferred to Phase C entry
   (see the note under C1 and `FRONTEND_SPEC.md` §9 Tier 3–4).
+  **Drafted 2026-07-09 → [MOCKUPS.md](MOCKUPS.md)** — a low-fi wireframe deck of the 3 archetypes
+  (Convergence Map / Capital & Catalyst Dashboard / Narrative Homepage), built ahead during the
+  Phase-A wait. Still `[ ]`: these carry no weight until shown in the real conversations (B2/B3).
 
 ### Target personas (Phase C drivers)
 
