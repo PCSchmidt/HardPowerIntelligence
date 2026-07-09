@@ -46,7 +46,16 @@ class TestExtractPublishedAt:
     def test_arxiv_iso(self):
         assert extract_published_at("arxiv", {"published": "2026-07-01T00:00:00Z"}).month == 7
 
-    def test_usaspending_start_date(self):
+    def test_usaspending_prefers_last_modified_over_start_date(self):
+        # A live multi-year award: PoP started years ago, but the recent modification is the honest
+        # recency cue — so it must NOT read as "Published 2022" (D137).
+        dt = extract_published_at(
+            "usaspending", {"start_date": "2022-09-30", "last_modified": "2026-07-06"}
+        )
+        assert dt.year == 2026 and dt.month == 7
+
+    def test_usaspending_falls_back_to_start_date(self):
+        # When the API omits Last Modified Date, start_date still gives an honest (if older) date.
         assert extract_published_at("usaspending", {"start_date": "2020-09-18"}).year == 2020
 
     def test_edgar_file_date(self):

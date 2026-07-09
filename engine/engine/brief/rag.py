@@ -32,7 +32,12 @@ _PUBLISHED_KEYS: dict[str, tuple[str, ...]] = {
     "feeds": ("published",),
     "arxiv": ("published", "updated"),
     "gdelt": ("seendate",),
-    "usaspending": ("start_date", "last_modified"),   # the award's own date = an honest staleness cue
+    # last_modified (the award's action/modification date) BEFORE start_date (D137): Start Date is the
+    # period-of-performance start, which for a multi-year award is years/decades back — showing it as
+    # "Published" made active awards look stale (a currently-live NASA contract read "Published 9/30/2022",
+    # 7/9). The recent modification is what put the award in our window, so last_modified is the honest
+    # recency cue; fall back to start_date only when the API omits it.
+    "usaspending": ("last_modified", "start_date"),
     "edgar": ("file_date",),
     "nrc": ("publication_date",),
     "sam_gov": ("posted_date", "published"),
