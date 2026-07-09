@@ -4,7 +4,7 @@ import { ChevronDown, FileText, Sparkles } from "lucide-react";
 import { useMemo, useState } from "react";
 import type { BriefItem, Citation, EntitySummary } from "@/lib/types";
 import { cn } from "@/lib/utils";
-import { formatUsd, keyAmount } from "@/lib/amounts";
+import { classifyAmount, formatUsd } from "@/lib/amounts";
 import { ITEM_BG, ITEM_ICON, ITEM_LABEL, ITEM_TEXT } from "@/lib/item-types";
 import {
   ATTRIBUTION_CLASS,
@@ -128,14 +128,16 @@ export function BriefContent({
     () =>
       items.map((item) => ({
         item,
-        amount: keyAmount(item.headline, item.body),
+        amount: classifyAmount(item.headline, item.body),
         cites: item.citation_ids
           .map((id) => citationById.get(id))
           .filter((c): c is Citation => Boolean(c)),
       })),
     [items, citationById],
   );
-  const maxAmount = Math.max(0, ...rows.map((r) => r.amount ?? 0));
+  // Scale bars against the largest *tracked* figure only (D138) — a market projection is shown
+  // with a "projected" tag, not a proportional bar, so it can't flatten every real deal's bar.
+  const maxAmount = Math.max(0, ...rows.map((r) => (r.amount?.kind === "tracked" ? r.amount.value : 0)));
 
   return (
     <div className="divide-y divide-border">
@@ -158,14 +160,26 @@ export function BriefContent({
             </span>
             {amount !== null && (
               <span className="ml-auto flex items-center gap-2 normal-case tracking-normal">
-                <span className="hidden h-1.5 w-24 overflow-hidden rounded-full bg-muted sm:block">
-                  <span
-                    className={cn("block h-full rounded-full", ITEM_BG[item.item_type])}
-                    style={{ width: `${maxAmount ? (amount / maxAmount) * 100 : 0}%` }}
-                  />
-                </span>
-                <span className="font-medium tabular-nums text-foreground">
-                  {formatUsd(amount)}
+                {amount.kind === "tracked" ? (
+                  <span className="hidden h-1.5 w-24 overflow-hidden rounded-full bg-muted sm:block">
+                    <span
+                      className={cn("block h-full rounded-full", ITEM_BG[item.item_type])}
+                      style={{ width: `${maxAmount ? (amount.value / maxAmount) * 100 : 0}%` }}
+                    />
+                  </span>
+                ) : (
+                  // Projection (D138): a tag, not a proportional bar — never on the tracked-capital scale.
+                  <span className="rounded-sm border border-dashed border-muted-foreground/40 px-1 text-[0.6rem] uppercase tracking-wide text-muted-foreground">
+                    projected
+                  </span>
+                )}
+                <span
+                  className={cn(
+                    "font-medium tabular-nums",
+                    amount.kind === "tracked" ? "text-foreground" : "text-muted-foreground",
+                  )}
+                >
+                  {formatUsd(amount.value)}
                 </span>
               </span>
             )}

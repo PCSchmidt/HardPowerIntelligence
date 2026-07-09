@@ -54,3 +54,30 @@ describe("BriefGlance source count (D131)", () => {
     expect(screen.queryByText(/sources/)).not.toBeInTheDocument();
   });
 });
+
+describe("BriefGlance tracked vs projected value (D138)", () => {
+  function withText(id: string, headline: string): BriefItem {
+    return { ...item(id), headline, body: "" };
+  }
+
+  it("excludes a market projection from the tracked total", () => {
+    render(
+      <BriefGlance
+        items={[
+          withText("1", "SK Hynix to invest $28B in expansion"),
+          withText("2", "$720B in U.S. grid investment needed by 2030"),
+        ]}
+      />,
+    );
+    // Only the $28B committed deal is summed — the $720B forecast is not tracked capital.
+    expect(screen.getByText(/≈\$28B tracked/)).toBeInTheDocument();
+    expect(screen.queryByText(/\$748B tracked/)).not.toBeInTheDocument();
+    // The projection is still shown, tagged as such.
+    expect(screen.getByText(/projected/i)).toBeInTheDocument();
+  });
+
+  it("omits the tracked figure entirely when every amount is a projection", () => {
+    render(<BriefGlance items={[withText("1", "Data-center power market projected to reach $500B by 2032")]} />);
+    expect(screen.queryByText(/tracked/)).not.toBeInTheDocument();
+  });
+});

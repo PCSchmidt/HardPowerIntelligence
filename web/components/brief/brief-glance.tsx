@@ -1,6 +1,6 @@
 import type { BriefItem, Citation } from "@/lib/types";
 import { cn } from "@/lib/utils";
-import { formatUsd, keyAmount } from "@/lib/amounts";
+import { classifyAmount, formatUsd } from "@/lib/amounts";
 import { ITEM_BG, ITEM_ICON, ITEM_LABEL, ITEM_TEXT } from "@/lib/item-types";
 import { distinctOutlets } from "@/lib/sources";
 
@@ -12,9 +12,14 @@ import { distinctOutlets } from "@/lib/sources";
 export function BriefGlance({ items, citations = [] }: { items: BriefItem[]; citations?: Citation[] }) {
   if (items.length === 0) return null;
 
-  const rows = items.map((item) => ({ item, amount: keyAmount(item.headline, item.body) }));
-  const maxAmount = Math.max(0, ...rows.map((r) => r.amount ?? 0));
-  const total = rows.reduce((sum, r) => sum + (r.amount ?? 0), 0);
+  const rows = items.map((item) => ({ item, amount: classifyAmount(item.headline, item.body) }));
+  // Only committed capital counts toward the tracked total and the magnitude scale (D138): a
+  // market/forecast projection is shown but not summed, so one $720B forecast can't dwarf real deals.
+  const trackedAmounts = rows
+    .map((r) => (r.amount?.kind === "tracked" ? r.amount.value : 0))
+    .filter((v) => v > 0);
+  const maxAmount = Math.max(0, ...trackedAmounts);
+  const total = trackedAmounts.reduce((sum, v) => sum + v, 0);
   // Source diversity (D133): distinct outlets across the brief, not the raw citation count —
   // a signal of how broadly the day was reported, shown alongside the item/$ totals.
   const sourceCount = distinctOutlets(citations).length;
@@ -47,14 +52,30 @@ export function BriefGlance({ items, citations = [] }: { items: BriefItem[]; cit
               </span>
               {amount !== null && (
                 <span className="hidden shrink-0 items-center gap-2 sm:flex">
-                  <span className="h-1.5 w-20 overflow-hidden rounded-full bg-muted">
-                    <span
-                      className={cn("block h-full rounded-full", ITEM_BG[item.item_type])}
-                      style={{ width: `${maxAmount ? (amount / maxAmount) * 100 : 0}%` }}
-                    />
-                  </span>
-                  <span className="w-12 text-right text-ui-sm font-medium tabular-nums text-foreground">
-                    {formatUsd(amount)}
+                  {amount.kind === "tracked" ? (
+                    // Committed capital: a solid bar scaled against the largest tracked figure.
+                    <span className="h-1.5 w-20 overflow-hidden rounded-full bg-muted">
+                      <span
+                        className={cn("block h-full rounded-full", ITEM_BG[item.item_type])}
+                        style={{ width: `${maxAmount ? (amount.value / maxAmount) * 100 : 0}%` }}
+                      />
+                    </span>
+                  ) : (
+                    // Projection/market-size (D138): shown, not summed — an outlined bar + tag so it
+                    // reads as a forecast, never as tracked capital on the same scale as real deals.
+                    <span className="flex w-20 justify-end">
+                      <span className="rounded-sm border border-dashed border-muted-foreground/40 px-1 text-[0.6rem] uppercase tracking-wide text-muted-foreground">
+                        projected
+                      </span>
+                    </span>
+                  )}
+                  <span
+                    className={cn(
+                      "w-12 text-right text-ui-sm font-medium tabular-nums",
+                      amount.kind === "tracked" ? "text-foreground" : "text-muted-foreground",
+                    )}
+                  >
+                    {formatUsd(amount.value)}
                   </span>
                 </span>
               )}
