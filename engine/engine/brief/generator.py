@@ -347,18 +347,30 @@ def _select_facts(
     candidates: list[tuple[dict, float]],
     limit: int,
     advancement_floor: int,
+    news_floor: int = 0,
 ) -> list[tuple[dict, float]]:
-    """Choose the fact set for synthesis: top candidates by materiality, but reserve
-    up to ``advancement_floor`` slots for advancement records (``research_paper``) so a
-    high-$ capital desk doesn't crowd out the technology-advancement leg (D063/D068).
-    Output preserves materiality order. ``candidates`` is assumed materiality-sorted."""
+    """Choose the fact set for synthesis: top candidates by materiality, but guarantee floors
+    so a high-$ AWARD-heavy desk can't crowd out two legs it needs. Reserve up to
+    ``advancement_floor`` slots for advancement records (``research_paper``, D063/D068) and up
+    to ``news_floor`` slots for attributed news (``source_id == "feeds"``, D136) — then fill the
+    remaining slots by overall materiality. The floors only change the outcome when those
+    records would otherwise miss the cut (award-heavy Defense); on a news-led desk the feeds
+    items already rank in, so reserving them is a no-op. Output preserves materiality order;
+    ``candidates`` is assumed materiality-sorted."""
     adv = [c for c in candidates if c[0].get("record_type") == "research_paper"]
-    cap = [c for c in candidates if c[0].get("record_type") != "research_paper"]
+    news = [
+        c for c in candidates
+        if c[0].get("record_type") != "research_paper" and c[0].get("source_id") == "feeds"
+    ]
     n_adv = min(max(advancement_floor, 0), len(adv), limit)
-    chosen = adv[:n_adv] + cap[: limit - n_adv]
-    if len(chosen) < limit:                       # not enough capital — top up with adv
-        chosen = (chosen + adv[n_adv:])[:limit]
-    chosen_ids = {str(c[0]["rr_id"]) for c in chosen}
+    n_news = min(max(news_floor, 0), len(news), max(0, limit - n_adv))
+    reserved = (adv[:n_adv] + news[:n_news])[:limit]
+    # Fill the remaining slots by overall materiality order (reserved items already counted).
+    chosen_ids = {str(c[0]["rr_id"]) for c in reserved}
+    for c in candidates:
+        if len(chosen_ids) >= limit:
+            break
+        chosen_ids.add(str(c[0]["rr_id"]))
     return [c for c in candidates if str(c[0]["rr_id"]) in chosen_ids]
 
 
@@ -443,7 +455,8 @@ async def generate_brief(desk: str, pool: asyncpg.Pool) -> GeneratedBrief:
     # Step 4: Choose the fact set — top by materiality, with an advancement floor so
     # capital flow doesn't crowd out the technology leg (D063/D068).
     selected = _select_facts(
-        candidates, settings.brief_max_items * 2, settings.brief_advancement_floor
+        candidates, settings.brief_max_items * 2, settings.brief_advancement_floor,
+        settings.brief_news_floor,
     )
 
     # Step 4b: Significance gate (D085) — drop true-but-trivial items (routine commodity

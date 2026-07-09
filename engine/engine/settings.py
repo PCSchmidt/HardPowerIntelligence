@@ -120,6 +120,15 @@ class Settings(BaseSettings):
     # (research_paper) records so high-$ capital doesn't crowd out the technology
     # leg of a brief (D063). 0 disables the floor.
     brief_advancement_floor: int = 3
+    # News floor (D136): reserve up to N fact slots for attributed news (source_id="feeds")
+    # so an AWARD-heavy desk can't shut news out entirely. Defense proved this: materiality
+    # favors structured sources (usaspending 0.9 / edgar 0.85 vs feeds 0.6) AND dollar
+    # magnitude, so on 2026-07-09 the Defense brief was 17 items across only 3 structured
+    # sources while every material defense NEWS story (Lockheed–Ultra Maritime, Canada subs,
+    # GCAP, Thales–Exail) sat in the wire. Mirrors brief_advancement_floor; feeds only (not
+    # GDELT — its syndicated news is lower-signal). No effect on desks where feeds already
+    # rank into the pool (Energy/AI). 0 disables.
+    brief_news_floor: int = 4
     # Publish gate (D070): a brief publishes when it has >= this many provable
     # (LLM-supported) claims. Counts claims, not items, so it's stable whether
     # synthesis consolidates facts into few dense items or many thin ones.

@@ -89,6 +89,66 @@ class TestSelectFacts:
         assert "c1" in _ids(facts)
 
 
+def _src(rr_id, record_type, source_id, score):
+    row, s = _cand(rr_id, record_type, score)
+    row["source_id"] = source_id
+    return (row, s)
+
+
+# Award-heavy desk (Defense-like): 5 high-$ awards outrank 2 feeds news + 1 GDELT item.
+AWARD_HEAVY = [
+    _src("w1", "federal_award", "usaspending", 0.90),
+    _src("w2", "federal_award", "usaspending", 0.80),
+    _src("w3", "filing", "edgar", 0.70),
+    _src("w4", "federal_award", "usaspending", 0.60),
+    _src("w5", "filing", "edgar", 0.50),
+    _src("n1", "news", "feeds", 0.45),
+    _src("n2", "news", "feeds", 0.44),
+    _src("g1", "news", "gdelt", 0.40),
+]
+
+
+class TestNewsFloor:
+    def test_reserves_feeds_slots_on_award_heavy_desk(self):
+        # limit 5, news_floor 2 → the two feeds items are guaranteed in despite ranking below
+        # w4/w5 by materiality; the lowest awards (w4, w5) get bumped.
+        facts = _select_facts(AWARD_HEAVY, limit=5, advancement_floor=0, news_floor=2)
+        ids = _ids(facts)
+        assert len(ids) == 5
+        assert "n1" in ids and "n2" in ids
+        assert "w5" not in ids  # a lower award was displaced to make room for news
+
+    def test_no_floor_excludes_news_when_awards_dominate(self):
+        facts = _select_facts(AWARD_HEAVY, limit=5, advancement_floor=0, news_floor=0)
+        assert _ids(facts) == ["w1", "w2", "w3", "w4", "w5"]
+
+    def test_only_feeds_reserved_not_gdelt(self):
+        # news_floor reserves feeds only; GDELT must earn its slot on materiality.
+        facts = _select_facts(AWARD_HEAVY, limit=3, advancement_floor=0, news_floor=3)
+        ids = _ids(facts)
+        assert "n1" in ids and "n2" in ids  # both feeds reserved
+        assert "g1" not in ids              # gdelt not reserved (and outranked)
+
+    def test_no_op_when_feeds_already_rank_in(self):
+        # News-led desk (Energy/AI-like): feeds already in the top slots, so reserving is a no-op.
+        news_led = [
+            _src("n1", "news", "feeds", 0.9),
+            _src("n2", "news", "feeds", 0.8),
+            _src("w1", "federal_award", "edgar", 0.7),
+        ]
+        with_floor = _ids(_select_facts(news_led, limit=3, advancement_floor=0, news_floor=2))
+        without = _ids(_select_facts(news_led, limit=3, advancement_floor=0, news_floor=0))
+        assert with_floor == without == ["n1", "n2", "w1"]
+
+    def test_news_and_advancement_floors_coexist(self):
+        cands = AWARD_HEAVY + [_src("a1", "research_paper", "arxiv", 0.30)]
+        facts = _select_facts(cands, limit=5, advancement_floor=1, news_floor=2)
+        ids = _ids(facts)
+        assert "a1" in ids           # advancement floor honored
+        assert "n1" in ids and "n2" in ids  # news floor honored
+        assert len(ids) == 5
+
+
 class TestCandidatePassages:
     def test_one_passage_per_fact_with_excerpt(self):
         facts = _select_facts(CANDIDATES, limit=3, advancement_floor=1)
