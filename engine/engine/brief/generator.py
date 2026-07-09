@@ -1,4 +1,5 @@
 import json
+import re
 import uuid
 from collections import Counter
 from dataclasses import dataclass, field, replace
@@ -238,6 +239,44 @@ async def _recently_featured(pool: asyncpg.Pool, desk: str, window_days: int) ->
     return {f"{r['source_id']}:{r['native_id']}" for r in rows}
 
 
+# Near-duplicate collapse (D135): syndicated wire news — GDELT especially — repeats one story
+# across dozens of outlets ("Trump Revives Calls For U.S. Control Of Greenland" landed ~30× on
+# 2026-07-09), each a distinct native_id so the ingest-level (source_id, native_id, content_hash)
+# dedup can't see it. Collapse candidates whose HEADLINE normalizes identically, keeping the
+# highest-scoring copy. Conservative — only exact normalized-title matches collapse, so genuinely
+# distinct stories survive. Cleans the wire and stops the significance LLM from re-scoring the
+# same headline dozens of times (token waste). Note: normalization keeps digits, so "F - 35" and
+# "F - 22" stay distinct; it only strips a trailing "| <station>" tail and non-alphanumerics.
+def _norm_title(text: str) -> str:
+    stripped = (text or "").strip()
+    head = stripped.splitlines()[0] if stripped else ""
+    head = head.split("|")[0]  # drop "| News Radio 105.5 WERC"-style syndication tails
+    return re.sub(r"[^a-z0-9]+", " ", head.lower()).strip()
+
+
+def dedupe_by_title(candidates: list[tuple[dict, float]]) -> list[tuple[dict, float]]:
+    """Collapse exact normalized-title duplicates, keeping the highest-scoring copy (D135).
+
+    Pure. The surviving representative sits at the first occurrence's position but carries the
+    best copy's row + score, so downstream ranking reflects the strongest version. Records with a
+    blank/unusable title are never collapsed (kept as-is) — we only merge on a real headline."""
+    index: dict[str, int] = {}  # normalized title -> position in `out`
+    out: list[tuple[dict, float]] = []
+    for row, score in candidates:
+        key = _norm_title(row.get("text_chunk") or "")
+        if not key:
+            out.append((row, score))  # can't identify a headline — never collapse
+            continue
+        if key in index:
+            i = index[key]
+            if score > out[i][1]:
+                out[i] = (row, score)  # keep the better-scoring copy in full
+            continue
+        index[key] = len(out)
+        out.append((row, score))
+    return out
+
+
 def apply_novelty_penalty(
     candidates: list[tuple[dict, float]],
     featured_keys: set[str],
@@ -379,6 +418,12 @@ async def generate_brief(desk: str, pool: asyncpg.Pool) -> GeneratedBrief:
     # Done first so retrieval can be seeded by the most material records and the
     # citation pool can be aligned to the facts we actually write about (D068).
     candidates = await _score_candidates(pool, since, desk)
+    # Collapse syndicated near-duplicates (D135) before novelty/diversity/selection + wire, so one
+    # story doesn't occupy dozens of wire slots or get scored dozens of times by the significance LLM.
+    _pre_dedupe = len(candidates)
+    candidates = dedupe_by_title(candidates)
+    if _pre_dedupe != len(candidates):
+        log.info("title_dedupe", desk=desk, collapsed=_pre_dedupe - len(candidates), kept=len(candidates))
     # Anti-rehash (D074): down-rank records already featured in recent published briefs
     # so a long-lived item (e.g. a multi-year award) doesn't lead the brief day after day.
     featured = await _recently_featured(pool, desk, settings.novelty_window_days)
