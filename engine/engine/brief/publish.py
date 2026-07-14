@@ -115,9 +115,12 @@ async def generate_publishable_brief(
     """Generate and evaluate a brief, regenerating on a failed gate OR a generation
     failure (D072).
 
-    Returns the first attempt that clears ``min_claims``; if none do within
-    ``max_attempts``, returns the best attempt (most provable claims) so the caller
-    can still persist the strongest brief, marked failed. A generation/eval *exception*
+    Returns the first attempt that publishes — ``eval_passed``, i.e. >= 1 honest (cited,
+    non-fabricated) item survives (the D070 provable-claim floor was retired by D099;
+    ``min_claims`` is retained only for the reported provable-claim count, not the gate).
+    If none pass within ``max_attempts``, returns the best attempt (most surviving items,
+    provable claims as tiebreak) so the caller can still persist the strongest brief, marked
+    failed. A generation/eval *exception*
     (e.g. the synthesis model returning a whitespace-only non-JSON body, or a transient
     provider error) is treated as a failed attempt and retried within the same budget,
     not propagated — so an unlucky draw can't crash an unattended desk run. If every

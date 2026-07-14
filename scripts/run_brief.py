@@ -79,7 +79,9 @@ async def main(desk: str, brief_date: str) -> int:
     print(f"\nPublished faithfulness: {score:.3f} | pre-clean synthesis: {pre_clean:.3f}")
     print(f"Items: {len(item_results)} generated, {len(excluded_ids)} excluded, {surviving} surviving")
     print(f"Provable claims: {provable_claims}")
-    print(f"Eval: {'PASSED' if eval_passed else 'FAILED'} (need >= {settings.brief_min_claims} provable claims)")
+    # Publication gates on >= 1 honest (cited, non-fabricated) item surviving — the D070 provable-claim
+    # floor was retired by D099. A FAILED brief therefore means zero items survived, not "too few claims".
+    print(f"Eval: {'PASSED' if eval_passed else 'FAILED'} (publishes on >= 1 honest item; {surviving} surviving)")
 
     # ── Layered brief (D071 prototype): facts are gated above; the read/watch/
     # convergence layer is ANALYSIS, held only to grounding — it must add no new

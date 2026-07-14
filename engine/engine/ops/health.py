@@ -159,10 +159,13 @@ def evaluate_health(
                     f"(citation-format drift, not a thin day) — desk is dark.",
                 ))
             else:
-                # A clean thin-day skip (below the claim floor). Normal — surface, don't alarm.
+                # A failed brief with no headline — synthesis produced nothing structured to anchor
+                # the collapse signal on (rare). Surface as INFO; the headline case above pages. (The
+                # publish gate is >=1 honest item, D099 — not a provable-claim floor, so this is never
+                # a "too few claims" thin day.)
                 findings.append(Finding(
                     "info", "brief_skipped",
-                    f"{desk}: skipped (below the provable-claim floor — a thin news day).",
+                    f"{desk}: no items survived the citation/faithfulness gate (persisted failed).",
                 ))
         elif status == "pending":
             findings.append(Finding(
