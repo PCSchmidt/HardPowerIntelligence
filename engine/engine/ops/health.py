@@ -147,11 +147,23 @@ def evaluate_health(
                     f"{desk}: an item body/analysis field looks like leaked JSON (D118 regression?).",
                 ))
         elif status == "failed":
-            # A clean thin-day skip (below the claim floor). Normal — surface, don't alarm.
-            findings.append(Finding(
-                "info", "brief_skipped",
-                f"{desk}: skipped (below the provable-claim floor — a thin news day).",
-            ))
+            # Distinguish two very different "failed" briefs. A synthesis that produced a
+            # COMPLETE brief (headline present) yet persisted ZERO items didn't have a thin
+            # news day — every item was stripped by the citation gate (the 2026-07-14 Defense
+            # collapse: uncited item bodies deleted wholesale, D139). That is a silent desk-dark
+            # and must page, unlike a genuine sparse day (some items, just below the claim floor).
+            if (b.get("item_count") or 0) == 0 and (b.get("headline") or "").strip():
+                findings.append(Finding(
+                    "warn", "brief_items_collapsed",
+                    f"{desk}: synthesis produced a full brief but 0 items survived the citation gate "
+                    f"(citation-format drift, not a thin day) — desk is dark.",
+                ))
+            else:
+                # A clean thin-day skip (below the claim floor). Normal — surface, don't alarm.
+                findings.append(Finding(
+                    "info", "brief_skipped",
+                    f"{desk}: skipped (below the provable-claim floor — a thin news day).",
+                ))
         elif status == "pending":
             findings.append(Finding(
                 "warn", "brief_pending",
@@ -206,7 +218,10 @@ def evaluate_health(
             mix = " / ".join(f"{ac.get(k, 0)} {k}" for k in _ATTRIBUTIONS)
             digest.append(f"{desk}: {b.get('item_count') or 0} items ({mix})")
         elif b and b.get("status") == "failed":
-            digest.append(f"{desk}: skipped (thin day)")
+            if (b.get("item_count") or 0) == 0 and (b.get("headline") or "").strip():
+                digest.append(f"{desk}: FAILED — full brief, 0 items survived (citation collapse)")
+            else:
+                digest.append(f"{desk}: skipped (thin day)")
         else:
             digest.append(f"{desk}: no brief")
     vol = sorted(

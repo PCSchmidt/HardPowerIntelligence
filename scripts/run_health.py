@@ -44,7 +44,7 @@ async def _gather(pool, day: date) -> tuple[list[dict], list[dict], list[dict]]:
         brief_rows = await conn.fetch(
             """
             SELECT b.id, b.desk, b.status, b.faithfulness_score, b.error_message,
-                   b.convergence_read, b.model_waterfall_metadata,
+                   b.headline, b.convergence_read, b.model_waterfall_metadata,
                    (SELECT count(*) FROM brief_items bi WHERE bi.brief_id = b.id) AS item_count
             FROM briefs b
             WHERE b.date = $1

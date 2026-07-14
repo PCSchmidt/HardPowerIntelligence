@@ -12,8 +12,70 @@ from engine.eval.citation_eval import (
     EvalResult,
     extract_claims,
     extract_citation_indices,
+    normalize_citations,
     strip_uncited_sentences,
 )
+
+
+class TestNormalizeCitations:
+    """Near-miss citation repair (D139) — the 2026-07-14 Defense collapse."""
+
+    def test_space_instead_of_colon(self):
+        assert normalize_citations("Fact [CITE 12].") == "Fact [CITE:12]."
+
+    def test_colon_space(self):
+        assert normalize_citations("Fact [CITE: 7].") == "Fact [CITE:7]."
+
+    def test_dash_and_lowercase(self):
+        assert normalize_citations("Fact [cite-3].") == "Fact [CITE:3]."
+
+    def test_bare_bracketed_number(self):
+        assert normalize_citations("Fact [9].") == "Fact [CITE:9]."
+
+    def test_full_width_brackets(self):
+        assert normalize_citations("Fact 【CITE:4】.") == "Fact [CITE:4]."
+
+    def test_parens_with_keyword(self):
+        assert normalize_citations("Fact (CITE:5).") == "Fact [CITE:5]."
+
+    def test_canonical_unchanged_and_idempotent(self):
+        s = "Fact [CITE:2]. More [CITE:3]."
+        assert normalize_citations(s) == s
+        assert normalize_citations(normalize_citations(s)) == s
+
+    def test_leading_zeros_normalized(self):
+        assert normalize_citations("Fact [CITE:012].") == "Fact [CITE:12]."
+
+    def test_range_not_converted(self):
+        # "[1-2]" is a range, not a citation — leave it (stays uncited → dropped downstream).
+        assert normalize_citations("Section [1-2] applies.") == "Section [1-2] applies."
+
+    def test_bare_parens_not_converted(self):
+        # Ordinary parentheticals like "(2)" must NOT become citations.
+        assert normalize_citations("Phase (2) begins.") == "Phase (2) begins."
+
+    def test_four_digit_year_in_brackets_not_converted(self):
+        # Citation indices are 1–3 digits; a bracketed year must not be mistaken for one.
+        assert normalize_citations("Due [2028] per plan.") == "Due [2028] per plan."
+
+    def test_empty(self):
+        assert normalize_citations("") == ""
+
+
+class TestStripRescuesNearMissCitations:
+    def test_near_miss_body_survives(self):
+        # The collapse signature: a fully-cited body in a near-miss format used to strip to empty;
+        # normalization now rescues every sentence before enforcement (D139).
+        body = "US struck an Iranian base with sea drones [CITE 2]. The Pentagon suspended CMMC [12]."
+        cleaned = strip_uncited_sentences(body)
+        assert cleaned == (
+            "US struck an Iranian base with sea drones [CITE:2]. "
+            "The Pentagon suspended CMMC [CITE:12]."
+        )
+
+    def test_uncited_still_dropped(self):
+        # Normalization must not weaken the rule — a genuinely uncited sentence is still removed.
+        assert strip_uncited_sentences("This has no citation at all.") == ""
 
 
 class TestStripUncitedSentences:

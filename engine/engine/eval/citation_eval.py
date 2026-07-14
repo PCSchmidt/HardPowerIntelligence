@@ -12,6 +12,28 @@ log = structlog.get_logger()
 _CITE_RE = re.compile(r"\[CITE:(\d+)\]")
 _SENTENCE_RE = re.compile(r"(?<=[.!?])\s+(?=[A-Z])")
 
+# Near-miss citation repair (D139). The publish invariant deletes any sentence lacking the exact
+# `[CITE:N]` token, so when the synthesis model drifts to a slightly-off citation format the gate
+# strips EVERY sentence and drops the whole brief — a complete, well-formed Defense brief (headline
+# + BLUF present) collapsed to 0 items this way on 2026-07-14. These patterns normalize the common
+# drifts back to `[CITE:N]` BEFORE enforcement, so format drift no longer silently darks a desk —
+# without weakening the rule (a genuinely uncited sentence is still dropped).
+#   _CITE_KEYWORD_RE: the CITE keyword with off spacing/punctuation/brackets/case —
+#                     [CITE 12] · [CITE: 12] · [cite-12] · (CITE:12) · 【CITE:12】
+#   _CITE_BARE_RE:    a bare bracketed index — [12] · ［12］ (square/full-width-square only, never
+#                     parens, so ordinary parentheticals like "(2)" are left alone).
+_CITE_KEYWORD_RE = re.compile(r"[\[(（【［]\s*cite\s*[:\-]?\s*(\d{1,3})\s*[\])）】］]", re.IGNORECASE)
+_CITE_BARE_RE = re.compile(r"[\[［]\s*(\d{1,3})\s*[\]］]")
+
+
+def normalize_citations(text: str) -> str:
+    """Repair near-miss citation tokens to the canonical ``[CITE:N]`` (D139). Idempotent."""
+    if not text:
+        return text
+    text = _CITE_KEYWORD_RE.sub(lambda m: f"[CITE:{int(m.group(1))}]", text)
+    text = _CITE_BARE_RE.sub(lambda m: f"[CITE:{int(m.group(1))}]", text)
+    return text
+
 # Abbreviations that end in a period but do NOT end a sentence. The naive period-space-capital
 # split above otherwise severs a sentence at "U.S. Space Force" or "Gen. Dagvin Anderson"; the
 # leading half then loses its [CITE:N] and gets dropped by strip_uncited_sentences, publishing a
@@ -90,6 +112,7 @@ def strip_uncited_sentences(body: str) -> str:
     body (possibly empty if nothing was cited)."""
     if not body:
         return ""
+    body = normalize_citations(body)  # repair near-miss citation formats before enforcing (D139)
     sentences = _split_sentences(body)
     kept = [s.strip() for s in sentences if s.strip() and _CITE_RE.search(s)]
     return " ".join(kept)

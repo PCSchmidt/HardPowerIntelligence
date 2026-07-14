@@ -54,6 +54,49 @@ class TestHealthyDay:
         assert report.exit_code == 0
 
 
+class TestCitationCollapse:
+    """A failed brief with a full structure (headline) but 0 items is a silent desk-dark
+    (the 2026-07-14 Defense collapse, D139) — it must page, unlike a genuine thin day."""
+
+    def _collapsed(self, desk):
+        return {"desk": desk, "status": "failed", "item_count": 0,
+                "faithfulness_score": 0.0, "error_message": None,
+                "headline": "US Deploys Sea Drones in Combat First; Pentagon Ramps Missile Production"}
+
+    def test_full_brief_zero_items_pages(self):
+        briefs = [self._collapsed("defense"), _brief("ai"), _brief("energy")]
+        report = evaluate_health(briefs=briefs, ingest_runs=[], sources=[_fresh_source()], now=NOW)
+        assert "brief_items_collapsed" in _codes(report)
+        assert _level(report, "brief_items_collapsed") == "warn"
+        assert report.verdict == "degraded"
+        assert report.exit_code == 1
+        assert any("citation collapse" in line for line in report.digest)
+
+    def test_failed_with_some_items_stays_thin_day_info(self):
+        # A failed brief that DID produce items (just below the claim floor) is a normal sparse day.
+        b = {"desk": "defense", "status": "failed", "item_count": 2,
+             "faithfulness_score": 0.0, "error_message": None, "headline": "Some headline"}
+        report = evaluate_health(
+            briefs=[b, _brief("ai"), _brief("energy")],
+            ingest_runs=[], sources=[_fresh_source()], now=NOW,
+        )
+        assert "brief_skipped" in _codes(report)
+        assert "brief_items_collapsed" not in _codes(report)
+        assert report.verdict == "ok"
+
+    def test_failed_zero_items_no_headline_is_conservative_info(self):
+        # 0 items AND no headline isn't the collapse signature (synthesis produced nothing
+        # structured) — stay the conservative thin-day INFO rather than false-page.
+        b = {"desk": "defense", "status": "failed", "item_count": 0,
+             "faithfulness_score": 0.0, "error_message": None, "headline": ""}
+        report = evaluate_health(
+            briefs=[b, _brief("ai"), _brief("energy")],
+            ingest_runs=[], sources=[_fresh_source()], now=NOW,
+        )
+        assert "brief_skipped" in _codes(report)
+        assert "brief_items_collapsed" not in _codes(report)
+
+
 class TestPublishShutout:
     def test_no_desk_published_is_critical(self):
         # All three skipped (thin) — no publish at all → readers see stale content.
