@@ -47,7 +47,11 @@ So this plan moves from *build* mode to *harden + validate* mode.
 - [x] **A2 — Output-quality canary.** ✅ 2026-07-05 (D126 item-count/faithfulness + D127). Adds a
   **confidence-mix** check (`confidence_collapsed` — a published brief with zero confirmed/reported
   items) and a **content-leak** canary (`content_leak` — catches a D118 JSON-leak regression in
-  prod via `looks_like_content_leak`).
+  prod via `looks_like_content_leak`). Extended **2026-07-14 (D139)** with `brief_items_collapsed`:
+  a `status='failed'` brief that has a headline but **0 items** (synthesis produced a full brief the
+  citation gate stripped to nothing — the 7/14 Defense dark, where a near-miss `[CITE:N]` format
+  deleted every sentence) now **warns/pages**, distinct from a genuine thin-day INFO. Fix also made
+  citation parsing tolerant (`normalize_citations`) so the drift can't dark a desk in the first place.
 - [x] **A3 — Daily self-digest.** ✅ 2026-07-05 (D127). `HealthReport.digest` — always-shown run
   picture: per-desk published item count + attribution mix, per-source ingest volume, and the
   run's LLM token/cost total. Emitted to stdout + the GitHub step summary alongside the anomalies.

@@ -580,6 +580,10 @@ inline `[CITE:N]` chips that open the drawer; the layered Convergence + Analysis
   item: type swatch + label, headline (anchor-links to the item), a normalized **magnitude bar** from
   the item's key dollar figure (parsed from headline, then body), and a **Sources (N)** count. A summary
   strip: "N items · ≈$X tracked · 100% cited." Delivers the day in ~10 seconds (importance-first).
+  - **Type-aware value (D138, 2026-07-09):** the "≈$X tracked" total and the magnitude-bar scale count
+    only *committed capital*. A market-size/forecast figure (e.g. a $720B grid-investment projection) is
+    still shown — with a dashed "projected" tag — but excluded from the total and the bar scale, so one
+    forecast can't inflate the headline (`web/lib/amounts.ts` `classifyAmount`; same treatment in `brief-content`).
 - **Provenance discoverability:** a visible **"Sources (N) ↗"** control on each item (not just the tiny
   inline chips) opening the existing drawer; prettify `source_id` → display name (SEC EDGAR,
   USASpending.gov, arXiv, GDELT…) in the drawer + glance.

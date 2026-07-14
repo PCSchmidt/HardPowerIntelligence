@@ -167,7 +167,9 @@ interface SidebarProps {
 > **As-built note (2026-06-17, D082/D084):** `BriefReader` also renders **`BriefGlance`**
 > (`components/brief/brief-glance.tsx`, Server) — an "At a glance" ledger above the read: per item a
 > type swatch, headline anchor-link, normalized $ magnitude bar (`lib/amounts.ts`), and sources count,
-> with an "N items · ≈$X tracked · 100% cited" strip — plus a dashed **GDELT Signal** block. `BriefContent`
+> with an "N items · ≈$X tracked · 100% cited" strip — plus a dashed **GDELT Signal** block. **Type-aware
+> since D138** (`lib/amounts.ts` `classifyAmount`): a market projection is tagged "projected" and excluded
+> from the tracked total and the magnitude-bar scale, so one forecast can't inflate the headline. `BriefContent`
 > now also exposes a visible "Sources (N)" control per item (opening `CitationsDrawer`, which shows
 > prettified source names via `lib/sources.ts`).
 >
