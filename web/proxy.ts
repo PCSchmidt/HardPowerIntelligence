@@ -2,7 +2,12 @@ import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
 const AUTH_REQUIRED_PREFIXES = ["/desk", "/brief", "/entity", "/account"];
-const AUTH_ROUTES = ["/login", "/signup"];
+// Routes a signed-in user has no business on — they get bounced to the product.
+// /reset-password is deliberately ABSENT (D141): the recovery link authenticates the user
+// *before* they choose a new password, so listing it here would bounce them to the desk and
+// make the password impossible to change — the deadlock this whole flow exists to remove.
+// /auth/callback is likewise absent; it must run the code exchange on its own terms.
+const AUTH_ROUTES = ["/login", "/signup", "/forgot-password"];
 
 // Next 16 proxy (formerly middleware): refreshes the Supabase session cookie on
 // every request and gates UX routing (D022). FastAPI remains the data authority.

@@ -14,6 +14,29 @@ live ingestion runner, with Supabase auth and Lemon Squeezy subscriptions. Built
 
 ### Added
 
+- **Password recovery + a real auth callback — the account funnel is no longer one-way** (2026-07-15, D141):
+  the operator was locked out of HPI with no way back in, and the diagnosis was worse than the symptom:
+  **`login-form.tsx` had shipped a "Forgot password?" link to `/forgot-password` since June, and that page
+  never existed** — every user who clicked it got a 404. There was no `resetPasswordForEmail` anywhere in the
+  codebase, no reset page, and no `/auth/callback` route at all. With all OAuth providers disabled
+  (`external: ['email']`) there was no escape hatch either; the only recovery path was an operator running
+  the Admin API by hand. Evidence it was already costing real users: `kwarlick@gmail.com` signed up
+  **2026-06-18 and has never signed in** — a stranded account sitting unconfirmed for four weeks.
+  **Added:** `/auth/callback` (exchanges the PKCE `code` for a session cookie, with a same-origin-only
+  `next` allowlist so an emailed link can't be turned into an open redirect, and human-readable handling of
+  expired/reused/codeless links), `/forgot-password`, and `/reset-password` (session-verified before the
+  form renders, 8-char minimum, confirmation match). **Also fixed a latent signup bug:** `emailRedirectTo`
+  pointed straight at `/desk/defense`, so even when confirmation mail *did* arrive the user landed on the
+  desk holding an unspent code and no session — i.e. still logged out; it now routes through the callback.
+  `login-form` renders `?error=` so a dead link explains itself instead of dumping the user at a blank form.
+  **The subtle one:** `/reset-password` is deliberately kept OUT of the proxy's `AUTH_ROUTES` — a recovery
+  link authenticates the user *before* they choose a new password, so bouncing signed-in users off that
+  route would make the password permanently unchangeable. A regression test pins it. +41 web tests (18 → 59),
+  covering open-redirect refusal, account-enumeration parity for unknown addresses, and the deadlock guard.
+  _Operator steps still required for delivery: wire Resend as Supabase Auth custom SMTP (the built-in mailer
+  is rate-limited and not production-grade) and allowlist the callback in Supabase Auth → URL Configuration._
+  Unblocks Phase B, where open self-signup is the tester path and a broken funnel would read as a demand
+  signal rather than a bug.
 - **News floor — attributed news can no longer be shut out of an award-heavy desk** (2026-07-09, D136): the 7/9 Defense brief was 17 items across only 3 structured sources (USAspending / EDGAR / arXiv), led by 7 NASA space awards, while every material defense *news* story — Lockheed–Ultra Maritime $3.5B, Canada→TKMS submarines, GCAP $6.1B, Thales–Exail — sat in the wire. Cause: materiality favors structured sources (usaspending 0.9 vs feeds 0.6) *and* dollar magnitude, so on a desk flush with awards the fact-pool fills before any news ranks. `_select_facts` now reserves up to `brief_news_floor` (4) slots for attributed news (`source_id="feeds"`), mirroring the D063 advancement floor — **feeds only** (not GDELT's syndicated wire) and a **no-op on news-led desks** (Energy/AI already rank feeds in), so it's targeted at the award-heavy failure without disturbing what works. Significance/publish gates still judge quality; the floor only guarantees news a seat at the table. +5 tests. Backend-only; live on the next run.
 - **Source-diversity count on each desk landing page** (2026-07-07, D133): the "At a glance" header now shows how many **distinct outlets** the brief draws on (e.g. "12 items · 9 sources · 100% cited") — a one-glance read of how broadly the day was reported. Counts distinct publication domains, not raw citations (three articles from one outlet = one source), sharing the `distinctOutlets` helper with the D131 card footer. +6 web tests. Ships on the next Vercel redeploy.
 - **At-a-glance source provenance on each brief card — outlet + freshness without a click** (2026-07-07, D131): answering "what publication is this, and how stale?" previously took 3+ clicks (open Analysis → Sources → source tag → article). Each card's "Sources (N)" footer now names the actual **outlet(s)** — the domain from the source URL (e.g. `navalnews.com, defensenews.com +1`), not the internal `source_id` — plus the most recent **"Published {date}"** (falling back to "Retrieved {date}" when no source carries a publication date, per the never-drop-for-missing-date rule, D129). The inline per-sentence citation chips are **kept** — claim-level provenance is the moat — so this augments rather than replaces them; the whole footer still opens the full drawer. +3 web tests. Ships on the next Vercel redeploy (web-only; no migration/API change).

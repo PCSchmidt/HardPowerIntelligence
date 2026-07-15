@@ -14,7 +14,10 @@ export function LoginForm() {
   const searchParams = useSearchParams();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [error, setError] = useState<string | null>(null);
+  // Seeded from ?error= so /auth/callback can explain itself (D141): a dead or already-used
+  // email link redirects here, and without this the user is dumped at a bare sign-in form with
+  // no idea why their link didn't work.
+  const [error, setError] = useState<string | null>(searchParams.get("error"));
   const [loading, setLoading] = useState(false);
 
   async function onSubmit(e: React.FormEvent) {

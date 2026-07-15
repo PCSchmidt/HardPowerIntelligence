@@ -25,7 +25,12 @@ export function SignupForm() {
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
-      options: { emailRedirectTo: `${window.location.origin}/desk/defense` },
+      // Route the confirmation link through /auth/callback (D141), not straight at the desk:
+      // the emailed link carries a PKCE `code` that only the callback can exchange for a
+      // session, so pointing it at /desk/defense landed confirmed users there still logged out.
+      options: {
+        emailRedirectTo: `${window.location.origin}/auth/callback?next=/desk/defense`,
+      },
     });
     setLoading(false);
     if (error) {
