@@ -4,7 +4,10 @@ Spec: persisting a brief for (desk, date) first DELETEs any existing brief for
 that day (cascades to items + citations), then inserts — so re-runs replace
 instead of raising UniqueViolation, and a passing brief can supersede a failed one.
 """
+import pytest
+
 from engine.brief.generator import (
+    _ITEM_TYPES,
     GeneratedBrief,
     _is_home_desk,
     _license_class_for,
@@ -12,8 +15,67 @@ from engine.brief.generator import (
     _overflow_wire,
     _unwrap_analysis_field,
     apply_outlet_diversity,
+    normalize_item_type,
     persist_brief,
 )
+
+
+class TestNormalizeItemType:
+    """item_type coercion (D140) — the 2026-07-15 Defense crash.
+
+    Synthesis labeled a CENTCOM strike "operational"; brief_items' CHECK allows only the
+    five EDGAR-era types, so persist raised CheckViolationError and the desk went dark for
+    a day AFTER the brief had passed the publish gate with 40 provable claims.
+    """
+
+    @pytest.mark.parametrize("t", sorted(_ITEM_TYPES))
+    def test_allowed_types_pass_through_and_are_idempotent(self, t):
+        assert normalize_item_type(t) == t
+        assert normalize_item_type(normalize_item_type(t)) == t
+
+    def test_the_label_that_broke_defense(self):
+        assert normalize_item_type("operational") == "signal"
+
+    @pytest.mark.parametrize(
+        "raw,expected",
+        [
+            ("contract", "award"),
+            ("procurement", "award"),
+            ("regulation", "policy"),
+            ("legislation", "policy"),
+            ("economic", "macro"),
+            ("research", "signal"),
+            ("military", "signal"),
+            ("news", "signal"),
+        ],
+    )
+    def test_known_synonyms_map_to_nearest_type(self, raw, expected):
+        assert normalize_item_type(raw) == expected
+
+    @pytest.mark.parametrize(
+        "raw,expected",
+        [
+            ("contract_award", "award"),
+            ("Contract-Award", "award"),
+            ("research paper", "signal"),
+            ("policy_change", "policy"),
+        ],
+    )
+    def test_compound_and_punctuated_labels(self, raw, expected):
+        assert normalize_item_type(raw) == expected
+
+    @pytest.mark.parametrize("raw", ["  FILING  ", "Award", "MACRO"])
+    def test_case_and_whitespace_tolerated(self, raw):
+        assert normalize_item_type(raw) in _ITEM_TYPES
+
+    @pytest.mark.parametrize("raw", [None, "", "   ", "wholly_unmapped_nonsense", 42, {}])
+    def test_unknown_and_empty_degrade_to_signal_never_raise(self, raw):
+        assert normalize_item_type(raw) == "signal"
+
+    def test_every_output_satisfies_the_db_constraint(self):
+        """The invariant that matters: nothing this returns can violate the CHECK."""
+        for raw in ["operational", "", None, "contract", "??", "research", "combat", 7]:
+            assert normalize_item_type(raw) in _ITEM_TYPES
 
 
 class TestUnwrapAnalysisField:

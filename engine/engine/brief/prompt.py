@@ -40,7 +40,11 @@ def build_synthesis_prompt(
         ),
         "items": [
             {
-                "item_type": "award|filing|policy|macro|signal",
+                "item_type": (
+                    "string — EXACTLY one of: award, filing, policy, macro, signal. "
+                    "No other value is permitted; use 'signal' for anything that fits "
+                    "none of the first four (operations, research, product news)."
+                ),
                 "headline": "string",
                 "body": (
                     "string — the VERIFIABLE FACT as prose with [CITE:N] inline citations. "

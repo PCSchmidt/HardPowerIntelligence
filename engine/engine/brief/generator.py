@@ -60,6 +60,52 @@ def _unwrap_analysis_field(value: str) -> str:
     return text
 
 
+# The five item types the DB CHECK on brief_items.item_type accepts — and, not coincidentally,
+# the exact keys of the web's ITEM_ICON / ITEM_LABEL / ITEM_BG / ITEM_TEXT maps, which are
+# Record<ItemType, …> and would render `undefined` for an unknown key. The taxonomy was fixed
+# on 2026-06-05 when the corpus was EDGAR-only (awards + filings); the net has since widened to
+# news, arXiv and agency feeds, so synthesis now reaches for labels outside it — "operational"
+# for a CENTCOM strike sank the entire 2026-07-15 Defense brief with a CheckViolationError
+# AFTER it had passed the publish gate with 40 provable claims, darkening the desk for a day
+# over one word (D140). A free-text LLM field must never reach a DB CHECK unmapped.
+_ITEM_TYPES = frozenset({"award", "filing", "policy", "macro", "signal"})
+
+# Nearest-fit for the labels the model actually reaches for. Deliberately small: the fallback
+# is the real safety net, this map only buys a more accurate chip where the intent is obvious.
+_ITEM_TYPE_SYNONYMS = {
+    "contract": "award", "procurement": "award", "grant": "award", "obligation": "award",
+    "sec": "filing", "disclosure": "filing", "earnings": "filing",
+    "regulation": "policy", "legislation": "policy", "rule": "policy", "law": "policy",
+    "doctrine": "policy", "strategy": "policy",
+    "economic": "macro", "economy": "macro", "market": "macro", "financial": "macro",
+    "operational": "signal", "operation": "signal", "combat": "signal", "military": "signal",
+    "deployment": "signal", "incident": "signal", "research": "signal", "paper": "signal",
+    "study": "signal", "technology": "signal", "news": "signal", "announcement": "signal",
+}
+
+
+def normalize_item_type(value: object) -> str:
+    """Coerce a synthesis-supplied ``item_type`` to one of the five allowed values (D140).
+
+    Idempotent. An unrecognized label degrades to ``"signal"`` (the catch-all) rather than
+    raising: the item's FACTS are already gated and citable, so a mislabeled chip is a
+    cosmetic loss, while a rejected INSERT takes the whole desk dark.
+    """
+    text = str(value or "").strip().lower().replace("-", "_").replace(" ", "_")
+    if text in _ITEM_TYPES:
+        return text
+    if text in _ITEM_TYPE_SYNONYMS:
+        return _ITEM_TYPE_SYNONYMS[text]
+    # Compound labels ("contract_award", "research_paper", "policy_change") — take the first
+    # component that maps, so the obvious intent still lands on the right chip.
+    for part in text.split("_"):
+        if part in _ITEM_TYPES:
+            return part
+        if part in _ITEM_TYPE_SYNONYMS:
+            return _ITEM_TYPE_SYNONYMS[part]
+    return "signal"
+
+
 @dataclass
 class GeneratedBrief:
     headline: str
@@ -541,6 +587,7 @@ async def generate_brief(desk: str, pool: asyncpg.Pool) -> GeneratedBrief:
             continue
         item["body"] = cleaned
         item["citation_indices"] = extract_citation_indices(cleaned)
+        item["item_type"] = normalize_item_type(item.get("item_type"))  # D140
         item["read"] = _unwrap_analysis_field(item.get("read", ""))
         item["watch"] = _unwrap_analysis_field(item.get("watch", ""))
         items.append(item)
@@ -714,7 +761,10 @@ async def persist_brief(
                     ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9::uuid[],$10)
                     """,
                     item_id, brief_id,
-                    item.get("item_type", "signal"),
+                    # Coerced again at the DB boundary (D140), not just at parse: this INSERT is
+                    # the constraint's edge, and any path that builds items without going through
+                    # generate_brief must not be able to violate it.
+                    normalize_item_type(item.get("item_type")),
                     item.get("headline", ""),
                     item.get("body", ""),
                     item.get("read", ""),    # analysis layer, grounded gate applied (D073)

@@ -1,6 +1,6 @@
 # HPI Phase Plan — from content-complete to validated & monetized
 
-**Status:** ADOPTED 2026-07-05 · **Current phase:** Phase A — all workstreams (A1–A5) shipped 2026-07-05 (D126/D127); **exit gate pending: 7 clean unattended days** · B0/B5 draft groundwork pulled forward 2026-07-09 (no-run-dependency work during the wait)
+**Status:** ADOPTED 2026-07-05 · **Current phase:** Phase A — all workstreams (A1–A5) shipped 2026-07-05 (D126/D127); **exit gate pending: 7 clean unattended days — counter reset 2026-07-15** (Defense dark two consecutive days: 7/14 citation collapse → D139, 7/15 `item_type` CheckViolation → D140; both fixed, clean-day count restarts at the next green run) · B0/B5 draft groundwork pulled forward 2026-07-09 (no-run-dependency work during the wait)
 **Owner:** operator · **Companion docs:** [ARCHITECTURE.md](ARCHITECTURE.md), [SOURCES.md](SOURCES.md), [SOURCE_LANDSCAPE.md](SOURCE_LANDSCAPE.md), `../DECISIONS.md` (D125)
 
 ## Where we are (macro state, 2026-07-05)
