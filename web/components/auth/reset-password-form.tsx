@@ -5,10 +5,9 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
+import { MIN_PASSWORD, passwordProblem } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
 import { PasswordInput } from "./password-input";
-
-const MIN_PASSWORD = 8;
 
 export function ResetPasswordForm() {
   const router = useRouter();
@@ -30,12 +29,9 @@ export function ResetPasswordForm() {
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
-    if (password.length < MIN_PASSWORD) {
-      setError(`Password must be at least ${MIN_PASSWORD} characters.`);
-      return;
-    }
-    if (password !== confirm) {
-      setError("Passwords don't match.");
+    const problem = passwordProblem(password, confirm);
+    if (problem) {
+      setError(problem);
       return;
     }
     setLoading(true);

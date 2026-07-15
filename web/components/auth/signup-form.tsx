@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
+import { MIN_PASSWORD, passwordProblem } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
 import { PasswordInput } from "./password-input";
 import { OAuthButtons } from "./oauth-buttons";
@@ -19,8 +20,15 @@ export function SignupForm() {
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
-    setLoading(true);
     setError(null);
+    // Same floor as the reset form (D141) — otherwise signup accepts a password that recovery
+    // would later refuse, and the rule appears to change under the user.
+    const problem = passwordProblem(password);
+    if (problem) {
+      setError(problem);
+      return;
+    }
+    setLoading(true);
     const supabase = createSupabaseBrowserClient();
     const { data, error } = await supabase.auth.signUp({
       email,
@@ -70,6 +78,7 @@ export function SignupForm() {
           className="h-10 w-full rounded-md border border-input bg-card px-3 text-ui-md outline-none focus-visible:ring-2 focus-visible:ring-ring"
         />
         <PasswordInput value={password} onChange={setPassword} autoComplete="new-password" />
+        <p className="text-ui-xs text-muted-foreground">At least {MIN_PASSWORD} characters.</p>
         {error && <p className="text-ui-sm text-destructive">{error}</p>}
         <Button type="submit" size="lg" className="w-full" disabled={loading}>
           {loading ? "Creating account…" : "Create account"}
