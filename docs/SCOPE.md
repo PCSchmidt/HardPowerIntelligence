@@ -11,14 +11,20 @@ sensor guards against scope creep.
 HPI organizes everything around three sector "desks" at the convergence of strategic
 power:
 
-| Desk | Coverage |
+| Desk | Coverage (thesis-level) |
 |------|----------|
-| **Defense** | Drones & autonomy, space, directed energy, EW, the defense-industrial base; contract awards, budgets, FMS |
-| **Energy** | Nuclear (incl. SMRs), alternatives, the grid, R&D, energy-security/dominance trends |
-| **AI Infrastructure** | Chips, data centers, hyperscaler capex, power demand, interconnection queues |
+| **Defense** | Unmanned/autonomy (CCA, drone swarms, UUV/USV), directed energy (HEL/HPM), hypersonics & missile defense, space (pLEO, SSA), quantum sensing/PNT, applied military AI, contested logistics & industrial base; contract awards, budgets, FMS |
+| **Energy** | Advanced nuclear (SMR, microreactors, TRISO, HALEU/enrichment), geothermal (EGS/closed-loop), next-gen solar (perovskite), storage (iron-air, nickel-zinc, thermal, LDES), grid orchestration (VPP, interconnection queue, transformer supply), space-based solar |
+| **AI Infrastructure** | Accelerators (GPU/TPU/ASIC, inference silicon), memory & packaging (HBM, CoWoS), interconnect/networking (silicon photonics, NVLink, Ultra Ethernet, optical switching), data-center power & thermal (liquid/immersion cooling, grid coupling), EUV lithography, orbital data centers |
 
 Cross-cutting layers: **Macro** (rates, inflation, policy) and **Smart Money** (insider
 + institutional + congressional flow).
+
+> **The authoritative search vocabulary is in code, not this table.** These cells are the
+> *thesis-level* summary; the operational topic set is the ~122 adapter probes (`_PROBES` in
+> `engine/engine/adapters/{gdelt,edgar,arxiv}.py`) — GDELT for news, EDGAR for filings, arXiv for
+> research — each a query tagged to a single home desk (D097). Keep this table in loose sync with
+> those, but treat the probes as ground truth (last vocabulary expansion: D102/D103, 2026-06-28).
 
 ---
 
@@ -26,12 +32,14 @@ Cross-cutting layers: **Macro** (rates, inflation, policy) and **Smart Money** (
 
 **One vertical deep: the Defense desk, web-only.**
 
-> **Evolution note (2026-06-14, D060/D062):** post-launch, the product adopted the **Defense
-> Tech ∩ AI ∩ Energy convergence** as its north-star. The engine is now multi-desk (all three
-> desks wired; cross-sector materiality boost), but execution still leads with **Defense
-> depth** — Defense is the only desk published from live data; AI/Energy are scaffolded and
-> await dedicated sources. "One vertical deep" still describes the *delivery* posture; the
-> convergence brief is the eventual flagship. See `DECISIONS.md` D060/D061/D062.
+> **Evolution note (2026-06-14, D060/D062; updated 2026-07-16):** post-launch, the product
+> adopted the **Defense Tech ∩ AI ∩ Energy convergence** as its north-star. The original
+> "one vertical deep / Defense only" Cycle-1 framing below is now **superseded** — as of
+> 2026-06/07 all three desks publish daily from live data (GDELT news + EDGAR filings + arXiv +
+> gov awards + agency feeds), each with its own probe vocabulary and primary-desk routing (D097).
+> The remaining asymmetry is depth and source breadth, not whether a desk runs. The convergence
+> brief (a cross-desk read) is still the eventual flagship. See `DECISIONS.md` D060/D061/D062 and
+> the memory `desk-coverage-overhaul`.
 
 | Area | Cycle 1 includes |
 |------|------------------|
