@@ -110,6 +110,8 @@
   --color-item-policy: #d97706;
   --color-item-macro: #14b8a6;
   --color-item-signal: #7c3aed;
+  --color-item-operational: #dc2626; /* D143 — real-world action/event; red reads as live/urgent */
+  --color-item-research: #65a30d;    /* D143 — R&D/tech milestone; lime, distinct from teal macro */
 
   /* Status */
   --color-success: #16a34a;

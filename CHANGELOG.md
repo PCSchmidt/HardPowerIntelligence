@@ -14,6 +14,27 @@ live ingestion runner, with Supabase auth and Lemon Squeezy subscriptions. Built
 
 ### Added
 
+- **Two new item types — the desks stop labeling a combat strike the same as generic news**
+  (2026-07-16, D143): the `brief_items.item_type` taxonomy (award/filing/policy/macro/signal) was
+  fixed 2026-06-05 when the corpus was SEC filings + gov awards. As the net widened to news, arXiv
+  and agency feeds the synthesis model kept reaching outside those five, and D140 had to coerce
+  everything unmapped to `signal` to stop persist throwing — which flattened two genuinely distinct
+  kinds of item into the catch-all. The cost was visible: the 7/15 Defense desk persisted **10 of
+  20 items as `signal`**, including the lead story (first combat use of unmanned surface vessels).
+  Promotes **`operational`** (a real-world action/event — a strike, deployment, exercise, a plant
+  or system coming online; radar glyph, red) and **`research`** (an R&D/tech milestone — a paper,
+  prototype, breakthrough; flask glyph, lime) to first-class types. `signal` remains the catch-all
+  for genuine news. **Touches four layers that must stay in lockstep** — the DB CHECK
+  (migration `20260716000001`, applied live), the engine's `_ITEM_TYPES` + `normalize_item_type`
+  synonyms + synthesis prompt, and the web `ItemType` union + four `item-types.ts` maps + two CSS
+  tokens — because a value in one but not the others is the D140 crash in a new place (the DB throws,
+  or the web renders `undefined`). The web maps are `Record<ItemType, …>`, so an incomplete map is
+  now a **compile error, not a runtime crash** — the type system enforces the invariant. Migration
+  is purely additive (every existing row already satisfies the wider set); deploy order
+  migration → web → engine, so no new value ever meets an unmapped consumer. +6 engine tests
+  (637 green), web tsc exhaustiveness-checked (73 green). _Existing `signal` rows are not
+  backfilled — they re-type naturally as new briefs generate; no reader-facing regression since
+  every type has a label/icon/color._
 - **B1 — product instrumentation, so the warm cohort produces evidence and not just opinions**
   (2026-07-15, D142): `NEXT_PUBLIC_POSTHOG_KEY` had sat in `.env` for months as the literal
   placeholder `phc_...`, wired to **nothing** — zero references anywhere in the web app (the same

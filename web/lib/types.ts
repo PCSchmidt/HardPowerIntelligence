@@ -3,7 +3,18 @@
 
 export type Tier = "free" | "pro";
 export type Desk = "defense" | "energy" | "ai";
-export type ItemType = "award" | "filing" | "policy" | "macro" | "signal";
+// Keep in lockstep with the DB CHECK (migration 20260716000001) and the engine's _ITEM_TYPES
+// (D143). "operational" (real-world actions/events) and "research" (R&D/tech milestones) were
+// promoted out of the "signal" catch-all so the desks stop labeling a combat strike and a
+// quantum-computing paper the same as generic news.
+export type ItemType =
+  | "award"
+  | "filing"
+  | "policy"
+  | "macro"
+  | "signal"
+  | "operational"
+  | "research";
 
 export interface StalenessIndicator {
   last_updated: string | null;

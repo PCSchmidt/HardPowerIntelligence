@@ -21,11 +21,14 @@ from engine.brief.generator import (
 
 
 class TestNormalizeItemType:
-    """item_type coercion (D140) — the 2026-07-15 Defense crash.
+    """item_type coercion (D140) + the widened taxonomy (D143).
 
-    Synthesis labeled a CENTCOM strike "operational"; brief_items' CHECK allows only the
-    five EDGAR-era types, so persist raised CheckViolationError and the desk went dark for
-    a day AFTER the brief had passed the publish gate with 40 provable claims.
+    D140: synthesis labeled a CENTCOM strike "operational"; the CHECK allowed only the five
+    EDGAR-era types, so persist raised CheckViolationError and the desk went dark AFTER passing
+    the publish gate with 40 provable claims. Coercion stopped the crash by folding everything
+    unmapped to "signal". D143 promoted "operational" and "research" to first-class types so
+    real-world actions and R&D milestones stop hiding in the catch-all — while the coercion
+    invariant (nothing returned can violate the CHECK) still holds.
     """
 
     @pytest.mark.parametrize("t", sorted(_ITEM_TYPES))
@@ -33,8 +36,9 @@ class TestNormalizeItemType:
         assert normalize_item_type(t) == t
         assert normalize_item_type(normalize_item_type(t)) == t
 
-    def test_the_label_that_broke_defense(self):
-        assert normalize_item_type("operational") == "signal"
+    def test_the_label_that_broke_defense_is_now_first_class(self):
+        # D140 coerced this to "signal" to survive; D143 gives it its own type.
+        assert normalize_item_type("operational") == "operational"
 
     @pytest.mark.parametrize(
         "raw,expected",
@@ -44,9 +48,16 @@ class TestNormalizeItemType:
             ("regulation", "policy"),
             ("legislation", "policy"),
             ("economic", "macro"),
-            ("research", "signal"),
-            ("military", "signal"),
+            # D143 — no longer folded into "signal":
+            ("research", "research"),
+            ("paper", "research"),
+            ("technology", "research"),
+            ("military", "operational"),
+            ("combat", "operational"),
+            ("deployment", "operational"),
+            # genuine news stays the catch-all
             ("news", "signal"),
+            ("announcement", "signal"),
         ],
     )
     def test_known_synonyms_map_to_nearest_type(self, raw, expected):
@@ -57,7 +68,8 @@ class TestNormalizeItemType:
         [
             ("contract_award", "award"),
             ("Contract-Award", "award"),
-            ("research paper", "signal"),
+            ("research paper", "research"),
+            ("combat operation", "operational"),
             ("policy_change", "policy"),
         ],
     )

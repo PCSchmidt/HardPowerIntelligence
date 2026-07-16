@@ -41,9 +41,13 @@ def build_synthesis_prompt(
         "items": [
             {
                 "item_type": (
-                    "string — EXACTLY one of: award, filing, policy, macro, signal. "
-                    "No other value is permitted; use 'signal' for anything that fits "
-                    "none of the first four (operations, research, product news)."
+                    "string — EXACTLY one of: award (a contract/grant/obligation), "
+                    "filing (an SEC/regulatory disclosure), policy (regulation, legislation, "
+                    "doctrine, strategy), macro (economic/market data), operational (a real-world "
+                    "action or event — a strike, deployment, exercise, a plant or system coming "
+                    "online), research (an R&D or technology milestone — a paper, prototype, "
+                    "breakthrough), or signal (genuine news/announcements fitting none of the "
+                    "above). No other value is permitted; use 'signal' only as the last resort."
                 ),
                 "headline": "string",
                 "body": (

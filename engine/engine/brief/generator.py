@@ -60,15 +60,17 @@ def _unwrap_analysis_field(value: str) -> str:
     return text
 
 
-# The five item types the DB CHECK on brief_items.item_type accepts — and, not coincidentally,
-# the exact keys of the web's ITEM_ICON / ITEM_LABEL / ITEM_BG / ITEM_TEXT maps, which are
-# Record<ItemType, …> and would render `undefined` for an unknown key. The taxonomy was fixed
-# on 2026-06-05 when the corpus was EDGAR-only (awards + filings); the net has since widened to
-# news, arXiv and agency feeds, so synthesis now reaches for labels outside it — "operational"
-# for a CENTCOM strike sank the entire 2026-07-15 Defense brief with a CheckViolationError
-# AFTER it had passed the publish gate with 40 provable claims, darkening the desk for a day
-# over one word (D140). A free-text LLM field must never reach a DB CHECK unmapped.
-_ITEM_TYPES = frozenset({"award", "filing", "policy", "macro", "signal"})
+# The item types the DB CHECK on brief_items.item_type accepts — and, not coincidentally, the
+# exact keys of the web's ITEM_ICON / ITEM_LABEL / ITEM_BG / ITEM_TEXT maps, which are
+# Record<ItemType, …> and would render `undefined` for an unknown key. The taxonomy was fixed on
+# 2026-06-05 when the corpus was EDGAR-only (awards + filings); when the net widened to news,
+# arXiv and agency feeds the model began reaching for labels outside it, and D140 coerced them all
+# to "signal" to stop persist throwing — which flattened real-world military OPERATIONS and
+# RESEARCH / tech milestones into the catch-all (7/15 Defense: 10 of 20 items "signal", incl. the
+# lead combat-USV story). D143 promotes those two to first-class types. Keep this set in lockstep
+# with the DB CHECK (migration 20260716000001) and the web ItemType union — a value in one but not
+# the others is the D140 failure in a new place. A free-text LLM field must never reach either unmapped.
+_ITEM_TYPES = frozenset({"award", "filing", "policy", "macro", "signal", "operational", "research"})
 
 # Nearest-fit for the labels the model actually reaches for. Deliberately small: the fallback
 # is the real safety net, this map only buys a more accurate chip where the intent is obvious.
@@ -78,9 +80,16 @@ _ITEM_TYPE_SYNONYMS = {
     "regulation": "policy", "legislation": "policy", "rule": "policy", "law": "policy",
     "doctrine": "policy", "strategy": "policy",
     "economic": "macro", "economy": "macro", "market": "macro", "financial": "macro",
-    "operational": "signal", "operation": "signal", "combat": "signal", "military": "signal",
-    "deployment": "signal", "incident": "signal", "research": "signal", "paper": "signal",
-    "study": "signal", "technology": "signal", "news": "signal", "announcement": "signal",
+    # Real-world actions and events (D143) — a strike, a deployment, a reactor coming online.
+    "operation": "operational", "combat": "operational", "military": "operational",
+    "deployment": "operational", "exercise": "operational", "strike": "operational",
+    "patrol": "operational", "incident": "operational", "launch": "operational",
+    # R&D and technology milestones (D143) — arXiv preprints, prototypes, breakthroughs.
+    "paper": "research", "study": "research", "arxiv": "research", "preprint": "research",
+    "technology": "research", "prototype": "research", "milestone": "research",
+    "breakthrough": "research", "development": "research",
+    # Genuinely just news / an announcement stays the catch-all.
+    "news": "signal", "announcement": "signal", "update": "signal",
 }
 
 
