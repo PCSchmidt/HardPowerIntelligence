@@ -16,11 +16,11 @@ Each is one `source_id` with its own adapter.
 | `feeds` | Reported — attributed named third-party | Generic RSS/Atom feed adapter — the scale lever for breadth (D104). |
 | `sam_gov` | Confirmed — primary public record (claims citation-supported) | SAM.gov contract-opportunities adapter (D105) — Phase 2 structured federal veins. |
 
-## Feed outlets — `source_id="feeds"` (38 total)
+## Feed outlets — `source_id="feeds"` (41 total)
 
 One generic RSS/Atom adapter drives a registry of named outlets. Tier: Reported — attributed named third-party. Each carries a single home desk (D097).
 
-### Defense (11)
+### Defense (12)
 
 - **Breaking Defense** — <https://breakingdefense.com/feed/>
 - **DefenseScoop** — <https://defensescoop.com/feed/>
@@ -33,8 +33,9 @@ One generic RSS/Atom adapter drives a registry of named outlets. Tier: Reported 
 - **Defense News** — <https://www.defensenews.com/arc/outboundfeeds/rss/?outputType=xml>
 - **C4ISRNET** — <https://www.c4isrnet.com/arc/outboundfeeds/rss/?outputType=xml>
 - **Atlantic Council** — <https://www.atlanticcouncil.org/feed/>
+- **Military Times** — <https://www.militarytimes.com/arc/outboundfeeds/rss/?outputType=xml>
 
-### AI (16)
+### AI (17)
 
 - **Data Center Dynamics** — <https://www.datacenterdynamics.com/en/rss/>
 - **IEEE Spectrum** — <https://spectrum.ieee.org/feeds/feed.rss>
@@ -52,8 +53,9 @@ One generic RSS/Atom adapter drives a registry of named outlets. Tier: Reported 
 - **Hugging Face** — <https://huggingface.co/blog/feed.xml>
 - **OpenAI** — <https://openai.com/news/rss.xml>
 - **The Gradient** — <https://thegradient.pub/rss/>
+- **Blocks & Files** — <https://blocksandfiles.com/feed/>
 
-### Energy (11)
+### Energy (12)
 
 - **Utility Dive** — <https://www.utilitydive.com/feeds/news/>
 - **World Nuclear News** — <https://www.world-nuclear-news.org/rss>
@@ -66,3 +68,4 @@ One generic RSS/Atom adapter drives a registry of named outlets. Tier: Reported 
 - **ESS News** — <https://www.ess-news.com/feed/>
 - **Carbon Tracker** — <https://carbontracker.org/feed/>
 - **Nuclear Newswire (ANS)** — <https://www.ans.org/news/feed/>
+- **OilPrice** — <https://oilprice.com/rss/main>
