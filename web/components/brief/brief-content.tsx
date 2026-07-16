@@ -13,6 +13,7 @@ import {
   attributionOf,
 } from "@/lib/attribution";
 import { distinctOutlets } from "@/lib/sources";
+import { capture } from "@/lib/analytics";
 import { CitationsDrawer } from "./citations-drawer";
 import { EntityChips } from "./entity-chips";
 
@@ -64,13 +65,25 @@ function CitedBody({ body, onCite }: { body: string; onCite: () => void }) {
 // Drill-down for the analysis layer (D071/D073): collapsed by default so the cited
 // ledger stays scannable; expands to the grounded HPI interpretation. Only rendered
 // when the grounding gate kept a read/watch — an empty field is simply absent.
-function AnalysisDisclosure({ read, watch }: { read: string; watch: string }) {
+function AnalysisDisclosure({
+  read,
+  watch,
+  onExpand,
+}: {
+  read: string;
+  watch: string;
+  onExpand?: () => void;
+}) {
   const [open, setOpen] = useState(false);
   return (
     <div className="rounded-md border border-brand-secondary/30 bg-muted/40">
       <button
         type="button"
-        onClick={() => setOpen((v) => !v)}
+        onClick={() => {
+          // Only the open direction is an event; collapsing isn't engagement (B1).
+          if (!open) onExpand?.();
+          setOpen((v) => !v);
+        }}
         aria-expanded={open ? "true" : "false"}
         className="flex w-full items-center gap-2 px-4 py-2.5 text-ui-xs font-medium uppercase tracking-wide text-brand-secondary"
       >
@@ -107,12 +120,29 @@ export function BriefContent({
   items,
   citations,
   entities,
+  desk = "",
 }: {
   items: BriefItem[];
   citations: Citation[];
   entities: EntitySummary[];
+  desk?: string;
 }) {
   const [drawer, setDrawer] = useState<Citation[] | null>(null);
+
+  // Opening the sources drawer is the single most diagnostic event HPI has (B1). The product's
+  // entire claim is cited provenance; whether readers actually pull the thread is what separates
+  // the moat being real from being decoration. Routed through one helper so every path that opens
+  // the drawer — the inline [n] markers and the "Sources (N)" row — is counted the same way.
+  function openSources(cites: Citation[], item: BriefItem, position: number) {
+    capture({
+      name: "item_sources_opened",
+      desk,
+      item_type: item.item_type,
+      citation_count: cites.length,
+      position,
+    });
+    setDrawer(cites);
+  }
   const citationById = useMemo(
     () => new Map(citations.map((c) => [c.id, c])),
     [citations],
@@ -141,7 +171,7 @@ export function BriefContent({
 
   return (
     <div className="divide-y divide-border">
-      {rows.map(({ item, amount, cites }) => {
+      {rows.map(({ item, amount, cites }, position) => {
         const Icon = ITEM_ICON[item.item_type];
         const attribution = attributionOf(item.attribution);
         return (
@@ -186,9 +216,20 @@ export function BriefContent({
           </div>
           <h2 className="font-display text-display-sm text-foreground">{item.headline}</h2>
           <EntityChips entityIds={item.entity_ids} entities={entityById} />
-          <CitedBody body={item.body} onCite={() => setDrawer(cites)} />
+          <CitedBody body={item.body} onCite={() => openSources(cites, item, position)} />
           {(item.read || item.watch) && (
-            <AnalysisDisclosure read={item.read} watch={item.watch} />
+            <AnalysisDisclosure
+              read={item.read}
+              watch={item.watch}
+              onExpand={() =>
+                capture({
+                  name: "item_analysis_expanded",
+                  desk,
+                  item_type: item.item_type,
+                  position,
+                })
+              }
+            />
           )}
           {cites.length > 0 &&
             (() => {
@@ -199,7 +240,7 @@ export function BriefContent({
               return (
                 <button
                   type="button"
-                  onClick={() => setDrawer(cites)}
+                  onClick={() => openSources(cites, item, position)}
                   className="group flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-left text-ui-sm text-muted-foreground"
                 >
                   <FileText size={14} className="shrink-0 text-primary" />

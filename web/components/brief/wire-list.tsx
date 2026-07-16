@@ -1,7 +1,10 @@
+"use client";
+
 import Link from "next/link";
 import { ArrowLeft, ExternalLink } from "lucide-react";
 import type { Desk, Wire } from "@/lib/types";
 import { sourceName } from "@/lib/sources";
+import { capture } from "@/lib/analytics";
 
 // The Full Wire (D112): a no-narrative list of the material, on-thesis items that cleared
 // scoring but lost the brief's space cut. Title + source + link, ranked by materiality, so a
@@ -57,7 +60,23 @@ export function WireList({ wire, deskLabel }: { wire: Wire; deskLabel: string })
             return (
               <li key={`${item.source_id}-${item.native_id ?? i}`}>
                 {item.url ? (
-                  <a href={item.url} target="_blank" rel="noopener noreferrer" className={className}>
+                  <a
+                    href={item.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className={className}
+                    // A wire click is a ranking complaint in disguise (B1): this item lost the
+                    // brief's space cut, and the reader went for it anyway. Enough of these on one
+                    // source or item_type is direct evidence the significance gate ranked it wrong.
+                    onClick={() =>
+                      capture({
+                        name: "wire_item_clicked",
+                        desk: wire.desk,
+                        source_id: item.source_id,
+                        position: i,
+                      })
+                    }
+                  >
                     {body}
                   </a>
                 ) : (

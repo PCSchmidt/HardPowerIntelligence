@@ -7,12 +7,20 @@ import { BriefGlance } from "./brief-glance";
 import { BriefContent } from "./brief-content";
 import { SignalLine } from "./signal-line";
 import { ReaderOnboarding } from "./reader-onboarding";
+import { DeskViewTracker } from "@/components/analytics/desk-view-tracker";
+import { FeedbackWidget } from "@/components/feedback/feedback-widget";
 
 // Composes the full reader (Server Component): staleness strip (D013), header,
 // interactive content, and the metadata footer. Shared by the desk and archive pages.
 export function BriefReader({ brief }: { brief: Brief }) {
   return (
     <div className="mx-auto max-w-content px-4 py-10 sm:px-6">
+      <DeskViewTracker
+        desk={brief.desk}
+        briefDate={brief.date}
+        itemCount={brief.items.length}
+      />
+      <FeedbackWidget />
       <ReaderOnboarding />
       {brief.staleness_indicator && (() => {
         // A quiet day / pre-cron load (latest_available) is informational, not an error — render
@@ -42,7 +50,12 @@ export function BriefReader({ brief }: { brief: Brief }) {
           <p className="prose-brief text-foreground">{brief.convergence_read}</p>
         </section>
       )}
-      <BriefContent items={brief.items} citations={brief.citations} entities={brief.entities} />
+      <BriefContent
+        items={brief.items}
+        citations={brief.citations}
+        entities={brief.entities}
+        desk={brief.desk}
+      />
       {brief.signal && <SignalLine signal={brief.signal} series={brief.signal_series} />}
       {/* Full Wire (D112): everything material that didn't fit the curated brief, so a heavy
           news day doesn't throw away real signal. */}

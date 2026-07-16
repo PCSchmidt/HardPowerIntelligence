@@ -80,8 +80,20 @@ you noticed manually, and you've stopped opening the PDFs to check health. Cost/
   **Drafted 2026-07-09 → [PERSONAS.md](PERSONAS.md)** — the 5 personas as interview-ready instruments
   (JTBD, aha, kill-signal, probes) + a ranking worksheet. Still `[ ]`: the exit gate is *validation
   against the real conversations*, not the draft.
-- [ ] **B1 — Instrumentation (light, privacy-respecting).** Page views per desk, wire clicks,
-  return visits, trial start/end, plus a one-click in-product feedback affordance.
+- [x] **B1 — Instrumentation (light, privacy-respecting).** ✅ 2026-07-15 (D142). `lib/analytics.ts`
+  (typed event vocabulary + PostHog init), `AnalyticsProvider` (pageviews + identify), `DeskViewTracker`
+  (the client seam for the Server-Component reader), and a one-click `FeedbackWidget`. Events:
+  `desk_viewed`, `wire_viewed`, `wire_item_clicked`, `item_sources_opened`, `item_analysis_expanded`,
+  `feedback_submitted`. **Privacy by three rules:** identify by Supabase UUID only — never email, the
+  join stays in our own DB; every URL stripped to origin+pathname before it leaves (`/auth/callback`
+  carries single-use PKCE codes); autocapture and session recording off, so every event is declared.
+  Unconfigured builds are silent, not broken — `NEXT_PUBLIC_POSTHOG_KEY` shipped as the literal
+  placeholder `phc_...` for months, so anything implausible disables analytics rather than throwing on
+  a live site. +10 tests (73 web green). `trial_started`/`trial_ended` deferred to C0 — trials don't
+  exist yet, and an unused event is a lie about what's measured.
+  **Operator step before it collects anything:** create the PostHog project, then set
+  `NEXT_PUBLIC_POSTHOG_KEY` / `NEXT_PUBLIC_POSTHOG_HOST` **in Vercel** and redeploy — `NEXT_PUBLIC_*`
+  is inlined at build time, so a local `.env` alone changes nothing in production.
 - [ ] **B2 — Warm cohort (~20–30) = "Founding Readers."** Permanent/extended comp in exchange
   for a 15-min structured interview (script from B0). Goal = qualitative depth + persona
   validation, explicitly NOT a conversion metric.

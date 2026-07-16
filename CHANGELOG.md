@@ -14,6 +14,36 @@ live ingestion runner, with Supabase auth and Lemon Squeezy subscriptions. Built
 
 ### Added
 
+- **B1 — product instrumentation, so the warm cohort produces evidence and not just opinions**
+  (2026-07-15, D142): `NEXT_PUBLIC_POSTHOG_KEY` had sat in `.env` for months as the literal
+  placeholder `phc_...`, wired to **nothing** — zero references anywhere in the web app (the same
+  scaffolded-and-abandoned pattern as `RESEND_API_KEY=re_...`). That mattered now because B1 gates
+  B2: **you get exactly one first-read per tester and it isn't repeatable**, so shipping interviews
+  before instrumentation would have bought twenty opinions and no behavioural data.
+  **Added:** `lib/analytics.ts` (typed event vocabulary + init), `AnalyticsProvider` (manual
+  pageviews + identify on auth state), `DeskViewTracker` (the client seam the Server-Component
+  `BriefReader` needs), and a one-click `FeedbackWidget` — sentiment required, note optional,
+  because demanding prose is what turns a 90%-response affordance into a 5% one.
+  **Events:** `desk_viewed`, `wire_viewed`, `wire_item_clicked`, `item_sources_opened`,
+  `item_analysis_expanded`, `feedback_submitted`. Two are deliberately product-specific:
+  `item_sources_opened` measures whether readers actually pull the citation thread — HPI's entire
+  claim is cited provenance, so this is the difference between the moat being real and being
+  decoration; and `wire_item_clicked` is a ranking complaint in disguise — that item lost the
+  brief's space cut and the reader went for it anyway, which is direct evidence the significance
+  gate mis-ranked it.
+  **Privacy by three rules.** (1) Identify by Supabase **UUID only, never email** — the UUID→person
+  join stays in our own DB, so we keep every question we can ask while PostHog holds no PII.
+  (2) **No query strings, ever**: `/auth/callback` carries single-use PKCE codes and recovery tokens
+  in its URL, and a default pageview capture would have shipped those to a third party — every URL
+  is stripped to origin+pathname on the way out (`stripQuery` + `sanitize_properties`), and the
+  provider uses `usePathname` rather than `useSearchParams` so the search string is never touched.
+  (3) **No blanket capture** — autocapture and session recording off, `person_profiles:
+  identified_only`, `respect_dnt: true`. An unconfigured build is **silent, not broken**, since the
+  key is still a placeholder on a live site. +10 tests (63 → 73 web green).
+  `trial_started`/`trial_ended` deferred to C0: trials don't exist, and an unused event is a lie
+  about what's being measured. _Collects nothing until the operator creates the PostHog project and
+  sets the key **in Vercel** — `NEXT_PUBLIC_*` is inlined at build time, so a local `.env` alone
+  changes nothing in production._
 - **Password recovery + a real auth callback — the account funnel is no longer one-way** (2026-07-15, D141):
   the operator was locked out of HPI with no way back in, and the diagnosis was worse than the symptom:
   **`login-form.tsx` had shipped a "Forgot password?" link to `/forgot-password` since June, and that page

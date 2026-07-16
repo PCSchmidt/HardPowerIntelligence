@@ -3,6 +3,8 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useState } from "react";
 
+import { AnalyticsProvider } from "@/components/analytics/analytics-provider";
+
 // Client provider wrapper so the root layout (Server Component) can stay server.
 // TanStack Query is used for mutations + revalidation only (D022).
 export function AppProviders({ children }: { children: React.ReactNode }) {
@@ -15,5 +17,9 @@ export function AppProviders({ children }: { children: React.ReactNode }) {
       }),
   );
 
-  return <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>;
+  return (
+    <QueryClientProvider client={queryClient}>
+      <AnalyticsProvider>{children}</AnalyticsProvider>
+    </QueryClientProvider>
+  );
 }
