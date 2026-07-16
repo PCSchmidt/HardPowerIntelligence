@@ -1,11 +1,35 @@
 # GDELT via BigQuery — Adapter Plan
 
-Status: **PROPOSED** (not started). Supersedes the DOC-API GDELT path if adopted.
+Status: **PROPOSED — Phase 1 validated 2026-07-16, build PARKED (demand-pulled).**
 Context: DECISIONS D110 (UA) → D116 (persistent IP) → D117 (patient backoff) all failed —
 GDELT's DOC 2.0 REST API blocks HPI's cloud egress IPs (GitHub Actions, Fly IAD) by
 reputation. BigQuery is GDELT's **sanctioned, authenticated** bulk-access channel, which
-removes the IP variable entirely. SITREP was verified NOT to use BigQuery — so this is a new
-path for us, a strong hypothesis, not yet proven in-house. Validate before building (Phase 1).
+removes the IP variable entirely.
+
+> **Phase 1 validation result (2026-07-16) — two findings, one good one sobering.**
+> Ran the go/no-go query from a reopened GCP project (`adept-watch-456712-t5`), BigQuery Studio.
+> **(1) The mechanism works.** Rows returned instantly, no auth/IP error, trivial bytes — the IP
+> wall is genuinely gone, and the sources are genuinely global (philstar.com/PH, arynews.tv/PK,
+> nationnews.com/BB, themoscowtimes.com, dw.com/DE, itbrief.co.nz). So the breadth that RSS misses
+> is real and reachable. **(2) The catch — GKG's theme taxonomy is far noisier than the DOC API's
+> full-text phrase search.** `V2Themes LIKE '%TAX_MILITARY%'` matched `TAX_MILITARY_TITLE_OFFICER`,
+> which fires on the *word* "officer" — so the top results were a Houston neglect case, a Memphis
+> shooting, a Philippine impeachment trial, a Colorado school-budget editorial, a Catholic bishop
+> profile, and a G.I. Joe movie. Almost zero investment-grade defense signal. The DOC API let us
+> search the exact phrase "hypersonic missile"; GKG makes us match broad NLP category codes, and
+> the precision loss is severe. Extracting on-thesis signal would need real theme-engineering
+> (curated GKG code sets + entity/organization filters + probably keyword co-occurrence) with
+> uncertain payoff. **Access was never the hard part; the data model is.**
+>
+> **Decision:** feeds (786 records/wk, 0 fail, precise because outlets are curated) remains the
+> news workhorse. BigQuery's global breadth is a real but *nice-to-have* for a mostly-Western
+> investment nexus, and the theme-engineering cost is non-trivial. **Park the adapter build;
+> revisit only if testers specifically ask for emerging-market / non-Western coverage** (demand-
+> pulled, per the phase plan). The door is proven open — reopening it later is cheap.
+>
+> **NOTE — table name correction:** the partitioned GKG table is `gdelt-bq.gdeltv2.gkg_partitioned`
+> (has `_PARTITIONTIME`); plain `gdelt-bq.gdeltv2.gkg` is NOT partitioned and errors on that pseudo-
+> column. The queries below have been corrected.
 
 ---
 
@@ -53,7 +77,7 @@ from google.cloud import bigquery
 client = bigquery.Client()  # uses the service-account creds
 sql = """
   SELECT DATE, DocumentIdentifier, SourceCommonName, V2Themes
-  FROM `gdelt-bq.gdeltv2.gkg`
+  FROM `gdelt-bq.gdeltv2.gkg_partitioned`
   WHERE _PARTITIONTIME >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 1 DAY)
     AND V2Themes LIKE '%TAX_MILITARY%'
   LIMIT 25
@@ -100,7 +124,7 @@ today. Query shape:
 
 ```sql
 SELECT DATE, DocumentIdentifier, SourceCommonName, V2Themes, V2Organizations, V2Persons, V2Tone
-FROM `gdelt-bq.gdeltv2.gkg`
+FROM `gdelt-bq.gdeltv2.gkg_partitioned`
 WHERE _PARTITIONTIME >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 1 DAY)  -- partition prune = cost control
   AND SourceCollectionIdentifier = 1                                       -- web news only
   AND ( <per-desk theme LIKE clauses> )
