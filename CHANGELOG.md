@@ -14,6 +14,18 @@ live ingestion runner, with Supabase auth and Lemon Squeezy subscriptions. Built
 
 ### Added
 
+- **Three trade feeds a GDELT source census surfaced — Military Times, OilPrice, Blocks & Files**
+  (2026-07-16, D145): the census (which of ~38 trade/academic outlets does GDELT actually index)
+  was run to test whether a source-first GDELT-BigQuery adapter was worth building. It wasn't —
+  GDELT's reachable set turned out to be ≈ outlets that already have RSS (the premium trades we'd
+  actually want — Jane's, S&P Global, Inside Defense, Aviation Week's full text — returned near-zero,
+  crawler-blocked like Reuters/FT/Bloomberg). But the census's real payoff was finding on-thesis
+  outlets simply missing from the registry: Military Times (defense — led with a CCA/Anduril
+  live-fire story), OilPrice (energy — Asian LNG spot pricing), Blocks & Files (AI infra — storage /
+  inference). All RSS-verified, single-topic (clean home-desk), added as three registry lines. Feeds
+  beat GDELT for every one: native titles, reliable, no adapter. +1 test. Validates on next CI run.
+  _GDELT-BigQuery build stays parked — three separate queries (theme, financial-source, trade-census)
+  all converged on "its reachable set is outlets that also have RSS," so there's no adapter to build._
 - **Gap-coverage probe batch — 11 investment-thesis topics with zero prior coverage** (2026-07-16,
   D144): a topic review (operator + external LLM cross-check against the SCOPE table) surfaced
   themes with a clear thesis but no probe: green ammonia, CCUS, offshore wind, methane abatement,

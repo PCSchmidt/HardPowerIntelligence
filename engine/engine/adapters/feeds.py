@@ -140,6 +140,14 @@ _FEEDS: tuple[_Feed, ...] = (
     _Feed("https://carbontracker.org/feed/", "Carbon Tracker", "energy"),
     # Live-validated 2026-07-04: /news/rss/ 404s; the working feed is /news/feed/ (200 + XML).
     _Feed("https://www.ans.org/news/feed/", "Nuclear Newswire (ANS)", "energy"),
+    # ── D145 batch: surfaced by a GDELT source census (which of ~38 trade/academic outlets GDELT
+    # indexes), then RSS-verified 2026-07-16. The census's real payoff wasn't GDELT (its reachable
+    # set ≈ outlets that already have RSS) — it was finding these on-thesis outlets missing from the
+    # registry. Single-topic trade press, so home-desk is unambiguous. Feeds > GDELT for all three:
+    # native titles, reliable, no adapter.
+    _Feed("https://www.militarytimes.com/arc/outboundfeeds/rss/?outputType=xml", "Military Times", "defense"),
+    _Feed("https://oilprice.com/rss/main", "OilPrice", "energy"),
+    _Feed("https://blocksandfiles.com/feed/", "Blocks & Files", "ai"),
 )
 
 

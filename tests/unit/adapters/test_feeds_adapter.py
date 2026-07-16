@@ -142,6 +142,14 @@ class TestFeedRegistry:
         urls = [f.url for f in _FEEDS]
         assert len(urls) == len(set(urls))
 
+    def test_d145_census_additions_present_and_routed(self):
+        # D145: outlets a GDELT source census surfaced as missing, then RSS-verified. Home desk
+        # pinned so a registry edit can't silently re-route them.
+        by_name = {f.name: f.desk for f in _FEEDS}
+        assert by_name["Military Times"] == "defense"
+        assert by_name["OilPrice"] == "energy"
+        assert by_name["Blocks & Files"] == "ai"
+
     def test_base_url_tracks_active_canary_feed(self):
         adapter = FeedsAdapter()
         adapter.build_request_payload(cursor=None, page=1)
