@@ -146,6 +146,17 @@ _PROBES: tuple[_Probe, ...] = (
     # Energy — next-gen hydro, grid-component crunch:
     _Probe("hydrokinetic", ("energy",)),                         # ultra-low-head hydro/tidal
     _Probe("grid transformer shortage", ("energy",)),            # transformer/copper crunch
+    # ── Gap-coverage batch (D144): the fileable subset — topics public companies actually
+    # disclose to the SEC, so they surface via the RELIABLE channel (EDGAR: 0 fail/7d) rather
+    # than depending on the flaky GDELT worker. Appended after the pinned first-8; multi-desk
+    # tags carry the convergence, home desk first per operator routing (2026-07-16).
+    _Probe("critical minerals", ("defense", "energy")),          # strategic-material chokepoint (home: defense)
+    _Probe("semiconductor export", ("ai", "defense")),           # export controls (home: ai — compute access)
+    _Probe("behind-the-meter power", ("ai", "energy")),          # data-center power co-location (home: ai)
+    _Probe("co-packaged optics", ("ai",)),                       # CPO optical interconnect
+    _Probe("carbon capture", ("energy",)),                       # CCUS
+    _Probe("offshore wind", ("energy",)),                        # offshore wind buildout
+    _Probe("green ammonia", ("energy",)),                        # hydrogen carrier / power-to-X
 )
 
 

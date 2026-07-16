@@ -14,6 +14,19 @@ live ingestion runner, with Supabase auth and Lemon Squeezy subscriptions. Built
 
 ### Added
 
+- **Gap-coverage probe batch — 11 investment-thesis topics with zero prior coverage** (2026-07-16,
+  D144): a topic review (operator + external LLM cross-check against the SCOPE table) surfaced
+  themes with a clear thesis but no probe: green ammonia, CCUS, offshore wind, methane abatement,
+  sovereign AI, co-packaged optics, additive defense manufacturing, counter-UAS, plus the three
+  cross-cutting ones whose home desk is a product-boundary call the operator made — critical
+  minerals → **Defense**, semiconductor export controls → **AI**, power co-location → **AI**.
+  Added to GDELT (news) and, for the **fileable** subset (topics public companies actually disclose
+  to the SEC — critical minerals, semiconductor export, behind-the-meter power, co-packaged optics,
+  carbon capture, offshore wind, green ammonia), to EDGAR as well, so they surface via the reliable
+  filings channel rather than depending on GDELT. Home-desk routing pinned by tests so a future
+  reshuffle can't silently re-home them. +4 tests (641 green). _Caveat surfaced during the work:
+  see the note under "GDELT is the flaky 4th source" — the news-only topics (e.g. sovereign AI)
+  will under-yield until the GDELT BigQuery path is built, since the DOC-API worker is IP-throttled._
 - **Two new item types — the desks stop labeling a combat strike the same as generic news**
   (2026-07-16, D143): the `brief_items.item_type` taxonomy (award/filing/policy/macro/signal) was
   fixed 2026-06-05 when the corpus was SEC filings + gov awards. As the net widened to news, arXiv

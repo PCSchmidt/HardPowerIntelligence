@@ -117,6 +117,21 @@ _PROBES: tuple[_Probe, ...] = (
     _Probe("hydrokinetic turbine", "energy"),                # ultra-low-head hydro
     _Probe("closed-loop geothermal", "energy"),              # advanced/radiator geothermal
     _Probe("grid transformer shortage", "energy"),           # high-voltage transformer/copper crunch
+    # ── Gap-coverage batch (D144): topics with an investment thesis but zero prior probe.
+    # Home-desk routing for the cross-cutting three set by operator (2026-07-16): critical
+    # minerals → Defense (industrial base), semiconductor export controls → AI (compute access),
+    # power co-location → AI (serving compute). See docs/SCOPE.md + [[desk-coverage-overhaul]].
+    _Probe("critical minerals supply", "defense"),           # rare-earth/strategic-material chokepoint
+    _Probe("counter-drone system", "defense"),               # C-UAS / counter-swarm
+    _Probe("additive manufacturing defense", "defense"),     # attritable / distributed production
+    _Probe("semiconductor export controls", "ai"),           # chip access / entity-list restrictions
+    _Probe("sovereign AI cloud", "ai"),                      # national/regulated compute (news-only, no filing)
+    _Probe("co-packaged optics", "ai"),                      # CPO — optical interconnect at the package
+    _Probe("nuclear powered data center", "ai"),             # power co-location / behind-the-meter compute
+    _Probe("green ammonia", "energy"),                       # power-to-X / hydrogen carrier
+    _Probe("carbon capture storage", "energy"),              # CCUS
+    _Probe("offshore wind", "energy"),                       # offshore wind buildout
+    _Probe("methane abatement", "energy"),                   # emissions / leak detection
 )
 
 

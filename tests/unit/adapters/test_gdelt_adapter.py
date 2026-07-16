@@ -72,6 +72,26 @@ class TestParse:
         assert rec.desk == ["defense"]
         assert len(rec.desk) == 1                  # exactly one home desk (D097)
 
+
+class TestGapCoverageBatch:
+    """The D144 gap-topic batch — routing pinned so a future probe reshuffle can't silently
+    re-home the cross-cutting three (the operator's product-boundary calls, 2026-07-16)."""
+
+    def _home(self, query: str) -> str:
+        return next(p.desk for p in _PROBES if p.query == query)
+
+    def test_operator_routing_of_the_cross_cutting_three(self):
+        assert self._home("critical minerals supply") == "defense"
+        assert self._home("semiconductor export controls") == "ai"
+        assert self._home("nuclear powered data center") == "ai"
+
+    def test_new_energy_topics_are_present_and_energy_homed(self):
+        for q in ("green ammonia", "carbon capture storage", "offshore wind", "methane abatement"):
+            assert self._home(q) == "energy"
+
+    def test_every_probe_home_desk_is_valid(self):
+        assert all(p.desk in {"defense", "ai", "energy"} for p in _PROBES)
+
     def test_title_truncated(self):
         long_title = "x" * (_TITLE_CHARS + 50)
         resp = {"articles": [{"url": "https://a.com/1", "title": long_title,

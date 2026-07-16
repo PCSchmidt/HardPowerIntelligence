@@ -188,6 +188,18 @@ class TestWidenedProbes:
         assert "munitions production" not in energy      # defense-only probe
         assert "gallium" in themes_for_desk("defense")   # trilateral probe
 
+    def test_gap_batch_fileable_subset_present_and_home_routed(self):
+        # D144: the fileable gap topics on the RELIABLE EDGAR channel. Home desk = desks[0]
+        # (_is_home_desk), pinned to the operator's 2026-07-16 routing so a reshuffle can't
+        # silently re-home the cross-cutting ones.
+        from engine.adapters.edgar import _PROBES
+        home = {p.query: p.desks[0] for p in _PROBES}
+        assert home["critical minerals"] == "defense"   # not "rare earth" — distinct phrase
+        assert home["semiconductor export"] == "ai"
+        assert home["behind-the-meter power"] == "ai"    # power co-location
+        for q in ("carbon capture", "offshore wind", "green ammonia"):
+            assert home[q] == "energy"
+
     def test_tangential_energy_probes_are_energy_only(self):
         # Curation Step 2 (D085 desk identity): energy-primary probes whose only AI link was
         # demand-side ("compute needs power") were demoted to energy-only, so generic energy
