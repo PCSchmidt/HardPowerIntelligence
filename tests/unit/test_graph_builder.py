@@ -16,6 +16,7 @@ from engine.entity.graph_builder import (
     confidence_from_weight,
     pairs_from_item,
     recency_weight,
+    same_company,
 )
 
 NOW = date(2026, 7, 16)
@@ -65,6 +66,27 @@ class TestPairsFromItem:
 
     def test_single_entity_no_pairs(self):
         assert list(pairs_from_item(["x"], "ai", NOW)) == []
+
+
+class TestSameCompany:
+    def test_prefix_variant_is_same_company(self):
+        # the live Northrop artifact: parent vs division/legal variant
+        assert same_company("Northrop Grumman Corp /DE/", "NORTHROP GRUMMAN SYSTEMS CORPORATION")
+
+    def test_identical_after_suffix_normalization(self):
+        assert same_company("Palantir Technologies Inc.", "Palantir Technologies Corp")
+
+    def test_distinct_companies_sharing_one_token_are_not_merged(self):
+        assert not same_company("General Dynamics", "General Electric")
+        assert not same_company("Rare Earths Americas", "USA Rare Earth")
+
+    def test_single_shared_token_never_merges(self):
+        # "Energy" alone must not merge two different energy companies
+        assert not same_company("Energy Fuels", "Energy Transfer")
+
+    def test_blank_names_are_not_same(self):
+        assert not same_company("", "Anything")
+        assert not same_company("Boeing", "")
 
 
 class TestComputeEdges:

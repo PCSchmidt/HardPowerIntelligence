@@ -14,6 +14,15 @@ live ingestion runner, with Supabase auth and Lemon Squeezy subscriptions. Built
 
 ### Added
 
+- **Convergence graph — suppress spurious same-company self-edges** (2026-07-17, D150): the live
+  graph's *strongest* edge was Northrop Grumman Corp ── Northrop Grumman Systems Corporation — the same
+  company held as two entity rows (parent + legal/division variant), which co-appear in every item
+  naming the company and so form a strong but meaningless "convergence with itself." The edge builder
+  now drops these via `same_company()` (normalized token-prefix match with a ≥2-shared-token guard so
+  "General Dynamics" vs "General Electric" is never merged). Genuine parent↔subsidiary *relationships*
+  belong in a semantic PARENT_OF edge (§5), not the co-appearance map. Rebuilt live: graph 10 → 9 edges
+  (8 cross-desk), the artifact retired; the top edge is now a real cross-company pair. +5 tests
+  (691 green). _A fuller entity-dedup (merging the two Northrop rows) remains a later refinement._
 - **Convergence graph §3 — the interactive hero surface at `/graph`** (2026-07-17, D149): the
   visualization the whole track was building toward. A dependency-free force-directed graph
   (`lib/graph-layout.ts` — a compact, unit-tested Coulomb-repulsion / Hooke-spring / centering /

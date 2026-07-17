@@ -27,6 +27,8 @@ from collections.abc import Iterable, Iterator, Sequence
 from dataclasses import dataclass, field
 from datetime import date, datetime, timezone
 
+from engine.entity.resolver import normalize_mention
+
 
 @dataclass(frozen=True)
 class CoAppearance:
@@ -69,6 +71,28 @@ def confidence_from_weight(weight: float) -> float:
     strong-but-finite convergence never quite claims certainty. Always a valid CHECK (0..1) value.
     """
     return 1.0 - 0.5 ** max(0.0, weight)
+
+
+def same_company(name_a: str, name_b: str) -> bool:
+    """True when two entity names almost certainly denote the SAME company held as two entity rows.
+
+    The resolver sometimes carries a company as both a parent and a division/legal variant — e.g.
+    "Northrop Grumman Corp /DE/" and "Northrop Grumman Systems Corporation". They co-appear in every
+    item that mentions the company, producing a strong but SPURIOUS convergence edge (a company with
+    itself). Detected by normalized token-prefix: after suffix normalization, the shorter name is the
+    leading tokens of the longer (or they're equal), with ≥2 shared tokens so a single common first
+    token ("General Dynamics" vs "General Electric") is never falsely merged. Genuine parent↔subsidiary
+    *relationships* belong in a semantic PARENT_OF edge (§5), not the co-appearance convergence map.
+    """
+    a = normalize_mention(name_a or "")
+    b = normalize_mention(name_b or "")
+    if not a or not b:
+        return False
+    if a == b:
+        return True
+    sa, sb = a.split(), b.split()
+    short, long = (sa, sb) if len(sa) <= len(sb) else (sb, sa)
+    return len(short) >= 2 and long[: len(short)] == short
 
 
 def pairs_from_item(entity_ids: Sequence[str], desk: str, at: date) -> Iterator[CoAppearance]:
@@ -212,7 +236,21 @@ async def build_convergence_edges(
         weight_floor=weight_floor,
         cross_desk_boost=cross_desk_boost,
     )
-    result = await persist_edges(conn, edges, now=now)
+    # Drop spurious self-company edges (one company held as two entity rows). Needs canonical names,
+    # which the pure compute layer doesn't have — so filter here, at the DB boundary.
+    names = await _entity_names(conn, {e.from_id for e in edges} | {e.to_id for e in edges})
+    kept = [e for e in edges if not same_company(names.get(e.from_id, ""), names.get(e.to_id, ""))]
+    result = await persist_edges(conn, kept, now=now)
     result["observations"] = len(observations)
-    result["cross_desk"] = sum(1 for e in edges if e.cross_desk)
+    result["cross_desk"] = sum(1 for e in kept if e.cross_desk)
+    result["self_company_dropped"] = len(edges) - len(kept)
     return result
+
+
+async def _entity_names(conn, ids: set[str]) -> dict[str, str]:
+    if not ids:
+        return {}
+    rows = await conn.fetch(
+        "SELECT id::text AS id, canonical_name FROM entities WHERE id = ANY($1::uuid[])", list(ids)
+    )
+    return {r["id"]: r["canonical_name"] for r in rows}
