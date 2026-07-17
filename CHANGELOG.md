@@ -14,6 +14,26 @@ live ingestion runner, with Supabase auth and Lemon Squeezy subscriptions. Built
 
 ### Added
 
+- **Convergence graph §4 — name-gazetteer linking breaks the 25% ceiling; graph goes 1 → 10 edges**
+  (2026-07-17, D147): §1's live run exposed the real bottleneck — most items link ≤1 entity because the
+  linker is identifier-only (EDGAR/USAspending carry a ticker/CIK/UEI; feeds/GDELT/arXiv, now the
+  biggest sources, emit `entity_mentions=[]`), so there was rarely a *pair* to draw an edge between.
+  This lifts it by generalizing NRC's blessed ticker-allowlist pattern (D096) from a hand-curated
+  handful to the whole 8k reference set: `engine/entity/gazetteer.py` matches known **multi-word**
+  company names as they literally appear in an item's synthesized headline+body (token n-grams, exact
+  word-boundary), and links via the resolver's exact path. Precision is the whole game — three guards:
+  multi-word only (a single-token alias like "BLOCK"/"GAP" collides with English; a 2-token company
+  name effectively doesn't), word-boundary match, and ambiguity-drop (one alias → two entities is
+  discarded). A document-frequency scan of the live corpus caught the residual generic-phrase
+  collisions — `QUANTUM COMPUTING` (the phrase, 25/1164 items, vs the company QUBT), `HYPERSCALE DATA`
+  (literally an EDGAR probe phrase), `AI ERA` — now stop-worded. **Result on the live corpus:** item
+  linking 24% → 31%, edge-able (≥2-entity) items 14 → 41, and after backfilling historical items
+  (`scripts/backfill_item_entities.py`, +118 links over 95 items) the convergence graph went from **1
+  edge to 10 (9 cross-desk)** — led by **Ramaco Resources ── USA Rare Earth spanning Defense∩AI∩Energy**,
+  the trilateral rare-earth/critical-minerals core, now computed rather than asserted. Runs
+  automatically on all future briefs (wired into the generator, one alias-index load per brief). +14
+  tests (674 green). _Known artifact: two entities exist for Northrop Grumman (Corp vs Systems Corp),
+  so they form a spurious self-edge — a future entity-dedup, not a linking bug._
 - **Convergence graph §1 — CONVERGES_WITH co-appearance edges (the graph's foundation)** (2026-07-16,
   D146): `entity_edges` shipped with 8,151 nodes but **0 edges and no producer** — the compounding
   clock had never started. This builds the first edge layer: a new `CONVERGES_WITH` edge_type (additive

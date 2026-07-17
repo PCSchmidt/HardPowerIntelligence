@@ -1,22 +1,22 @@
 # Convergence Graph — build plan
 
-**Status:** **§1 DONE 2026-07-16 (D146)** — edge layer built, tested (18 unit tests), wired into the
-daily cadence, migration applied live. The remaining §2/§3 are re-sequenced by what §1's live run
-revealed (see the boxed finding below). The Phase-C Archetype-A hero surface (the interactive
-entity/theme graph) and its foundation. **Companion:** [PERSONAS.md](PERSONAS.md) (A serves P1/P3),
-`MOCKUPS.md` (B5), [PHASE_PLAN.md](PHASE_PLAN.md).
+**Status:** **§1 + §4 DONE (D146/D147)** — edge layer + name-gazetteer coverage lift both built, tested
+(32 unit tests), wired into the daily cadence, migration applied live. Graph is now **10 edges (9
+cross-desk)**, up from 1; **§2 API is the next concrete build.** The Phase-C Archetype-A hero surface
+(the interactive entity/theme graph) and its foundation. **Companion:** [PERSONAS.md](PERSONAS.md) (A
+serves P1/P3), `MOCKUPS.md` (B5), [PHASE_PLAN.md](PHASE_PLAN.md).
 
-> **§1 live-run finding (2026-07-16) — the graph is data-starved, and it re-sequences the track.**
-> Run against real published briefs, **215 co-appearances produced exactly 1 surviving edge** (Element
-> Solutions ── Solstice Advanced Materials, AI∩Energy). 212 of 213 distinct pairs appear exactly once;
-> only **2 of 53 linked entities span >1 desk**. This is NOT mis-tuning — dropping the prune floor
-> renders 212 coincidental single-co-appearance pairs (the hairball the floor exists to stop). The
-> structural cause: **most brief items link ≤1 entity**, because the linker is identifier-only (one
-> primary filer per filing), so there is rarely a *pair* to connect. The 25% linking ceiling shows up
-> here as graph sparsity. **Consequence:** §4 (coverage-lift / NER by-name linking) moves from
-> "parallel/later" to **the blocker for a viewable graph** — §2 API + §3 viz would render a single node
-> today. Recommended new order: **§1 (done) → §4 coverage-lift → §2 API → §3 viz.** The graph also
-> densifies on its own as briefs accrue (the daily `graph` job compounds it), but §4 is the real lever.
+> **§1 → §4 story (2026-07-16/17) — how the graph went from starved to legible.** §1's first live run
+> produced **exactly 1 edge from 215 co-appearances**: 212 of 213 pairs appeared once, because **most
+> items linked ≤1 entity** — the linker was identifier-only (EDGAR/USAspending carry a ticker/CIK/UEI;
+> feeds/GDELT/arXiv emit none), so there was rarely a *pair* to connect. That re-sequenced the track:
+> §4 (name linking) became the blocker, not a parallel nicety. §4 (D147) matched known multi-word
+> company names in item text (precision-guarded: multi-word only, word-boundary, ambiguity-drop, plus a
+> document-frequency stopword pass that caught generic collisions like the phrase "quantum computing"
+> vs the company QUBT). Result: item linking **24% → 31%**, edge-able items **14 → 41**, and the graph
+> **1 → 10 edges (9 cross-desk)** — led by **Ramaco Resources ── USA Rare Earth spanning
+> Defense∩AI∩Energy**, the trilateral thesis, now computed. It compounds further as briefs accrue (the
+> daily `graph` job) and as §4's stopword list is tuned. **New order: §1 ✓ → §4 ✓ → §2 API → §3 viz.**
 
 > **Framing (2026-07-16 decision).** Build cost is not the operator's binding constraint (abundant
 > time/tokens; the build has learning + portfolio value regardless of the commercial outcome), so

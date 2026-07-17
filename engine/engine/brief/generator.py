@@ -19,6 +19,7 @@ from engine.brief.rag import (
 )
 from engine.brief.significance import filter_significant
 from engine.db import transient_retry
+from engine.entity.gazetteer import load_alias_index
 from engine.entity.linker import resolve_item_entities
 from engine.eval.citation_eval import extract_citation_indices, strip_uncited_sentences
 from engine.llm.client import llm_client, parse_json
@@ -723,9 +724,15 @@ async def persist_brief(
         # because it is what blew the energy desk's job cap on 2026-07-04 (see daily-brief.yml).
         entity_started = datetime.now(timezone.utc)
         async with pool.acquire() as conn:
+            # Load the name-gazetteer index ONCE per brief (§4 coverage lift), not per item —
+            # it's the same reference set for every item and the query returns thousands of rows.
+            alias_index = await load_alias_index(conn)
             for i, item in enumerate(surviving_items):
                 rrids = _item_raw_record_ids(item, brief.passages)
-                item_entity_ids[i] = await resolve_item_entities(conn, rrids)
+                item_text = f"{item.get('headline', '')} {item.get('body', '')}"
+                item_entity_ids[i] = await resolve_item_entities(
+                    conn, rrids, item_text=item_text, alias_index=alias_index
+                )
         linked = sum(1 for ids in item_entity_ids if ids)
         log.info(
             "entities_linked", desk=desk, items=len(surviving_items),

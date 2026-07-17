@@ -19,6 +19,7 @@ import json
 
 import structlog
 
+from engine.entity.gazetteer import find_mentions as find_gazetteer_mentions
 from engine.entity.reference import pad_cik
 from engine.entity.resolution import resolve_mention
 from engine.entity.resolver import normalize_mention
@@ -98,31 +99,53 @@ async def _mint_entity(conn, name: str, identifiers: list[tuple[str, str]]) -> s
     return entity_id
 
 
-async def resolve_item_entities(conn, raw_record_ids: list[str]) -> list[str]:
+async def resolve_item_entities(
+    conn,
+    raw_record_ids: list[str],
+    *,
+    item_text: str = "",
+    alias_index: dict[str, str] | None = None,
+) -> list[str]:
     """Resolve (and, where authoritative, mint) the entities behind one brief item's source records.
+
+    Two linking paths, unioned:
+      1. **Identifier / authoritative name** from the source records' ``entity_mentions`` (EDGAR/
+         USAspending/NRC/arXiv) — the precision-1.0 path, unchanged.
+      2. **Name gazetteer** (§4 coverage lift): if ``alias_index`` is provided, match known multi-word
+         reference names appearing in ``item_text`` (the synthesized headline+body). This is what
+         brings feeds/GDELT/arXiv items — which carry no identifier — into the graph. Precision is
+         guarded in the gazetteer (multi-word, word-boundary, ambiguity-drop); it only ever links to a
+         real seeded entity, so a spurious name simply fails to match rather than mislinking.
 
     Returns a de-duplicated, order-preserving list of ``entities.id`` strings.
     """
-    if not raw_record_ids:
-        return []
-    rows = await conn.fetch(
-        "SELECT source_id, entity_mentions, structured_data FROM normalized_records "
-        "WHERE raw_record_id = ANY($1::uuid[])",
-        raw_record_ids,
-    )
     entity_ids: list[str] = []
     seen: set[str] = set()
-    for row in rows:
-        mentions = _loads(row["entity_mentions"]) or []
-        structured = _loads(row["structured_data"]) or {}
-        for name, identifiers in extract_resolution_inputs(row["source_id"], mentions, structured):
-            result = await resolve_mention(conn, name, identifiers=identifiers)
-            entity_id = result.entity_id
-            if entity_id is None:
-                mintable = [(t, v) for (t, v) in identifiers if t in _MINTABLE_ID_TYPES and v]
-                if mintable:
-                    entity_id = await _mint_entity(conn, name, mintable)
-            if entity_id and entity_id not in seen:
+
+    if raw_record_ids:
+        rows = await conn.fetch(
+            "SELECT source_id, entity_mentions, structured_data FROM normalized_records "
+            "WHERE raw_record_id = ANY($1::uuid[])",
+            raw_record_ids,
+        )
+        for row in rows:
+            mentions = _loads(row["entity_mentions"]) or []
+            structured = _loads(row["structured_data"]) or {}
+            for name, identifiers in extract_resolution_inputs(row["source_id"], mentions, structured):
+                result = await resolve_mention(conn, name, identifiers=identifiers)
+                entity_id = result.entity_id
+                if entity_id is None:
+                    mintable = [(t, v) for (t, v) in identifiers if t in _MINTABLE_ID_TYPES and v]
+                    if mintable:
+                        entity_id = await _mint_entity(conn, name, mintable)
+                if entity_id and entity_id not in seen:
+                    seen.add(entity_id)
+                    entity_ids.append(entity_id)
+
+    if alias_index and item_text:
+        for entity_id in find_gazetteer_mentions(item_text, alias_index):
+            if entity_id not in seen:
                 seen.add(entity_id)
                 entity_ids.append(entity_id)
+
     return entity_ids
