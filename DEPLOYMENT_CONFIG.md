@@ -4,11 +4,20 @@ Gate 9 (`deploy_ready`) artifact. Defines the production topology, the deploy st
 service, and the full environment/secrets matrix. Architecture per **D009** (Vercel +
 Fly.io + Supabase) and **D050** (Lemon Squeezy payments).
 
-> Status: **DEPLOYED — live in production (2026-06-12).** web
-> `hard-power-intelligence.vercel.app` · API `hpi-api.fly.dev` · Supabase cloud
-> `miotyfrwzurhycixyjko`. A cited brief renders at `/desk/defense` (faithfulness 1.0).
-> First-deploy procedure in `DEPLOY_RUNBOOK.md`; what remains before public launch in
-> [§6](#6-outstanding-before-first-deploy).
+> Status: **DEPLOYED — live in production.** web `hardpowerintel.com` (+ the
+> `hard-power-intelligence.vercel.app` alias) · API `hpi-api.fly.dev` · Supabase cloud
+> `miotyfrwzurhycixyjko`. Cited briefs render at `/desk/{defense,ai,energy}`; the convergence
+> graph at `/graph`. First-deploy procedure in `DEPLOY_RUNBOOK.md`.
+>
+> **Topology changes since first deploy (2026-07-17):**
+> - **`hpi-worker` RETIRED.** It only ever ran the GDELT DOC-API pull, which is IP-blocked from Fly
+>   (see the `gdelt-ingestion-saga`); GDELT is parked and the app was destroyed. **Ingestion now runs
+>   entirely in GitHub Actions** (`.github/workflows/daily-brief.yml`: ingest → per-desk brief →
+>   convergence-graph rebuild → health), not on a persistent Fly machine. The `worker/` package and
+>   `fly.worker.toml` remain in-repo but are **not deployed**.
+> - **Fly account:** `hpi-api` lives under the Fly account **`hardpowerintelligence@gmail.com`**, NOT
+>   `p.christopher.schmidt@gmail.com` (which owns the separate `aerointel-backend` project). `fly deploy`
+>   must `fly auth login` as the former or it 401s "unauthorized."
 
 ---
 
@@ -25,8 +34,8 @@ Fly.io + Supabase) and **D050** (Lemon Squeezy payments).
                     │  (FastAPI)             │        │  Postgres + pgvector +   │
                     └────────────────────────┘        │  Auth + Storage + RLS    │
                     ┌────────────────────────┐        └─────────────────────────┘
-                    │  Fly.io — hpi-worker   │◄──────────────┘ (procrastinate queue, D004)
-                    │  (persistent ingest)   │
+                    │  GitHub Actions        │◄──────────────┘ (scheduled ingest + brief + graph)
+                    │  daily-brief.yml (cron)│
                     └────────────────────────┘
    Lemon Squeezy (MoR) ──► webhook ──► hpi-api  POST /v1/webhooks/lemon-squeezy (D050)
 ```
@@ -34,8 +43,8 @@ Fly.io + Supabase) and **D050** (Lemon Squeezy payments).
 | Service | Platform | Notes |
 |---------|----------|-------|
 | `web` (Next.js) | **Vercel** | SSR/ISR; the only public surface. Reads data via FastAPI. |
-| `hpi-api` (FastAPI) | **Fly.io** | Single data boundary (D011). Not publicly browsable beyond `/health` + webhook. |
-| `hpi-worker` (procrastinate) | **Fly.io** | Persistent (never sleeps — D009); owns ingestion schedule (D004). |
+| `hpi-api` (FastAPI) | **Fly.io** | Single data boundary (D011). Not publicly browsable beyond `/health` + webhook. Under Fly account `hardpowerintelligence@gmail.com`. |
+| Ingestion + brief + graph | **GitHub Actions** | `daily-brief.yml` cron (06:00 UTC): ingest → per-desk brief (parallel) → convergence-graph rebuild → health. Replaced the retired `hpi-worker` Fly machine (2026-07-17). |
 | Database / Auth / Storage | **Supabase** | Managed Postgres + pgvector + Auth + Storage. Migrations in `supabase/migrations/`. |
 | Payments | **Lemon Squeezy** | Merchant of Record (D050); hosted checkout + HMAC webhook. |
 | Errors | **Sentry** | Optional; inits only when DSN present. |
@@ -47,10 +56,13 @@ Fly.io + Supabase) and **D050** (Lemon Squeezy payments).
 1. **Supabase** — create cloud project; `supabase db push` to apply all migrations
    (incl. `20260611000001_lock_briefs_rls.sql`); capture project URL, anon key, service
    role key, JWT secret, pooled `DATABASE_URL`.
-2. **hpi-api → Fly.io** — `fly deploy` with `docker/Dockerfile.api`; set secrets (§4).
-3. **hpi-worker → Fly.io** — `fly deploy` with `docker/Dockerfile.worker`; set secrets.
-4. **web → Vercel** — connect repo (root `web/`), set env (§4), deploy. Point
-   `FASTAPI_INTERNAL_URL` at the private Fly.io api address.
+2. **hpi-api → Fly.io** — `fly auth login` as `hardpowerintelligence@gmail.com`, then
+   `fly deploy --config fly.api.toml`; set secrets (§4).
+3. **web → Vercel** — connect repo (**root is repo root, not `web/`** — Root Directory is set to
+   `web` in the project, so `vercel --prod` runs from the repo root), set env (§4), deploy. Point
+   `FASTAPI_INTERNAL_URL` at the Fly.io api address.
+4. **Ingestion/brief/graph** — no deploy step: runs in GitHub Actions (`daily-brief.yml`), needs the
+   repo secrets (DATABASE_URL, OPENROUTER/OPENAI/SAM_GOV keys). (Formerly the `hpi-worker` Fly app.)
 5. **Lemon Squeezy** — create store/product, set the webhook URL to
    `https://<api-host>/v1/webhooks/lemon-squeezy`, capture API key + webhook secret.
 6. Smoke test: signup → brief renders → checkout (test mode) → webhook updates tier.
@@ -84,12 +96,12 @@ Legend: 🔒 secret (never commit) · 🌐 public (safe in client bundle).
 | `OPENROUTER_API_KEY` | 🔒 | LLM waterfall (D006) — used by brief generation |
 | `SENTRY_DSN` | 🔒 | Optional |
 
-### hpi-worker (Fly.io)
+### Ingestion (GitHub Actions repo secrets — formerly hpi-worker)
 | Var | Type | Source |
 |-----|------|--------|
 | `DATABASE_URL` | 🔒 | Same Supabase connection |
-| `OPENROUTER_API_KEY` | 🔒 | LLM calls during ingestion/synthesis |
-| `SENTRY_DSN` | 🔒 | Optional |
+| `OPENROUTER_API_KEY` / `OPENAI_API_KEY` | 🔒 | LLM waterfall + embeddings during ingestion/synthesis |
+| `SAM_GOV_API_KEY` | 🔒 | SAM.gov opportunities adapter |
 
 ---
 
@@ -98,7 +110,7 @@ Legend: 🔒 secret (never commit) · 🌐 public (safe in client bundle).
 These cannot be generated by code — gather before first deploy:
 
 - [ ] **Supabase cloud project** → URL, anon key, service role key, JWT secret, `DATABASE_URL`
-- [ ] **Fly.io account** + `flyctl` auth; two apps created (`hpi-api`, `hpi-worker`)
+- [ ] **Fly.io account** (`hardpowerintelligence@gmail.com`) + `flyctl` auth; one app (`hpi-api`)
 - [ ] **Vercel project** linked to repo (`web/` as root)
 - [ ] **Lemon Squeezy** store + product → API key, store ID, webhook signing secret
 - [ ] **OpenRouter** API key (LLM waterfall)
@@ -124,10 +136,10 @@ These cannot be generated by code — gather before first deploy:
 - ✅ **`docker/Dockerfile.api`** + **`fly.api.toml`** — written and **verified locally**
   (image builds; container serves `/health` 200). Ready for `fly deploy --config fly.api.toml`.
 - ✅ **`.dockerignore`** — keeps the build context to the uv workspace.
-- 🚧 **`docker/Dockerfile.worker`** + **`fly.worker.toml`** — written as **templates**, but
-  **`hpi-worker` has no code** (`worker/tasks/` is empty — no procrastinate App or periodic
-  schedule, D004). Must implement the worker before it can deploy. Until then, ingestion/
-  brief generation runs manually (e.g. the brief script) rather than on a schedule.
+- ✅ **Scheduled ingestion — GitHub Actions, not a Fly worker.** `daily-brief.yml` (06:00 UTC cron)
+  runs ingest → per-desk brief → convergence-graph rebuild → health. The `hpi-worker` Fly app (which
+  only ever ran the IP-blocked GDELT pull) was **retired 2026-07-17**; `worker/` + `fly.worker.toml`
+  stay in-repo but are not deployed.
 - ✅ **Cloud provisioned + secrets set** — Supabase cloud, Fly `hpi-api` (secrets via
   `fly secrets`), Vercel project (env set). Done 2026-06-12.
 - ✅ **RLS migration applied to cloud** — `supabase db push`; paywall lock-down verified.
