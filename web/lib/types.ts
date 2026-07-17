@@ -96,6 +96,19 @@ export interface ConvergenceGraph {
   meta: { node_count: number; edge_count: number; cross_desk_edges: number };
 }
 
+// The shared stories behind an edge — GET /graph/co-appearances (the "why are these connected").
+export interface EdgeStory {
+  desk: string;
+  date: string;
+  headline: string;
+  item_type: ItemType;
+}
+
+export interface EdgeCoappearances {
+  count: number;
+  items: EdgeStory[];
+}
+
 // Entity 360 payload from GET /entities/{id} (T3.6, D091).
 export interface EntityAppearance {
   brief_id: string;

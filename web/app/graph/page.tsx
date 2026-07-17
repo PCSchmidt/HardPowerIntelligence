@@ -17,9 +17,9 @@ export default async function GraphPage() {
       <header className="mb-6">
         <h1 className="font-display text-2xl font-bold text-brand">Convergence Graph</h1>
         <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
-          Entities that recur together across the Defense, AI, and Energy desks. A purple node or link
-          spans more than one desk — the cross-sector convergence the briefs are built around. The graph
-          fills in and sharpens over time as more briefs publish.
+          Entities that recur together across the Defense, AI, and Energy desks. A gold node or link
+          spans more than one desk — the cross-sector convergence the briefs are built around. Hover an
+          edge to see the stories behind a connection. The graph fills in and sharpens as more briefs publish.
         </p>
       </header>
 

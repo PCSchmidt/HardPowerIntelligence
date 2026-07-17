@@ -1,5 +1,5 @@
 import { apiFetch } from "@/lib/api/client";
-import type { ConvergenceGraph } from "@/lib/types";
+import type { ConvergenceGraph, EdgeCoappearances } from "@/lib/types";
 
 export interface GraphQuery {
   desk?: string;
@@ -19,4 +19,11 @@ export function getConvergenceGraph(q: GraphQuery = {}) {
   if (q.limit != null) params.set("limit", String(q.limit));
   const qs = params.toString();
   return apiFetch<ConvergenceGraph>(`/graph/convergence${qs ? `?${qs}` : ""}`);
+}
+
+// The published items where two entities both appear — the evidence behind an edge.
+export function getEdgeCoappearances(a: string, b: string) {
+  return apiFetch<EdgeCoappearances>(
+    `/graph/co-appearances?a=${encodeURIComponent(a)}&b=${encodeURIComponent(b)}`,
+  );
 }

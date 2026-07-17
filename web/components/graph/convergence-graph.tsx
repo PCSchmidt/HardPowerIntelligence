@@ -8,11 +8,10 @@ import {
   DEFAULT_PARAMS,
   initialPositions,
   stepSimulation,
-  type SimEdge,
   type SimNode,
   type SimParams,
 } from "@/lib/graph-layout";
-import type { ConvergenceGraph } from "@/lib/types";
+import type { ConvergenceGraph, EdgeCoappearances } from "@/lib/types";
 import { deskLabel, entityDisplayName } from "@/lib/entities";
 import { cn } from "@/lib/utils";
 
@@ -21,8 +20,7 @@ const H = 640;
 const MAX_FRAMES = 600;
 const SETTLE_ENERGY = 4;
 
-// On-brand palette (DESIGN_SYSTEM.md): desk accents + antique gold for convergence — the "this is the
-// valuable thing" accent, which is exactly what a cross-sector node is.
+// On-brand palette (DESIGN_SYSTEM.md): desk accents + antique gold for convergence.
 const DESK: Record<string, { base: string; glow: string }> = {
   defense: { base: "#1b3a6b", glow: "#3a5c93" },
   ai: { base: "#7c3aed", glow: "#9d6bf6" },
@@ -40,11 +38,22 @@ function palette(key: string) {
   return DESK[key] ?? NEUTRAL;
 }
 
+type RenderEdge = {
+  from: string;
+  to: string;
+  weight: number;
+  cross_desk: boolean;
+  confidence: number;
+  co_count: number;
+  desks: string[];
+};
+
 export function ConvergenceGraph({ graph }: { graph: ConvergenceGraph }) {
   const router = useRouter();
   const [crossDeskOnly, setCrossDeskOnly] = useState(false);
   const [minConf, setMinConf] = useState(0);
   const [hovered, setHovered] = useState<string | null>(null);
+  const [hoveredEdge, setHoveredEdge] = useState<RenderEdge | null>(null);
 
   useEffect(() => {
     capture({
@@ -56,9 +65,17 @@ export function ConvergenceGraph({ graph }: { graph: ConvergenceGraph }) {
   }, [graph.meta]);
 
   const { visibleNodes, simEdges, degree } = useMemo(() => {
-    const edges = graph.edges.filter(
-      (e) => (!crossDeskOnly || e.cross_desk) && e.confidence >= minConf,
-    );
+    const edges: RenderEdge[] = graph.edges
+      .filter((e) => (!crossDeskOnly || e.cross_desk) && e.confidence >= minConf)
+      .map((e) => ({
+        from: e.from,
+        to: e.to,
+        weight: e.weight,
+        cross_desk: e.cross_desk,
+        confidence: e.confidence,
+        co_count: e.co_count,
+        desks: e.desks,
+      }));
     const ids = new Set<string>();
     const deg: Record<string, number> = {};
     for (const e of edges) {
@@ -67,22 +84,19 @@ export function ConvergenceGraph({ graph }: { graph: ConvergenceGraph }) {
       deg[e.from] = (deg[e.from] ?? 0) + 1;
       deg[e.to] = (deg[e.to] ?? 0) + 1;
     }
-    return {
-      visibleNodes: graph.nodes.filter((n) => ids.has(n.id)),
-      simEdges: edges.map((e) => ({
-        from: e.from,
-        to: e.to,
-        weight: e.weight,
-        cross_desk: e.cross_desk,
-        confidence: e.confidence,
-      })),
-      degree: deg,
-    };
+    return { visibleNodes: graph.nodes.filter((n) => ids.has(n.id)), simEdges: edges, degree: deg };
   }, [graph, crossDeskOnly, minConf]);
 
   const nodeById = useMemo(() => new Map(visibleNodes.map((n) => [n.id, n])), [visibleNodes]);
   const colorOf = useCallback(
     (id: string) => palette(paletteKey(nodeById.get(id)?.desks ?? [])).base,
+    [nodeById],
+  );
+  const labelOf = useCallback(
+    (id: string) => {
+      const n = nodeById.get(id);
+      return n ? (n.ticker ?? entityDisplayName(n.name)) : "";
+    },
     [nodeById],
   );
   const neighbors = useMemo(() => {
@@ -106,7 +120,6 @@ export function ConvergenceGraph({ graph }: { graph: ConvergenceGraph }) {
   const rafRef = useRef<number | null>(null);
   const runningRef = useRef(false);
   const svgRef = useRef<SVGSVGElement>(null);
-
   const simEdgesRef = useRef(simEdges);
   simEdgesRef.current = simEdges;
 
@@ -142,9 +155,44 @@ export function ConvergenceGraph({ graph }: { graph: ConvergenceGraph }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [layoutKey]);
 
+  // ── edge evidence: fetch the shared stories on hover (cached per pair) ──
+  const [edgeStories, setEdgeStories] = useState<EdgeCoappearances | null>(null);
+  const [edgeLoading, setEdgeLoading] = useState(false);
+  const storyCache = useRef<Map<string, EdgeCoappearances>>(new Map());
+  useEffect(() => {
+    if (!hoveredEdge) {
+      setEdgeStories(null);
+      setEdgeLoading(false);
+      return;
+    }
+    const key = `${hoveredEdge.from}|${hoveredEdge.to}`;
+    const cached = storyCache.current.get(key);
+    if (cached) {
+      setEdgeStories(cached);
+      setEdgeLoading(false);
+      return;
+    }
+    let cancelled = false;
+    setEdgeStories(null);
+    setEdgeLoading(true);
+    fetch(`/api/graph/co-appearances?a=${hoveredEdge.from}&b=${hoveredEdge.to}`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d: EdgeCoappearances | null) => {
+        if (cancelled) return;
+        if (d) {
+          storyCache.current.set(key, d);
+          setEdgeStories(d);
+        }
+        setEdgeLoading(false);
+      })
+      .catch(() => !cancelled && setEdgeLoading(false));
+    return () => {
+      cancelled = true;
+    };
+  }, [hoveredEdge]);
+
   // ── pointer: drag a node, or click through to its Entity 360 ──
   const dragRef = useRef<{ id: string; moved: boolean } | null>(null);
-
   function toSvg(clientX: number, clientY: number) {
     const rect = svgRef.current!.getBoundingClientRect();
     return { x: ((clientX - rect.left) / rect.width) * W, y: ((clientY - rect.top) / rect.height) * H };
@@ -178,15 +226,28 @@ export function ConvergenceGraph({ graph }: { graph: ConvergenceGraph }) {
   }
 
   const activeIds = useMemo(() => {
-    if (!hovered) return null;
-    const set = new Set<string>([hovered]);
-    for (const nb of neighbors.get(hovered) ?? []) set.add(nb);
-    return set;
-  }, [hovered, neighbors]);
+    if (hovered) {
+      const set = new Set<string>([hovered]);
+      for (const nb of neighbors.get(hovered) ?? []) set.add(nb);
+      return set;
+    }
+    if (hoveredEdge) return new Set<string>([hoveredEdge.from, hoveredEdge.to]);
+    return null;
+  }, [hovered, hoveredEdge, neighbors]);
 
   const pos = useMemo(() => new Map(renderNodes.map((n) => [n.id, n])), [renderNodes]);
   const hoveredNode = hovered ? nodeById.get(hovered) : null;
-  const hoveredPos = hovered ? pos.get(hovered) : null;
+  const hoveredNodePos = hovered ? pos.get(hovered) : null;
+  const edgeMid = hoveredEdge
+    ? (() => {
+        const a = pos.get(hoveredEdge.from);
+        const b = pos.get(hoveredEdge.to);
+        return a && b ? { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 } : null;
+      })()
+    : null;
+
+  const isHoveredEdge = (e: RenderEdge) =>
+    hoveredEdge != null && hoveredEdge.from === e.from && hoveredEdge.to === e.to;
 
   return (
     <div className="flex flex-col gap-4">
@@ -278,19 +339,35 @@ export function ConvergenceGraph({ graph }: { graph: ConvergenceGraph }) {
               const b = pos.get(e.to);
               if (!a || !b) return null;
               const dim = activeIds && !(activeIds.has(e.from) && activeIds.has(e.to));
+              const hot = isHoveredEdge(e);
               const mx = (a.x + b.x) / 2;
               const my = (a.y + b.y) / 2;
               const cx = mx - (b.y - a.y) * 0.12;
               const cy = my + (b.x - a.x) * 0.12;
+              const d = `M${a.x},${a.y} Q${cx},${cy} ${b.x},${b.y}`;
               return (
-                <path
-                  key={i}
-                  d={`M${a.x},${a.y} Q${cx},${cy} ${b.x},${b.y}`}
-                  stroke={`url(#edge-${i})`}
-                  strokeWidth={Math.max(1.2, Math.min(5, e.weight))}
-                  strokeOpacity={dim ? 0.06 : 0.22 + e.confidence * 0.5}
-                  style={{ transition: "stroke-opacity 200ms ease" }}
-                />
+                <g key={i}>
+                  <path
+                    d={d}
+                    stroke={`url(#edge-${i})`}
+                    strokeWidth={hot ? Math.max(2.4, Math.min(6, e.weight + 1.5)) : Math.max(1.2, Math.min(5, e.weight))}
+                    strokeOpacity={dim ? 0.06 : hot ? 0.95 : 0.22 + e.confidence * 0.5}
+                    style={{ transition: "stroke-opacity 150ms ease, stroke-width 150ms ease" }}
+                  />
+                  {/* wide invisible hit area for reliable hover */}
+                  <path
+                    d={d}
+                    stroke="transparent"
+                    strokeWidth={16}
+                    className="cursor-help"
+                    style={{ pointerEvents: "stroke" }}
+                    onPointerEnter={() => {
+                      setHoveredEdge(e);
+                      setHovered(null);
+                    }}
+                    onPointerLeave={() => setHoveredEdge((cur) => (cur === e ? null : cur))}
+                  />
+                </g>
               );
             })}
           </g>
@@ -315,7 +392,10 @@ export function ConvergenceGraph({ graph }: { graph: ConvergenceGraph }) {
                   style={{ opacity: dim ? 0.22 : 1, transition: "opacity 200ms ease" }}
                   onPointerDown={(e) => onNodePointerDown(e, n.id)}
                   onPointerUp={() => onPointerUp(n.id)}
-                  onPointerEnter={() => setHovered(n.id)}
+                  onPointerEnter={() => {
+                    setHovered(n.id);
+                    setHoveredEdge(null);
+                  }}
                   onPointerLeave={() => setHovered((h) => (h === n.id ? null : h))}
                 >
                   {(isConv || focus) && (
@@ -352,13 +432,13 @@ export function ConvergenceGraph({ graph }: { graph: ConvergenceGraph }) {
           </g>
         </svg>
 
-        {/* Hover detail card */}
-        {hoveredNode && hoveredPos && (
+        {/* Node hover card */}
+        {hoveredNode && hoveredNodePos && !hoveredEdge && (
           <div
             className="pointer-events-none absolute z-10 w-max max-w-xs -translate-x-1/2 rounded-lg border border-border bg-popover px-3.5 py-2.5 shadow-lg"
             style={{
-              left: `${(hoveredPos.x / W) * 100}%`,
-              top: `${(hoveredPos.y / H) * 100}%`,
+              left: `${(hoveredNodePos.x / W) * 100}%`,
+              top: `${(hoveredNodePos.y / H) * 100}%`,
               transform: "translate(-50%, calc(-100% - 18px))",
             }}
           >
@@ -392,6 +472,63 @@ export function ConvergenceGraph({ graph }: { graph: ConvergenceGraph }) {
             )}
           </div>
         )}
+
+        {/* Edge hover card — the evidence behind a connection */}
+        {hoveredEdge && edgeMid && (
+          <div
+            className="pointer-events-none absolute z-10 w-72 -translate-x-1/2 rounded-lg border border-border bg-popover px-3.5 py-2.5 shadow-lg"
+            style={{
+              left: `${Math.min(88, Math.max(12, (edgeMid.x / W) * 100))}%`,
+              top: `${(edgeMid.y / H) * 100}%`,
+              transform: "translate(-50%, calc(-100% - 14px))",
+            }}
+          >
+            <div className="flex items-center justify-center gap-2 text-ui-sm font-semibold text-foreground">
+              <span className="tabular-nums">{labelOf(hoveredEdge.from)}</span>
+              <span className="text-muted-foreground">⇄</span>
+              <span className="tabular-nums">{labelOf(hoveredEdge.to)}</span>
+            </div>
+            <div className="mt-1.5 flex flex-wrap items-center justify-center gap-1.5 text-ui-xs text-muted-foreground">
+              {hoveredEdge.desks.map((d) => (
+                <span
+                  key={d}
+                  className="rounded px-1.5 py-0.5 font-medium text-white"
+                  style={{ backgroundColor: (DESK[d] ?? NEUTRAL).base }}
+                >
+                  {deskLabel(d)}
+                </span>
+              ))}
+              <span>
+                co-appeared {hoveredEdge.co_count}× · {Math.round(hoveredEdge.confidence * 100)}% confidence
+              </span>
+            </div>
+            <div className="mt-2 border-t border-border pt-2">
+              {edgeLoading && <div className="text-ui-xs italic text-muted-foreground">Loading stories…</div>}
+              {!edgeLoading && edgeStories && (
+                <ul className="space-y-1.5">
+                  {edgeStories.items.slice(0, 4).map((s, j) => (
+                    <li key={j} className="flex gap-1.5 text-ui-xs leading-snug text-foreground">
+                      <span
+                        className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full"
+                        style={{ backgroundColor: (DESK[s.desk] ?? NEUTRAL).base }}
+                      />
+                      <span>
+                        {s.headline}
+                        <span className="ml-1 text-muted-foreground tabular-nums">· {s.date}</span>
+                      </span>
+                    </li>
+                  ))}
+                  {edgeStories.count > 4 && (
+                    <li className="text-ui-xs text-muted-foreground">+{edgeStories.count - 4} more</li>
+                  )}
+                  {edgeStories.count === 0 && (
+                    <li className="text-ui-xs italic text-muted-foreground">Recurring co-appearance across desks.</li>
+                  )}
+                </ul>
+              )}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Legend */}
@@ -400,7 +537,7 @@ export function ConvergenceGraph({ graph }: { graph: ConvergenceGraph }) {
         <LegendDot color={DESK.defense.base} label="Defense" />
         <LegendDot color={DESK.ai.base} label="AI Infrastructure" />
         <LegendDot color={DESK.energy.base} label="Energy" />
-        <span className="ml-auto italic">Drag to rearrange · hover to focus · click a node for its Entity 360</span>
+        <span className="ml-auto italic">Drag to rearrange · hover a node or edge · click a node for its Entity 360</span>
       </div>
     </div>
   );

@@ -11,6 +11,7 @@ desk-span convergence signal the entity chips use. Authed like the other entity 
 from __future__ import annotations
 
 import json
+from uuid import UUID
 
 import asyncpg
 from fastapi import APIRouter, Depends, Query
@@ -23,6 +24,7 @@ router = APIRouter()
 _DESKS = ("defense", "ai", "energy")
 _DEFAULT_LIMIT = 100
 _MAX_LIMIT = 500
+_COAPPEARANCE_LIMIT = 12
 
 # Live CONVERGES_WITH edges under the filters, strongest first. Filters are all optional (guarded by a
 # NULL/FALSE sentinel per param) so one prepared statement serves every combination. The jsonb `?`
@@ -115,6 +117,46 @@ def graph_payload(edge_rows: list, node_rows: list) -> dict:
             "cross_desk_edges": sum(1 for e in edges if e["cross_desk"]),
         },
     }
+
+
+# The published items where BOTH entities appear — the evidence behind a CONVERGES_WITH edge
+# ("why are these two connected?"). entity_ids @> ARRAY[a,b] is GIN-indexed (brief_items_entity_ids_gin).
+_COAPPEARANCES_SQL = """
+SELECT b.desk AS desk, b.date AS date, bi.headline AS headline, bi.item_type AS item_type
+FROM brief_items bi JOIN briefs b ON b.id = bi.brief_id
+WHERE b.status = 'published' AND bi.entity_ids @> ARRAY[$1, $2]::uuid[]
+ORDER BY b.date DESC, bi.display_order
+LIMIT $3
+"""
+
+
+def coappearance_payload(rows: list) -> dict:
+    """Pure: the shared-story list shown when hovering an edge."""
+    return {
+        "count": len(rows),
+        "items": [
+            {
+                "desk": r["desk"],
+                "date": str(r["date"]),
+                "headline": r["headline"],
+                "item_type": r["item_type"],
+            }
+            for r in rows
+        ],
+    }
+
+
+@router.get("/graph/co-appearances")
+async def get_edge_coappearances(
+    a: UUID,
+    b: UUID,
+    principal: Principal = Depends(get_principal),
+    pool: asyncpg.Pool = Depends(get_pool),
+) -> dict:
+    """The published items where entities ``a`` and ``b`` both appear — the evidence behind an edge."""
+    async with pool.acquire() as conn:
+        rows = await conn.fetch(_COAPPEARANCES_SQL, a, b, _COAPPEARANCE_LIMIT)
+    return coappearance_payload(rows)
 
 
 @router.get("/graph/convergence")

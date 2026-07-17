@@ -10,7 +10,7 @@ from fastapi.testclient import TestClient
 
 from app.deps import Principal, get_pool, get_principal
 from app.main import app
-from app.routers.graph import edge_payload, graph_payload, node_payload
+from app.routers.graph import coappearance_payload, edge_payload, graph_payload, node_payload
 
 
 class TestEdgePayload:
@@ -76,6 +76,22 @@ class TestGraphPayload:
     def test_empty(self):
         out = graph_payload([], [])
         assert out["meta"] == {"node_count": 0, "edge_count": 0, "cross_desk_edges": 0}
+
+
+class TestCoappearancePayload:
+    def test_shapes_shared_items(self):
+        rows = [
+            {"desk": "defense", "date": "2026-07-16", "headline": "Rare earth 8-K surge", "item_type": "filing"},
+            {"desk": "ai", "date": "2026-07-15", "headline": "Critical minerals", "item_type": "signal"},
+        ]
+        out = coappearance_payload(rows)
+        assert out["count"] == 2
+        assert out["items"][0] == {
+            "desk": "defense", "date": "2026-07-16", "headline": "Rare earth 8-K surge", "item_type": "filing",
+        }
+
+    def test_empty(self):
+        assert coappearance_payload([]) == {"count": 0, "items": []}
 
 
 class _FakeConn:
