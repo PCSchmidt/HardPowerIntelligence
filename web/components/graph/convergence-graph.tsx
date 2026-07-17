@@ -13,24 +13,31 @@ import {
   type SimParams,
 } from "@/lib/graph-layout";
 import type { ConvergenceGraph } from "@/lib/types";
-import { entityDisplayName } from "@/lib/entities";
+import { deskLabel, entityDisplayName } from "@/lib/entities";
 import { cn } from "@/lib/utils";
 
-const W = 800;
-const H = 600;
+const W = 960;
+const H = 640;
 const MAX_FRAMES = 600;
 const SETTLE_ENERGY = 4;
 
-const DESK_COLOR: Record<string, string> = {
-  defense: "#dc2626",
-  ai: "#2563eb",
-  energy: "#16a34a",
+// On-brand palette (DESIGN_SYSTEM.md): desk accents + antique gold for convergence — the "this is the
+// valuable thing" accent, which is exactly what a cross-sector node is.
+const DESK: Record<string, { base: string; glow: string }> = {
+  defense: { base: "#1b3a6b", glow: "#3a5c93" },
+  ai: { base: "#7c3aed", glow: "#9d6bf6" },
+  energy: { base: "#16a34a", glow: "#3ccb6e" },
 };
-const CONVERGENCE_COLOR = "#9333ea"; // spans ≥2 desks — the star of the show
+const GOLD = { base: "#c8a96e", glow: "#e6cf9a" };
+const NEUTRAL = { base: "#8a8a82", glow: "#a8a8a0" };
 
-function nodeColor(desks: string[]): string {
-  if (desks.length >= 2) return CONVERGENCE_COLOR;
-  return DESK_COLOR[desks[0]] ?? "#64748b";
+function paletteKey(desks: string[]): string {
+  if (desks.length >= 2) return "gold";
+  return DESK[desks[0]] ? desks[0] : "neutral";
+}
+function palette(key: string) {
+  if (key === "gold") return GOLD;
+  return DESK[key] ?? NEUTRAL;
 }
 
 export function ConvergenceGraph({ graph }: { graph: ConvergenceGraph }) {
@@ -39,7 +46,6 @@ export function ConvergenceGraph({ graph }: { graph: ConvergenceGraph }) {
   const [minConf, setMinConf] = useState(0);
   const [hovered, setHovered] = useState<string | null>(null);
 
-  // Fire the view event once — the behavioral read on whether the hero surface gets explored.
   useEffect(() => {
     capture({
       name: "convergence_graph_viewed",
@@ -49,7 +55,6 @@ export function ConvergenceGraph({ graph }: { graph: ConvergenceGraph }) {
     });
   }, [graph.meta]);
 
-  // Client-side filters (the graph is small; no refetch needed).
   const { visibleNodes, simEdges, degree } = useMemo(() => {
     const edges = graph.edges.filter(
       (e) => (!crossDeskOnly || e.cross_desk) && e.confidence >= minConf,
@@ -64,7 +69,7 @@ export function ConvergenceGraph({ graph }: { graph: ConvergenceGraph }) {
     }
     return {
       visibleNodes: graph.nodes.filter((n) => ids.has(n.id)),
-      simEdges: edges.map((e): SimEdge & { cross_desk: boolean; confidence: number } => ({
+      simEdges: edges.map((e) => ({
         from: e.from,
         to: e.to,
         weight: e.weight,
@@ -75,22 +80,26 @@ export function ConvergenceGraph({ graph }: { graph: ConvergenceGraph }) {
     };
   }, [graph, crossDeskOnly, minConf]);
 
-  const nodeById = useMemo(
-    () => new Map(visibleNodes.map((n) => [n.id, n])),
-    [visibleNodes],
+  const nodeById = useMemo(() => new Map(visibleNodes.map((n) => [n.id, n])), [visibleNodes]);
+  const colorOf = useCallback(
+    (id: string) => palette(paletteKey(nodeById.get(id)?.desks ?? [])).base,
+    [nodeById],
   );
   const neighbors = useMemo(() => {
     const m = new Map<string, Set<string>>();
+    const add = (a: string, b: string) => {
+      if (!m.has(a)) m.set(a, new Set());
+      m.get(a)!.add(b);
+    };
     for (const e of simEdges) {
-      (m.get(e.from) ?? m.set(e.from, new Set()).get(e.from)!).add(e.to);
-      (m.get(e.to) ?? m.set(e.to, new Set()).get(e.to)!).add(e.from);
+      add(e.from, e.to);
+      add(e.to, e.from);
     }
     return m;
   }, [simEdges]);
 
   const params: SimParams = { width: W, height: H, ...DEFAULT_PARAMS };
 
-  // Simulation state lives in a ref (authoritative); render state is a copy set each frame.
   const nodesRef = useRef<SimNode[]>([]);
   const [renderNodes, setRenderNodes] = useState<SimNode[]>([]);
   const pinnedRef = useRef<Set<string>>(new Set());
@@ -98,12 +107,15 @@ export function ConvergenceGraph({ graph }: { graph: ConvergenceGraph }) {
   const runningRef = useRef(false);
   const svgRef = useRef<SVGSVGElement>(null);
 
+  const simEdgesRef = useRef(simEdges);
+  simEdgesRef.current = simEdges;
+
   const startLoop = useCallback(() => {
     if (runningRef.current) return;
     runningRef.current = true;
     let frames = 0;
     const loop = () => {
-      nodesRef.current = stepSimulation(nodesRef.current, simEdges, params, pinnedRef.current);
+      nodesRef.current = stepSimulation(nodesRef.current, simEdgesRef.current, params, pinnedRef.current);
       const energy = nodesRef.current.reduce((s, n) => s + Math.hypot(n.vx, n.vy), 0);
       setRenderNodes(nodesRef.current);
       frames += 1;
@@ -115,16 +127,11 @@ export function ConvergenceGraph({ graph }: { graph: ConvergenceGraph }) {
     };
     rafRef.current = requestAnimationFrame(loop);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [simEdges]);
+  }, []);
 
-  // (Re)initialize the layout whenever the visible node set changes.
   const layoutKey = visibleNodes.map((n) => n.id).sort().join(",");
   useEffect(() => {
-    nodesRef.current = initialPositions(
-      visibleNodes.map((n) => n.id),
-      W,
-      H,
-    );
+    nodesRef.current = initialPositions(visibleNodes.map((n) => n.id), W, H);
     setRenderNodes(nodesRef.current);
     pinnedRef.current = new Set();
     runningRef.current = false;
@@ -140,12 +147,8 @@ export function ConvergenceGraph({ graph }: { graph: ConvergenceGraph }) {
 
   function toSvg(clientX: number, clientY: number) {
     const rect = svgRef.current!.getBoundingClientRect();
-    return {
-      x: ((clientX - rect.left) / rect.width) * W,
-      y: ((clientY - rect.top) / rect.height) * H,
-    };
+    return { x: ((clientX - rect.left) / rect.width) * W, y: ((clientY - rect.top) / rect.height) * H };
   }
-
   function onNodePointerDown(e: React.PointerEvent, id: string) {
     e.stopPropagation();
     (e.target as Element).setPointerCapture(e.pointerId);
@@ -153,19 +156,15 @@ export function ConvergenceGraph({ graph }: { graph: ConvergenceGraph }) {
     pinnedRef.current.add(id);
     startLoop();
   }
-
   function onPointerMove(e: React.PointerEvent) {
     const drag = dragRef.current;
     if (!drag) return;
     const { x, y } = toSvg(e.clientX, e.clientY);
     dragRef.current = { ...drag, moved: true };
-    nodesRef.current = nodesRef.current.map((n) =>
-      n.id === drag.id ? { ...n, x, y, vx: 0, vy: 0 } : n,
-    );
+    nodesRef.current = nodesRef.current.map((n) => (n.id === drag.id ? { ...n, x, y, vx: 0, vy: 0 } : n));
     setRenderNodes(nodesRef.current);
     startLoop();
   }
-
   function onPointerUp(id: string) {
     const drag = dragRef.current;
     pinnedRef.current.delete(id);
@@ -186,20 +185,23 @@ export function ConvergenceGraph({ graph }: { graph: ConvergenceGraph }) {
   }, [hovered, neighbors]);
 
   const pos = useMemo(() => new Map(renderNodes.map((n) => [n.id, n])), [renderNodes]);
+  const hoveredNode = hovered ? nodeById.get(hovered) : null;
+  const hoveredPos = hovered ? pos.get(hovered) : null;
 
   return (
-    <div className="flex flex-col gap-3">
-      <div className="flex flex-wrap items-center gap-4 text-sm">
-        <label className="flex items-center gap-2 cursor-pointer select-none">
+    <div className="flex flex-col gap-4">
+      {/* Toolbar */}
+      <div className="flex flex-wrap items-center gap-x-6 gap-y-3 rounded-lg border border-border bg-card px-4 py-2.5 text-ui-sm">
+        <label className="flex cursor-pointer select-none items-center gap-2 font-medium">
           <input
             type="checkbox"
             checked={crossDeskOnly}
             onChange={(e) => setCrossDeskOnly(e.target.checked)}
-            className="accent-[var(--color-brand,#9333ea)]"
+            className="h-3.5 w-3.5 accent-[#c8a96e]"
           />
           Cross-desk only
         </label>
-        <label className="flex items-center gap-2">
+        <label className="flex items-center gap-2.5">
           <span className="text-muted-foreground">Min confidence</span>
           <input
             type="range"
@@ -208,96 +210,219 @@ export function ConvergenceGraph({ graph }: { graph: ConvergenceGraph }) {
             step={0.05}
             value={minConf}
             onChange={(e) => setMinConf(Number(e.target.value))}
+            className="w-28 accent-[#1b3a6b]"
           />
-          <span className="tabular-nums w-8 text-muted-foreground">{minConf.toFixed(2)}</span>
+          <span className="w-8 tabular-nums text-muted-foreground">{minConf.toFixed(2)}</span>
         </label>
         <span className="ml-auto text-muted-foreground">
-          {visibleNodes.length} entities · {simEdges.length} links
+          <span className="font-medium text-foreground tabular-nums">{visibleNodes.length}</span> entities
+          <span className="mx-1.5 text-border">·</span>
+          <span className="font-medium text-foreground tabular-nums">{simEdges.length}</span> links
         </span>
       </div>
 
-      <div className="rounded-lg border border-border bg-card">
+      {/* Canvas */}
+      <div
+        className="relative overflow-hidden rounded-xl border border-border"
+        style={{ background: "radial-gradient(120% 130% at 50% 0%, #ffffff 0%, #f6f5f1 62%, #f1efe9 100%)" }}
+      >
         <svg
           ref={svgRef}
           viewBox={`0 0 ${W} ${H}`}
-          className="w-full h-auto touch-none"
+          className="h-auto w-full touch-none animate-fade-in"
           onPointerMove={onPointerMove}
           role="img"
           aria-label="Convergence graph: entities that recur together across the Defense, AI, and Energy desks"
         >
-          {simEdges.map((e, i) => {
-            const a = pos.get(e.from);
-            const b = pos.get(e.to);
-            if (!a || !b) return null;
-            const dim = activeIds && !(activeIds.has(e.from) && activeIds.has(e.to));
-            return (
-              <line
-                key={i}
-                x1={a.x}
-                y1={a.y}
-                x2={b.x}
-                y2={b.y}
-                stroke={e.cross_desk ? CONVERGENCE_COLOR : "#94a3b8"}
-                strokeWidth={Math.max(1, Math.min(6, e.weight))}
-                strokeOpacity={dim ? 0.08 : 0.25 + e.confidence * 0.5}
-              />
-            );
-          })}
-          {renderNodes.map((n) => {
-            const meta = nodeById.get(n.id);
-            if (!meta) return null;
-            const r = Math.min(20, 7 + (degree[n.id] ?? 0) * 2);
-            const dim = activeIds && !activeIds.has(n.id);
-            const showLabel = meta.convergence || hovered === n.id || (degree[n.id] ?? 0) >= 3;
-            return (
-              <g
-                key={n.id}
-                transform={`translate(${n.x},${n.y})`}
-                className="cursor-pointer"
-                opacity={dim ? 0.2 : 1}
-                onPointerDown={(e) => onNodePointerDown(e, n.id)}
-                onPointerUp={() => onPointerUp(n.id)}
-                onPointerEnter={() => setHovered(n.id)}
-                onPointerLeave={() => setHovered((h) => (h === n.id ? null : h))}
-              >
-                <circle
-                  r={r}
-                  fill={nodeColor(meta.desks)}
-                  fillOpacity={0.85}
-                  stroke="var(--color-background,#fff)"
-                  strokeWidth={1.5}
+          <defs>
+            {(["defense", "ai", "energy", "gold", "neutral"] as const).map((k) => {
+              const c = palette(k);
+              return (
+                <radialGradient key={k} id={`nodefill-${k}`} cx="38%" cy="34%" r="72%">
+                  <stop offset="0%" stopColor={c.glow} />
+                  <stop offset="100%" stopColor={c.base} />
+                </radialGradient>
+              );
+            })}
+            <filter id="node-glow" x="-60%" y="-60%" width="220%" height="220%">
+              <feGaussianBlur stdDeviation="6" result="b" />
+              <feMerge>
+                <feMergeNode in="b" />
+              </feMerge>
+            </filter>
+            {simEdges.map((e, i) => {
+              const a = pos.get(e.from);
+              const b = pos.get(e.to);
+              if (!a || !b) return null;
+              return (
+                <linearGradient
+                  key={i}
+                  id={`edge-${i}`}
+                  gradientUnits="userSpaceOnUse"
+                  x1={a.x}
+                  y1={a.y}
+                  x2={b.x}
+                  y2={b.y}
+                >
+                  <stop offset="0%" stopColor={colorOf(e.from)} />
+                  <stop offset="100%" stopColor={colorOf(e.to)} />
+                </linearGradient>
+              );
+            })}
+          </defs>
+
+          {/* Edges — curved, gradient-blended (sector A meeting sector B) */}
+          <g strokeLinecap="round" fill="none">
+            {simEdges.map((e, i) => {
+              const a = pos.get(e.from);
+              const b = pos.get(e.to);
+              if (!a || !b) return null;
+              const dim = activeIds && !(activeIds.has(e.from) && activeIds.has(e.to));
+              const mx = (a.x + b.x) / 2;
+              const my = (a.y + b.y) / 2;
+              const cx = mx - (b.y - a.y) * 0.12;
+              const cy = my + (b.x - a.x) * 0.12;
+              return (
+                <path
+                  key={i}
+                  d={`M${a.x},${a.y} Q${cx},${cy} ${b.x},${b.y}`}
+                  stroke={`url(#edge-${i})`}
+                  strokeWidth={Math.max(1.2, Math.min(5, e.weight))}
+                  strokeOpacity={dim ? 0.06 : 0.22 + e.confidence * 0.5}
+                  style={{ transition: "stroke-opacity 200ms ease" }}
                 />
-                {showLabel && (
-                  <text
-                    y={-r - 5}
-                    textAnchor="middle"
-                    className="pointer-events-none fill-foreground"
-                    style={{ fontSize: 12, fontWeight: meta.convergence ? 600 : 400 }}
-                  >
-                    {meta.ticker ?? entityDisplayName(meta.name)}
-                  </text>
-                )}
-              </g>
-            );
-          })}
+              );
+            })}
+          </g>
+
+          {/* Nodes */}
+          <g>
+            {renderNodes.map((n) => {
+              const meta = nodeById.get(n.id);
+              if (!meta) return null;
+              const key = paletteKey(meta.desks);
+              const c = palette(key);
+              const isConv = meta.convergence;
+              const r = Math.min(24, 8 + Math.sqrt(degree[n.id] ?? 0) * 3.2) + (isConv ? 2 : 0);
+              const dim = activeIds && !activeIds.has(n.id);
+              const focus = hovered === n.id;
+              const showLabel = isConv || focus || (degree[n.id] ?? 0) >= 3;
+              return (
+                <g
+                  key={n.id}
+                  transform={`translate(${n.x},${n.y})`}
+                  className="cursor-pointer"
+                  style={{ opacity: dim ? 0.22 : 1, transition: "opacity 200ms ease" }}
+                  onPointerDown={(e) => onNodePointerDown(e, n.id)}
+                  onPointerUp={() => onPointerUp(n.id)}
+                  onPointerEnter={() => setHovered(n.id)}
+                  onPointerLeave={() => setHovered((h) => (h === n.id ? null : h))}
+                >
+                  {(isConv || focus) && (
+                    <circle r={r + 6} fill={c.glow} opacity={focus ? 0.5 : 0.32} filter="url(#node-glow)" />
+                  )}
+                  <circle
+                    r={r}
+                    fill={`url(#nodefill-${key})`}
+                    stroke={focus ? c.base : "#ffffff"}
+                    strokeWidth={focus ? 2 : 1.5}
+                  />
+                  {isConv && <circle r={r} fill="none" stroke={GOLD.base} strokeOpacity={0.55} strokeWidth={1} />}
+                  {showLabel && (
+                    <text
+                      y={-r - 7}
+                      textAnchor="middle"
+                      className="pointer-events-none select-none"
+                      style={{
+                        font: `${isConv ? 600 : 500} 12px var(--font-ui, Inter), system-ui, sans-serif`,
+                        fill: "#1a1a1a",
+                        paintOrder: "stroke",
+                        stroke: "#faf9f7",
+                        strokeWidth: 3,
+                        strokeLinejoin: "round",
+                        letterSpacing: "-0.01em",
+                      }}
+                    >
+                      {meta.ticker ?? entityDisplayName(meta.name)}
+                    </text>
+                  )}
+                </g>
+              );
+            })}
+          </g>
         </svg>
+
+        {/* Hover detail card */}
+        {hoveredNode && hoveredPos && (
+          <div
+            className="pointer-events-none absolute z-10 w-max max-w-xs -translate-x-1/2 rounded-lg border border-border bg-popover px-3.5 py-2.5 shadow-lg"
+            style={{
+              left: `${(hoveredPos.x / W) * 100}%`,
+              top: `${(hoveredPos.y / H) * 100}%`,
+              transform: "translate(-50%, calc(-100% - 18px))",
+            }}
+          >
+            <div className="font-display text-base font-semibold leading-tight text-foreground">
+              {entityDisplayName(hoveredNode.name)}
+            </div>
+            <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+              {hoveredNode.ticker ? (
+                <span className="rounded bg-secondary px-1.5 py-0.5 text-ui-xs font-semibold tabular-nums text-foreground">
+                  {hoveredNode.ticker}
+                </span>
+              ) : (
+                <span className="rounded bg-secondary px-1.5 py-0.5 text-ui-xs text-muted-foreground">
+                  private / venture
+                </span>
+              )}
+              {hoveredNode.desks.map((d) => (
+                <span
+                  key={d}
+                  className="rounded px-1.5 py-0.5 text-ui-xs font-medium text-white"
+                  style={{ backgroundColor: (DESK[d] ?? NEUTRAL).base }}
+                >
+                  {deskLabel(d)}
+                </span>
+              ))}
+            </div>
+            {hoveredNode.convergence && (
+              <div className="mt-1.5 text-ui-xs font-medium" style={{ color: GOLD.base }}>
+                Converges across {hoveredNode.desks.length} desks
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
-      <div className="flex flex-wrap items-center gap-4 text-xs text-muted-foreground">
-        <LegendDot color={CONVERGENCE_COLOR} label="Cross-desk (convergence)" />
-        <LegendDot color={DESK_COLOR.defense} label="Defense" />
-        <LegendDot color={DESK_COLOR.ai} label="AI" />
-        <LegendDot color={DESK_COLOR.energy} label="Energy" />
-        <span className="ml-auto">Drag to rearrange · click a node for its Entity 360</span>
+      {/* Legend */}
+      <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-ui-xs text-muted-foreground">
+        <LegendDot color={GOLD.base} ring label="Cross-desk — convergence" strong />
+        <LegendDot color={DESK.defense.base} label="Defense" />
+        <LegendDot color={DESK.ai.base} label="AI Infrastructure" />
+        <LegendDot color={DESK.energy.base} label="Energy" />
+        <span className="ml-auto italic">Drag to rearrange · hover to focus · click a node for its Entity 360</span>
       </div>
     </div>
   );
 }
 
-function LegendDot({ color, label }: { color: string; label: string }) {
+function LegendDot({
+  color,
+  label,
+  ring,
+  strong,
+}: {
+  color: string;
+  label: string;
+  ring?: boolean;
+  strong?: boolean;
+}) {
   return (
-    <span className="flex items-center gap-1.5">
-      <span className={cn("inline-block h-2.5 w-2.5 rounded-full")} style={{ backgroundColor: color }} />
+    <span className={cn("flex items-center gap-1.5", strong && "font-medium text-foreground")}>
+      <span
+        className="inline-block h-2.5 w-2.5 rounded-full"
+        style={{ backgroundColor: color, boxShadow: ring ? `0 0 0 2px #faf9f7, 0 0 6px ${color}` : undefined }}
+      />
       {label}
     </span>
   );

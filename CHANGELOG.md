@@ -14,6 +14,18 @@ live ingestion runner, with Supabase auth and Lemon Squeezy subscriptions. Built
 
 ### Added
 
+- **Convergence graph — visual redesign to the editorial brand standard** (2026-07-17, D151): the first
+  cut rendered as a generic developer force-graph with off-brand ad-hoc colors (red/blue/purple) that
+  clashed with the whole navy/gold editorial system — not something to put in front of a discerning
+  analyst/investor. Rebuilt to the `DESIGN_SYSTEM.md` palette: desk nodes in their real accents (navy
+  Defense, violet AI, green Energy) and **convergence nodes in antique gold** (the brand's "valuable
+  thing" accent — which is what a cross-sector node *is*). Edges now **arc** and are **gradient-blended
+  between their two endpoints' sector colors**, so a Defense↔Energy link literally shows navy meeting
+  green — convergence made visible, not just labeled. Nodes get radial-gradient depth and the gold ones
+  a soft glow/halo so they read as focal points; labels gain a legibility halo (Inter, tracked); a
+  refined hover card shows the name in the display serif with a ticker chip + desk pills; toolbar,
+  legend, and a subtle canvas vignette use the design tokens. Interaction (drag/hover-focus/click→Entity
+  360) and instrumentation unchanged. `tsc` + build clean; frontend-only (web redeploy).
 - **Convergence graph — suppress spurious same-company self-edges** (2026-07-17, D150): the live
   graph's *strongest* edge was Northrop Grumman Corp ── Northrop Grumman Systems Corporation — the same
   company held as two entity rows (parent + legal/division variant), which co-appear in every item
