@@ -14,6 +14,21 @@ live ingestion runner, with Supabase auth and Lemon Squeezy subscriptions. Built
 
 ### Added
 
+- **Convergence graph §3 — the interactive hero surface at `/graph`** (2026-07-17, D149): the
+  visualization the whole track was building toward. A dependency-free force-directed graph
+  (`lib/graph-layout.ts` — a compact, unit-tested Coulomb-repulsion / Hooke-spring / centering /
+  damping simulation; no d3 or canvas library, proportionate to a tens-of-edges graph) rendered as
+  themeable SVG in a client component. Nodes are entities colored by desk — **purple = spans ≥2 desks,
+  the convergence signal**; edges are weighted by co-appearance strength and opacity by confidence.
+  Interactions: drag to rearrange (pins the node, re-heats the sim), hover to highlight a node and its
+  neighbors, click to open that entity's Entity 360; client-side "cross-desk only" + min-confidence
+  filters. Server-fetched via `GET /v1/graph/convergence` (§2), gated behind auth (`/graph` added to
+  the proxy's auth-required prefixes), linked from the navbar (desktop + mobile), empty-state when the
+  graph has no links yet. Instrumented per the "behavior is the truth serum" discipline —
+  `convergence_graph_viewed` + `convergence_node_clicked` events (identify-by-UUID, no PII). +9 layout
+  tests (82 web green); `tsc` clean; production build passes. Completes the §1→§4→§2→§3 arc: the
+  Defense∩AI∩Energy thesis is now something a reader can *see* and explore, and it sharpens as briefs
+  accrue. _Deploy note: web needs redeploy; the graph populates from the live edge set (10 edges today)._
 - **Convergence graph §2 — `GET /v1/graph/convergence` serves a curated subgraph** (2026-07-17, D148):
   the API layer the visualization (§3) will pull. Returns the top-weighted `CONVERGES_WITH` edges plus
   the entity nodes they touch — a self-contained `{nodes, edges, meta}` payload — under optional filters

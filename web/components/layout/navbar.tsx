@@ -77,6 +77,12 @@ export function NavBar() {
               </span>
             ),
           )}
+          <Link
+            href="/graph"
+            className="rounded-md px-3 py-1.5 text-ui-md font-medium text-foreground hover:bg-muted"
+          >
+            Convergence
+          </Link>
         </nav>
 
         <div className="flex items-center gap-2">
@@ -167,6 +173,13 @@ export function NavBar() {
               </span>
             ),
           )}
+          <Link
+            href="/graph"
+            onClick={() => setNavOpen(false)}
+            className="block rounded-md px-3 py-2.5 text-ui-md font-medium text-foreground hover:bg-muted"
+          >
+            Convergence
+          </Link>
         </nav>
       )}
     </header>

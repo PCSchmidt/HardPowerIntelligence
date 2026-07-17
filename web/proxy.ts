@@ -1,7 +1,7 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
-const AUTH_REQUIRED_PREFIXES = ["/desk", "/brief", "/entity", "/account"];
+const AUTH_REQUIRED_PREFIXES = ["/desk", "/brief", "/entity", "/graph", "/account"];
 // Routes a signed-in user has no business on — they get bounced to the product.
 // /reset-password is deliberately ABSENT (D141): the recovery link authenticates the user
 // *before* they choose a new password, so listing it here would bounce them to the desk and

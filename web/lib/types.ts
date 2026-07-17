@@ -69,6 +69,33 @@ export interface EntitySummary {
   convergence: boolean;
 }
 
+// Convergence graph payload from GET /graph/convergence (Convergence-graph §2).
+export interface GraphNode {
+  id: string;
+  name: string;
+  ticker: string | null;
+  is_private: boolean;
+  desks: string[];
+  convergence: boolean;
+}
+
+export interface GraphEdge {
+  from: string;
+  to: string;
+  confidence: number;
+  weight: number;
+  co_count: number;
+  desks: string[];
+  cross_desk: boolean;
+  last_seen: string | null;
+}
+
+export interface ConvergenceGraph {
+  nodes: GraphNode[];
+  edges: GraphEdge[];
+  meta: { node_count: number; edge_count: number; cross_desk_edges: number };
+}
+
 // Entity 360 payload from GET /entities/{id} (T3.6, D091).
 export interface EntityAppearance {
   brief_id: string;

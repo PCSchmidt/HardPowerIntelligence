@@ -81,6 +81,10 @@ export type AnalyticsEvent =
   | { name: "wire_item_clicked"; desk: string; source_id: string; position: number }
   | { name: "item_sources_opened"; desk: string; item_type: string; citation_count: number; position: number }
   | { name: "item_analysis_expanded"; desk: string; item_type: string; position: number }
+  // Convergence graph (§3) — the hero surface. Whether readers explore it (and click through to an
+  // entity) is the behavioral read on whether the graph is genuinely useful vs merely impressive.
+  | { name: "convergence_graph_viewed"; node_count: number; edge_count: number; cross_desk_edges: number }
+  | { name: "convergence_node_clicked"; entity_id: string; convergence: boolean }
   | { name: "feedback_submitted"; sentiment: "useful" | "not_useful"; has_note: boolean; note: string; path: string };
 
 export function capture(event: AnalyticsEvent): void {

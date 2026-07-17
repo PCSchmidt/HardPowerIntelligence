@@ -1,9 +1,11 @@
 # Convergence Graph — build plan
 
-**Status:** **§1 + §4 + §2 DONE (D146/D147/D148)** — edge layer + name-gazetteer coverage lift + graph
-API all built, tested, wired, migration applied live. `GET /v1/graph/convergence` serves a filtered
-top-N subgraph, verified on live data. Graph is now **10 edges (9 cross-desk)**, up from 1; **§3 the
-interactive viz (the hero surface) is the next concrete build.** The Phase-C Archetype-A hero surface
+**Status:** **§1 + §4 + §2 + §3 ALL DONE (D146–D149)** — the full arc shipped: edge layer +
+name-gazetteer coverage lift + graph API + the interactive `/graph` hero surface, all built, tested
+(`tsc` + build clean), wired, migration applied live. Graph is **10 edges (9 cross-desk)** today and
+compounds as briefs accrue. **Remaining/optional:** §5 semantic edges (node-detail depth), entity
+dedup (the Northrop Corp-vs-Systems self-edge), and tuning the gazetteer stopword list. The Phase-C
+Archetype-A hero surface
 (the interactive entity/theme graph) and its foundation. **Companion:** [PERSONAS.md](PERSONAS.md) (A
 serves P1/P3), `MOCKUPS.md` (B5), [PHASE_PLAN.md](PHASE_PLAN.md).
 
