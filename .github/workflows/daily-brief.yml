@@ -163,7 +163,35 @@ jobs:
           fi
           exit 0
 
-  # ── Phase 3: post-run health check (Phase A / A1) ────────────────────────────────
+  # ── Phase 3: rebuild the convergence graph edges (Convergence-graph §1) ──────────
+  # Graph-wide recompute of CONVERGES_WITH co-appearance edges from the published brief layer,
+  # after all desks have published. Runs on every brief run (schedule or manual) — the edge set
+  # is derived from the WHOLE published corpus, not just today's desks, so recomputing is always
+  # correct and idempotent. Non-gating: the script exits 0 even on error (edges are derived and
+  # decorative; a graph hiccup must never fail the brief run). `always()` so a skipped/crashed
+  # desk still lets the graph refresh off whatever published.
+  graph:
+    needs: [ingest, brief]
+    if: ${{ always() }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          version: "0.8.0"
+
+      - name: Sync workspace
+        run: uv sync --all-packages --all-extras
+
+      - name: Rebuild convergence edges
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: uv run python scripts/build_convergence_edges.py
+
+  # ── Phase 4: post-run health check (Phase A / A1) ────────────────────────────────
   # The per-desk jobs above only go red on a hard CRASH. This job inspects the run's own
   # telemetry (briefs, ingestion_runs, source_registry) and goes red on SILENT degradation
   # the crash-only alarm misses: a total publish shutout, stuck/absent rows, a failed ingest

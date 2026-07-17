@@ -1,8 +1,22 @@
 # Convergence Graph — build plan
 
-**Status:** SCOPED 2026-07-16 (not started). The Phase-C Archetype-A hero surface (the interactive
+**Status:** **§1 DONE 2026-07-16 (D146)** — edge layer built, tested (18 unit tests), wired into the
+daily cadence, migration applied live. The remaining §2/§3 are re-sequenced by what §1's live run
+revealed (see the boxed finding below). The Phase-C Archetype-A hero surface (the interactive
 entity/theme graph) and its foundation. **Companion:** [PERSONAS.md](PERSONAS.md) (A serves P1/P3),
 `MOCKUPS.md` (B5), [PHASE_PLAN.md](PHASE_PLAN.md).
+
+> **§1 live-run finding (2026-07-16) — the graph is data-starved, and it re-sequences the track.**
+> Run against real published briefs, **215 co-appearances produced exactly 1 surviving edge** (Element
+> Solutions ── Solstice Advanced Materials, AI∩Energy). 212 of 213 distinct pairs appear exactly once;
+> only **2 of 53 linked entities span >1 desk**. This is NOT mis-tuning — dropping the prune floor
+> renders 212 coincidental single-co-appearance pairs (the hairball the floor exists to stop). The
+> structural cause: **most brief items link ≤1 entity**, because the linker is identifier-only (one
+> primary filer per filing), so there is rarely a *pair* to connect. The 25% linking ceiling shows up
+> here as graph sparsity. **Consequence:** §4 (coverage-lift / NER by-name linking) moves from
+> "parallel/later" to **the blocker for a viewable graph** — §2 API + §3 viz would render a single node
+> today. Recommended new order: **§1 (done) → §4 coverage-lift → §2 API → §3 viz.** The graph also
+> densifies on its own as briefs accrue (the daily `graph` job compounds it), but §4 is the real lever.
 
 > **Framing (2026-07-16 decision).** Build cost is not the operator's binding constraint (abundant
 > time/tokens; the build has learning + portfolio value regardless of the commercial outcome), so

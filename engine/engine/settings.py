@@ -81,6 +81,14 @@ class Settings(BaseSettings):
     # multi-desk grant overpower a much larger single-desk award.
     materiality_cross_sector_weight: float = 0.02
     magnitude_min_window: int = 10
+
+    # Convergence graph — CONVERGES_WITH edge computation (§1, 2026-07-16). A co-appearance's
+    # weight decays with a 30-day half-life so recent convergence dominates stale; a pair spanning
+    # >1 desk is boosted 2× (the cross-sector signal); anything under the floor is coincidence and
+    # is pruned so the graph stays legible as briefs accrue (the anti-hairball guard).
+    convergence_half_life_days: float = 30.0
+    convergence_weight_floor: float = 1.5
+    convergence_cross_desk_boost: float = 2.0
     source_weights: str = (
         '{"usaspending":0.9,"dod_contracts":0.85,"edgar":0.85,"nrc":0.85,'
         '"sam_gov":0.8,"congress_gov":0.8,"arxiv":0.7,"fred":0.7,'

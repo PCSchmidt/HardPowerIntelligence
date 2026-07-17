@@ -14,6 +14,23 @@ live ingestion runner, with Supabase auth and Lemon Squeezy subscriptions. Built
 
 ### Added
 
+- **Convergence graph §1 — CONVERGES_WITH co-appearance edges (the graph's foundation)** (2026-07-16,
+  D146): `entity_edges` shipped with 8,151 nodes but **0 edges and no producer** — the compounding
+  clock had never started. This builds the first edge layer: a new `CONVERGES_WITH` edge_type (additive
+  migration, since the schema's 15 types were all semantic — AWARDED/SUPPLIES/… — with no co-occurrence
+  type) plus `engine/entity/graph_builder.py`, a pure, unit-tested (18 tests) computation of
+  recency-decayed (30-day half-life) cross-desk co-appearance from the published `brief_items.entity_ids`,
+  with a 2× cross-desk boost and a weight-floor prune (the anti-hairball guard). Idempotent upsert keyed
+  on a new partial unique index; a non-gating `graph` job in `daily-brief.yml` recomputes it after each
+  run, so it compounds with time. **The verification is the real story:** run against live data, **215
+  co-appearances produced exactly 1 surviving edge** (Element Solutions ── Solstice Advanced Materials,
+  AI∩Energy). 212 of 213 distinct pairs appear once; only 2 of 53 linked entities span >1 desk. The
+  graph is not mis-tuned — dropping the floor renders 212 coincidental single-co-appearance pairs (the
+  hairball). It's **data-starved**: most items link ≤1 entity (the identifier-only linker resolves one
+  primary filer per item), so there is rarely a *pair* to connect. This is the 25% linking ceiling
+  surfacing as graph sparsity, and it re-sequences the track: **§4 coverage-lift (NER by-name linking)
+  is now the blocker for a viewable graph, not a parallel nicety — §2 API + §3 viz would render one
+  node today.** 660 backend tests green (+18 for the edge math); migration applied live (additive, 0-row).
 - **Three trade feeds a GDELT source census surfaced — Military Times, OilPrice, Blocks & Files**
   (2026-07-16, D145): the census (which of ~38 trade/academic outlets does GDELT actually index)
   was run to test whether a source-first GDELT-BigQuery adapter was worth building. It wasn't —

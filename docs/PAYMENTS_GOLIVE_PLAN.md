@@ -1,10 +1,22 @@
 # Payments go-live (C0) — plan
 
-**Status:** SCOPED 2026-07-16 (not started). Flip Lemon Squeezy from TEST/dark to live + trial
-mechanics. **Why it matters:** unblocks **B3** — the cold-cohort paid trial, the *only* clean read on
-whether strangers will pay $19.99/mo (warm-cohort enthusiasm can't answer that). It's also the first
-turn of the revenue→data flywheel: subscriptions fund paywalled sources → richer briefs/edges. See
-[PHASE_PLAN.md](PHASE_PLAN.md), the `payments-revenue-loop` memory, [PERSONAS.md](PERSONAS.md).
+**Status:** SCOPED 2026-07-16; **PARKED-WITH-TRIGGER 2026-07-16** (operator decision). The system is
+built + tested and degrades gracefully while dark, so there is nothing to lose by deferring the *setup*
+— and a decisive reason to: configuring Lemon Squeezy now bakes in **price + tier-boundary** decisions
+that B2 warm-cohort feedback is meant to inform, so we'd be configuring on worse information. B3 (the
+paid read) is gated on B2 anyway, so deferral costs ~zero on the timeline to first revenue.
+
+> **Trigger to un-park:** B2 feedback has converged on price + the free/Pro boundary → then run §1–§4
+> (LS dashboard → env wiring → test-mode e2e → trial mechanics) and flip live **a few days *before***
+> the first cold/marketing cohort — NOT on launch day. The go-live has silent-failure config modes
+> (variant ID, webhook URL reachability, signature-secret mismatch) and the trial `trialing→active` /
+> `trialing→expired` transitions need verifying; budget lead time so "parked" never collapses into
+> "scrambled at launch." The warm cohort (B2) needs none of this — it runs on comps (`grant_comp.py`).
+
+**Why it still matters (unchanged):** un-parked, this unblocks **B3** — the cold-cohort paid trial, the
+*only* clean read on whether strangers will pay $19.99/mo (warm-cohort enthusiasm can't answer that).
+It's also the first turn of the revenue→data flywheel: subscriptions fund paywalled sources → richer
+briefs/edges. See [PHASE_PLAN.md](PHASE_PLAN.md), the `payments-revenue-loop` memory, [PERSONAS.md](PERSONAS.md).
 
 ---
 
