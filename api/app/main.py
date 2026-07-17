@@ -8,7 +8,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.errors import install_exception_handlers
-from app.routers import auth, briefs, calendar, entities, health, webhooks
+from app.routers import auth, briefs, calendar, entities, graph, health, webhooks
 from app.settings import api_settings
 from engine.db import create_pool
 from engine.settings import settings
@@ -70,6 +70,7 @@ def create_app() -> FastAPI:
     app.include_router(auth.router, prefix="/v1")
     app.include_router(briefs.router, prefix="/v1")
     app.include_router(entities.router, prefix="/v1")
+    app.include_router(graph.router, prefix="/v1")
     app.include_router(calendar.router, prefix="/v1")
     app.include_router(webhooks.router, prefix="/v1")
     return app

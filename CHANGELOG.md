@@ -14,6 +14,15 @@ live ingestion runner, with Supabase auth and Lemon Squeezy subscriptions. Built
 
 ### Added
 
+- **Convergence graph §2 — `GET /v1/graph/convergence` serves a curated subgraph** (2026-07-17, D148):
+  the API layer the visualization (§3) will pull. Returns the top-weighted `CONVERGES_WITH` edges plus
+  the entity nodes they touch — a self-contained `{nodes, edges, meta}` payload — under optional filters
+  (`desk`, `days` window, `min_confidence`, `cross_desk_only`, `limit` capped at 500), strongest-first.
+  A graph view needs a legible slice, not all N² pairs, so top-N + filters are first-class. Nodes carry
+  the same desk-span convergence flag the entity chips use; edges carry weight/confidence/co_count/desks/
+  cross_desk/last_seen. Authed like the other entity surfaces (any tier). Verified against live data —
+  all filter combinations correct (desk membership via the jsonb `?` operator, confidence/time/limit).
+  +12 tests (686 green). Next: §3 the interactive viz.
 - **Convergence graph §4 — name-gazetteer linking breaks the 25% ceiling; graph goes 1 → 10 edges**
   (2026-07-17, D147): §1's live run exposed the real bottleneck — most items link ≤1 entity because the
   linker is identifier-only (EDGAR/USAspending carry a ticker/CIK/UEI; feeds/GDELT/arXiv, now the
