@@ -56,7 +56,9 @@ Gap to fill (which persona has zero?): ______________________________
 3. **Grant comp** (optional, for "Founding Reader" status):
    `python scripts/grant_comp.py --email them@example.com`
 4. **Let them use it a few days** — behavioral data (PostHog `desk_viewed`, `item_sources_opened`,
-   `wire_item_clicked`) accrues on its own. Note whether they came back unprompted.
+   `wire_item_clicked`, and for the graph `convergence_graph_viewed` / `convergence_node_clicked`)
+   accrues on its own. Note whether they came back unprompted, and whether they *clicked through* the
+   graph (used) vs merely opened it (admired) — see the demo flow in [TESTER_ONBOARDING.md](TESTER_ONBOARDING.md).
 5. **Interview, 15 min**, using that persona's probes from [PERSONAS.md](PERSONAS.md).
 6. **Score resemblance (0–3 per persona)** into the ranking worksheet in PERSONAS.md — that's the
    output that decides the Phase-C hero surface.

@@ -36,6 +36,7 @@ the codebase (`api/app/routers/briefs.py`).
 | Today's brief, all three desks — BLUF, items, citations, analysis, convergence | ✅ complete | ✅ |
 | The wire (overflow items) | ✅ | ✅ |
 | Entity pages, calendar | ✅ | ✅ |
+| **The convergence graph** (`/graph`, "Convergence" in the nav) — interactive cross-desk entity map | ✅ | ✅ |
 | Archive before today | ❌ `403 pro_required` | ✅ rolling 90 days |
 
 **A free signup sees the complete product as it exists that day.** Nothing is held back or teased.
@@ -63,6 +64,39 @@ lever for the warm cohort (B2).
 - **First-contact spam risk.** `hardpowerintel.com` began sending 2026-07-15. It's SPF/DKIM/DMARC
   clean and landed in Gmail's inbox on the first try, but a new domain has no reputation. If a
   tester reports nothing arrived, have them check spam before you debug anything.
+
+---
+
+## Running a demo session (feature the convergence graph)
+
+A ~15-minute flow that ends on the hero surface and produces **comparable, instrumented** signal across
+testers. Let them drive wherever possible — what they click *unprompted* is the read; what they do when
+steered is weaker. Each step names the PostHog event it should fire, so you can cross-check afterward
+(the events are declared in `web/lib/analytics.ts`).
+
+1. **Land on their home desk.** Let them read the BLUF and skim. → `desk_viewed`.
+2. **One item they choose.** Ask them to open something that actually interests them, and watch whether
+   they open the **sources**. → `item_sources_opened` — *the* load-bearing event: HPI's whole claim is
+   cited provenance, so a reader who never opens a source is telling you the moat is decoration to them.
+3. **Steer to `/graph`** (Convergence in the nav) — the cross-desk entity map. Let them explore: drag a
+   cluster, hover to isolate, then **click a node they recognize** → its Entity 360. → `convergence_graph_viewed`,
+   then `convergence_node_clicked`.
+4. **The tell.** Do they *click through* from a node into a company they cover, or just admire the shape?
+   A polished graph reliably earns "that's impressive"; a genuinely *useful* one earns a click into a
+   name they care about and a "wait, why are these two connected?" `convergence_node_clicked` (not the
+   view) is the signal.
+5. **Interview** using that persona's probes in [PERSONAS.md](PERSONAS.md).
+
+**Persona weighting:** for **P1 (thematic hedge-fund)** and **P3 (corp-dev)** the graph is the
+centerpiece — it's their aha surface (the recruiting worksheet maps both to "Convergence Map"). For
+**P5 (generalist)** the daily read is the product and the graph is "here's what's underneath"; don't
+read a shrug at the graph from a P5 as a failure of the graph.
+
+**Cross-check in PostHog after each session:** you should see `desk_viewed`, ideally
+`item_sources_opened` and `convergence_node_clicked`. A session with a `convergence_graph_viewed` but
+**zero** `convergence_node_clicked` is *admired, not used* — log it as such. (If you see **no** events at
+all after a real session, that's an ingestion problem to fix before the next tester, not a quiet reader —
+the key is confirmed live in the prod bundle, so the failure would be dashboard/project config.)
 
 ---
 
