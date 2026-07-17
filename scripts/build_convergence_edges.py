@@ -18,6 +18,7 @@ import sys
 sys.path.insert(0, "engine")
 
 from engine.db import create_pool
+from engine.entity.funding_builder import build_funding_edges
 from engine.entity.graph_builder import build_convergence_edges
 from engine.settings import settings
 
@@ -32,10 +33,15 @@ async def main() -> int:
                 weight_floor=settings.convergence_weight_floor,
                 cross_desk_boost=settings.convergence_cross_desk_boost,
             )
+            funding = await build_funding_edges(conn)
         print(
             f"convergence edges: {result['upserted']} live "
             f"({result['cross_desk']} cross-desk), {result['retired']} retired, "
             f"from {result['observations']} co-appearances"
+        )
+        print(
+            f"funding (AWARDED) edges: {funding['awarded_edges']} live across "
+            f"{funding['agencies']} agencies, {funding['retired']} retired"
         )
     finally:
         await pool.close()

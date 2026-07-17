@@ -26,7 +26,7 @@ class TestEdgePayload:
     def test_shapes_and_rounds(self):
         out = edge_payload(self._row())
         assert out == {
-            "from": "a", "to": "b", "confidence": 0.8651, "weight": 2.8934,
+            "from": "a", "to": "b", "type": "converges", "confidence": 0.8651, "weight": 2.8934,
             "co_count": 3, "desks": ["ai", "defense", "energy"], "cross_desk": True,
             "last_seen": "2026-07-16",
         }
@@ -44,18 +44,25 @@ class TestEdgePayload:
 
 class TestNodePayload:
     def test_public_multidesk_is_convergence(self):
-        out = node_payload({"id": "e1", "name": "Ramaco", "ticker": "METC",
+        out = node_payload({"id": "e1", "name": "Ramaco", "entity_type": "company", "ticker": "METC",
                             "desks": ["energy", "ai", "defense"]})
-        assert out == {"id": "e1", "name": "Ramaco", "ticker": "METC",
+        assert out == {"id": "e1", "name": "Ramaco", "kind": "company", "ticker": "METC",
                        "is_private": False, "desks": ["ai", "defense", "energy"], "convergence": True}
 
     def test_private_single_desk(self):
-        out = node_payload({"id": "e2", "name": "USA Rare Earth", "ticker": None, "desks": ["defense"]})
+        out = node_payload({"id": "e2", "name": "USA Rare Earth", "entity_type": "company",
+                            "ticker": None, "desks": ["defense"]})
         assert out["is_private"] is True
         assert out["convergence"] is False
 
+    def test_agency_kind(self):
+        out = node_payload({"id": "a1", "name": "Department of Defense", "entity_type": "gov_agency",
+                            "ticker": None, "desks": None})
+        assert out["kind"] == "agency"
+        assert out["convergence"] is False
+
     def test_no_desks(self):
-        out = node_payload({"id": "e3", "name": "X", "ticker": "X", "desks": None})
+        out = node_payload({"id": "e3", "name": "X", "entity_type": "company", "ticker": "X", "desks": None})
         assert out["desks"] == []
         assert out["convergence"] is False
 
@@ -68,14 +75,20 @@ class TestGraphPayload:
             {"from_id": "c", "to_id": "d", "confidence": 0.7, "weight": 2.0, "co_count": 2,
              "desks": ["energy"], "cross_desk": False, "last_seen": "2026-07-15"},
         ]
-        nodes = [{"id": n, "name": n, "ticker": None, "desks": ["energy"]} for n in "abcd"]
-        out = graph_payload(edges, nodes)
-        assert out["meta"] == {"node_count": 4, "edge_count": 2, "cross_desk_edges": 1}
-        assert len(out["nodes"]) == 4 and len(out["edges"]) == 2
+        funding = [{"from_id": "ag1", "to_id": "a", "total_usd": 1000.0, "award_count": 2, "agency": "DoD"}]
+        nodes = [
+            {"id": n, "name": n, "entity_type": "company", "ticker": None, "desks": ["energy"]}
+            for n in "abcd"
+        ] + [{"id": "ag1", "name": "DoD", "entity_type": "gov_agency", "ticker": None, "desks": None}]
+        out = graph_payload(edges, funding, nodes)
+        assert out["meta"] == {"node_count": 5, "edge_count": 3, "cross_desk_edges": 1, "funding_edges": 1}
+        assert out["edges"][2] == {
+            "from": "ag1", "to": "a", "type": "awarded", "amount_usd": 1000.0, "award_count": 2, "agency": "DoD",
+        }
 
     def test_empty(self):
-        out = graph_payload([], [])
-        assert out["meta"] == {"node_count": 0, "edge_count": 0, "cross_desk_edges": 0}
+        out = graph_payload([], [], [])
+        assert out["meta"] == {"node_count": 0, "edge_count": 0, "cross_desk_edges": 0, "funding_edges": 0}
 
 
 class TestCoappearancePayload:
@@ -138,14 +151,14 @@ def test_happy_path_returns_nodes_and_edges():
         "desks": '["ai", "defense", "energy"]', "cross_desk": True, "last_seen": "2026-07-16",
     }]
     node_rows = [
-        {"id": "a", "name": "Ramaco", "ticker": "METC", "desks": ["ai", "defense", "energy"]},
-        {"id": "b", "name": "USA Rare Earth", "ticker": None, "desks": ["defense", "ai"]},
+        {"id": "a", "name": "Ramaco", "entity_type": "company", "ticker": "METC", "desks": ["ai", "defense", "energy"]},
+        {"id": "b", "name": "USA Rare Earth", "entity_type": "company", "ticker": None, "desks": ["defense", "ai"]},
     ]
     _override(edge_rows, node_rows)
     resp = TestClient(app).get("/v1/graph/convergence?cross_desk_only=true&min_confidence=0.5")
     assert resp.status_code == 200
     body = resp.json()
-    assert body["meta"] == {"node_count": 2, "edge_count": 1, "cross_desk_edges": 1}
+    assert body["meta"] == {"node_count": 2, "edge_count": 1, "cross_desk_edges": 1, "funding_edges": 0}
     assert body["edges"][0]["desks"] == ["ai", "defense", "energy"]
     assert {n["name"] for n in body["nodes"]} == {"Ramaco", "USA Rare Earth"}
 

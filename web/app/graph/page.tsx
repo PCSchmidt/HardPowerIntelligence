@@ -10,7 +10,8 @@ export const metadata: Metadata = {
 };
 
 export default async function GraphPage() {
-  const { data } = await getConvergenceGraph({ limit: 200 });
+  // Fetch with the funding overlay included; the client toggles it on/off without a refetch.
+  const { data } = await getConvergenceGraph({ limit: 200, funding: true });
 
   return (
     <main className="mx-auto max-w-page px-4 py-8 sm:px-6 lg:px-8">

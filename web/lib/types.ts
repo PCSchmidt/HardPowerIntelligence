@@ -73,6 +73,7 @@ export interface EntitySummary {
 export interface GraphNode {
   id: string;
   name: string;
+  kind: "company" | "agency";
   ticker: string | null;
   is_private: boolean;
   desks: string[];
@@ -82,18 +83,24 @@ export interface GraphNode {
 export interface GraphEdge {
   from: string;
   to: string;
-  confidence: number;
-  weight: number;
-  co_count: number;
-  desks: string[];
-  cross_desk: boolean;
-  last_seen: string | null;
+  type: "converges" | "awarded";
+  // convergence (co-appearance) edges
+  confidence?: number;
+  weight?: number;
+  co_count?: number;
+  desks?: string[];
+  cross_desk?: boolean;
+  last_seen?: string | null;
+  // funding (AWARDED) edges
+  amount_usd?: number | null;
+  award_count?: number;
+  agency?: string;
 }
 
 export interface ConvergenceGraph {
   nodes: GraphNode[];
   edges: GraphEdge[];
-  meta: { node_count: number; edge_count: number; cross_desk_edges: number };
+  meta: { node_count: number; edge_count: number; cross_desk_edges: number; funding_edges: number };
 }
 
 // The shared stories behind an edge — GET /graph/co-appearances (the "why are these connected").

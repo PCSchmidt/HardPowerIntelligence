@@ -14,6 +14,21 @@ live ingestion runner, with Supabase auth and Lemon Squeezy subscriptions. Built
 
 ### Added
 
+- **Convergence graph §5 — federal-funding (AWARDED) semantic layer** (2026-07-17, D153): the first
+  *semantic* relationship beyond co-appearance, chosen honestly from what the structured data actually
+  carries. A data audit found the classic KG relations (SUPPLIES/COMPETES_WITH/FILES_AS) aren't in the
+  structured fields — EDGAR gives only the filer, and they'd need LLM text extraction — but USAspending
+  carries a rich, real relationship: **which agency funds which company**. So `funding_builder.py` mints
+  federal agencies as `gov_agency` nodes (a type the schema already allowed) and computes directed
+  **AWARDED** edges (agency → recipient, weighted by total obligated dollars) from `awarding_agency` →
+  `recipient_uei`. Live: **121 AWARDED edges across 12 agencies** — NASA→Boeing ($67B), Caltech ($9.4B/
+  14 awards), DoT→Raytheon, etc. Because federal contractors barely overlap the rare-earth convergence
+  cluster, funding is a **toggleable full overlay** (off by default — the convergence view stays clean):
+  `GET /graph/convergence?funding=true` returns the top-60 AWARDED edges by dollars plus their agency +
+  company nodes. The viz renders agencies as slate hub-chips (acronyms) and AWARDED edges as dashed,
+  dollar-scaled lines; hovering one shows the agency, total obligated, and award count. Nodes now carry
+  a `kind`, edges a `type`. LLM-extracted company↔company relations (TRANSACTED/SUPPLIES) remain a later,
+  separately-eval'd pass. +11 tests (700 backend / 82 web green); tsc + build clean.
 - **Convergence graph — visual redesign to the editorial brand standard** (2026-07-17, D151): the first
   cut rendered as a generic developer force-graph with off-brand ad-hoc colors (red/blue/purple) that
   clashed with the whole navy/gold editorial system — not something to put in front of a discerning
