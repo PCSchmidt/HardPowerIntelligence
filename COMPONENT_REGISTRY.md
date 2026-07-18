@@ -1076,6 +1076,22 @@ interface StatusDotProps {
 
 ---
 
+## 8. Graph (Convergence-graph §3/§5, D149–D153)
+
+### `ConvergenceGraph`
+
+| | |
+|-|-|
+| Path | `components/graph/convergence-graph.tsx` |
+| Type | Client |
+| Description | The interactive convergence graph hero surface at `/graph`. A dependency-free force-directed SVG graph (physics in `lib/graph-layout.ts`, unit-tested). Company nodes are colored by desk with **antique-gold convergence nodes** (span ≥2 desks); edges arc and gradient-blend their two endpoints' sector colors. Hovering a node shows a detail card; hovering a convergence edge fetches + shows the shared brief items behind it (`/api/graph/co-appearances`); clicking a node opens its Entity 360. A **Federal funding** toggle overlays the AWARDED subgraph — federal agencies as slate hub-chips and dashed, dollar-scaled AWARDED edges. Client-side filters: cross-desk only, min-confidence. Instrumented (`convergence_graph_viewed`, `convergence_node_clicked`). |
+| Data | Server-fetched via `getConvergenceGraph({ funding: true })` (page), `GET /graph/convergence`; edge evidence via the `app/api/graph/co-appearances` route handler → `GET /graph/co-appearances`. |
+| Supporting | `lib/graph-layout.ts` (pure force simulation), `lib/api/graph.ts`, `lib/types.ts` (`GraphNode`/`GraphEdge`/`ConvergenceGraph`). |
+
+Rendered by the `GET /graph` page (`app/graph/page.tsx`, Server; auth-gated via `proxy.ts`).
+
+---
+
 ## Component count summary
 
 | Category | Count |
@@ -1087,4 +1103,5 @@ interface StatusDotProps {
 | Auth | 5 |
 | Subscription | 5 |
 | Common | 8 |
-| **Total** | **47** |
+| Graph | 1 |
+| **Total** | **48** |

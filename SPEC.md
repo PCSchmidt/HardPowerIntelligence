@@ -124,6 +124,15 @@ awards, recent filings, insider transactions.
 Data sourced from the entity graph — no external API calls at render time.
 Available to Pro subscribers.
 
+## Web — Convergence Graph (D146–D153)
+
+Interactive force-directed graph of the entity relationships at `/graph` (auth-gated). Company nodes
+cluster by cross-desk co-appearance; gold **convergence nodes** span ≥2 desks; edges blend the two
+sectors they bridge. Hover a node for its detail, hover an edge for the cited stories behind the
+connection, click a node for its Entity 360. A **federal-funding overlay** toggles the `AWARDED`
+agency→company subgraph (from USAspending). Served by `GET /graph/convergence`; instrumented for
+engagement. See FRONTEND_SPEC.md (`/graph`) and API_SPEC.md (Graph).
+
 ## Web — Auth (Supabase)
 
 Email + password auth via Supabase Auth. OAuth via Google and GitHub (Cycle 1).

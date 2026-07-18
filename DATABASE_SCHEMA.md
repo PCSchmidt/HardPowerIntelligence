@@ -165,6 +165,18 @@ CREATE INDEX entity_edges_source_record
     ON entity_edges (source_raw_record_id);
 ```
 
+> **Amended by later migrations (Convergence-graph, D146–D153).** Migration
+> `20260716000002_entity_edges_converges_with.sql` adds a 16th edge_type, **`CONVERGES_WITH`**
+> (cross-desk co-appearance — the original 15 are all *semantic*, with no co-occurrence type), plus a
+> partial unique index `entity_edges_live_pair (from_entity_id, to_entity_id, edge_type) WHERE valid_to
+> IS NULL` so the edge-builders can upsert idempotently. **How rows are populated today:**
+> `CONVERGES_WITH` by `engine/entity/graph_builder.py` (recency-decayed cross-desk co-appearance from
+> `brief_items.entity_ids`, canonically ordered, `properties` = weight/co_count/desks/cross_desk);
+> **`AWARDED`** by `engine/entity/funding_builder.py` (agency → recipient from USAspending,
+> `properties` = total_usd/award_count/agency), which mints federal agencies as **`gov_agency`** entity
+> nodes. Both recompute in the daily `graph` job (`scripts/build_convergence_edges.py`) and are served
+> via `GET /graph/convergence`. Semantic company↔company edges (SUPPLIES/COMPETES_WITH…) remain unbuilt.
+
 ### `resolution_queue`
 
 Entity mentions that could not be resolved automatically (confidence below threshold).
@@ -370,6 +382,11 @@ CREATE INDEX normalized_records_embedding
 ---
 
 ## Group 3: Job Queue (procrastinate)
+
+> **Not used in production (as-built, 2026-07-17).** The procrastinate-on-`hpi-worker` design
+> (D004/D025/D026 below) was superseded: scheduling runs in **GitHub Actions** (`daily-brief.yml`
+> cron), and the `hpi-worker` Fly app — which only ever ran the IP-blocked GDELT pull — was retired.
+> These tables aren't created in the live DB. Kept for reference / a possible future durable-queue move.
 
 Procrastinate creates and manages its own schema via migrations. Do not create these
 tables manually — run `procrastinate schema --apply` during deployment.

@@ -4,8 +4,12 @@
 
 > **Discovery, not spec.** These are low-fidelity, throwaway schematics whose only job is to get
 > better feedback in the Phase-B conversations than an abstract description would. Committed design
-> spec for the chosen surface is deferred to Phase-C entry. **Do not build the hero surface before
-> the B decision gate.**
+> spec for the chosen surface is deferred to Phase-C entry.
+>
+> **Update 2026-07-17:** the "do not build before the B gate" caution was deliberately relaxed —
+> **Archetype A (Convergence Map) has since been built and deployed** at `/graph` (D146–D153; see
+> `CONVERGENCE_GRAPH_PLAN.md`). These plates remain the *validation* framing for whether A vs B vs C is
+> the right hero; the build being done doesn't answer that — behavior + the cold cohort do.
 
 ## Interactive mockups
 

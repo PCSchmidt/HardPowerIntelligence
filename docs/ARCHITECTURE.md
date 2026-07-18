@@ -80,6 +80,16 @@ this," and never silently overwrite history.
 `entity_edges`, `resolution_queue`). Apache AGE is an optional in-Supabase upgrade;
 a dedicated graph DB is deferred until traversal scale demands it.
 
+**The edge layer + Convergence Graph surface (D146–D153).** `entity_edges` is populated by two
+builders run in the daily `graph` job (`scripts/build_convergence_edges.py`): `graph_builder.py`
+computes **`CONVERGES_WITH`** cross-desk co-appearance edges from `brief_items.entity_ids`
+(recency-decayed, cross-desk-boosted, pruned), and `funding_builder.py` computes **`AWARDED`**
+agency→company edges from USAspending (minting federal agencies as `gov_agency` nodes). A name-gazetteer
+(`gazetteer.py`) lifts item→entity linking past the identifier-only ceiling so pairs actually form.
+These are served by `GET /graph/convergence` and rendered as the interactive **Convergence Graph** hero
+surface at `/graph` (the entity graph made visible; see FRONTEND_SPEC / COMPONENT_REGISTRY). Semantic
+company↔company edges (SUPPLIES/COMPETES_WITH) remain a later, LLM-extraction workstream.
+
 ---
 
 ## 4. The source scheduler
@@ -99,9 +109,11 @@ Cadence ranges from continuous (news 15–30 min, 8-K sweep) through daily (EDGA
 USAspending awards, EIA, FRED) to quarterly (13F). The same calendar that schedules
 fetches also powers the user-facing **catalyst calendar**.
 
-**Implementation (solo-dev pragmatic):** `hpi-worker` runs procrastinate with
-`@app.periodic` decorators for scheduling — no `pg_cron` required (D004/D025).
-Upgrade to Redis/Celery only if throughput demands it.
+**Implementation (as-built, 2026-07-17):** scheduling runs in **GitHub Actions**
+(`.github/workflows/daily-brief.yml`, 06:00 UTC cron: ingest → per-desk brief →
+convergence-graph rebuild → health), not a persistent worker. The procrastinate-on-Fly
+design (`hpi-worker`, D004/D025) was superseded — the worker only ever ran the IP-blocked
+GDELT pull and was retired. Upgrade to a durable queue only if throughput demands it.
 
 ---
 

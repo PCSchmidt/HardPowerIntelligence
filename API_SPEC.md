@@ -449,6 +449,66 @@ Returns the Entity 360 view for a canonical entity.
 
 ---
 
+### Graph
+
+The convergence graph (Convergence-graph §1–§5, D146–D153). Serves the `entity_edges` layer as a
+curated subgraph for the interactive `/graph` reader surface.
+
+#### `GET /graph/convergence`
+
+Returns the top-weighted `CONVERGES_WITH` co-appearance edges plus the entity nodes they touch — a
+self-contained `{nodes, edges, meta}` payload. Optionally overlays the AWARDED federal-funding subgraph.
+
+**Auth:** required  
+**Tier gating:** any tier
+
+**Query params:** `desk?` (defense|ai|energy), `days?` (int, recency window), `min_confidence?`
+(0–1, default 0), `cross_desk_only?` (bool), `funding?` (bool — overlay the top-60 AWARDED edges by
+dollars + their agency/company nodes), `limit?` (int, capped 500, default 100).
+
+**Response `200`:**
+```json
+{
+  "nodes": [
+    {"id": "uuid", "name": "USA Rare Earth, Inc.", "kind": "company",
+     "ticker": "USAR", "is_private": false, "desks": ["ai", "defense", "energy"], "convergence": true},
+    {"id": "uuid", "name": "Department of Defense", "kind": "agency",
+     "ticker": null, "is_private": true, "desks": [], "convergence": false}
+  ],
+  "edges": [
+    {"from": "uuid", "to": "uuid", "type": "converges", "confidence": 0.87, "weight": 2.9,
+     "co_count": 3, "desks": ["ai", "defense", "energy"], "cross_desk": true, "last_seen": "2026-07-16"},
+    {"from": "uuid", "to": "uuid", "type": "awarded", "amount_usd": 67313381822.0,
+     "award_count": 3, "agency": "National Aeronautics and Space Administration"}
+  ],
+  "meta": {"node_count": 12, "edge_count": 9, "cross_desk_edges": 8, "funding_edges": 0}
+}
+```
+
+**Errors:** `422 invalid_desk` when `desk` is not one of the three desks.
+
+#### `GET /graph/co-appearances`
+
+The published brief items where two entities both appear — the evidence behind a convergence edge
+("why are these two connected"). Powers the edge-hover card on the graph.
+
+**Auth:** required  
+**Tier gating:** any tier
+
+**Query params:** `a: UUID`, `b: UUID` (the two entity ids).
+
+**Response `200`:**
+```json
+{
+  "count": 3,
+  "items": [
+    {"desk": "ai", "date": "2026-07-09", "headline": "Solstice to Acquire Element Solutions in $14.5B Deal", "item_type": "filing"}
+  ]
+}
+```
+
+---
+
 ### Calendar
 
 #### `GET /calendar`
@@ -864,7 +924,9 @@ All secrets in environment variables; never hardcoded.
 
 ## Service boundary notes
 
-- `hpi-api` handles all HTTP: briefs, entities, calendar, auth relay, Lemon Squeezy webhooks, admin.
-- `hpi-worker` handles background processing: scheduler, ingestion adapters, brief generation. It does not expose HTTP endpoints (internal Fly.io network only for health).
+- `hpi-api` handles all HTTP: briefs, entities, calendar, graph, auth relay, Lemon Squeezy webhooks, admin.
+- **Background processing runs in GitHub Actions** (`daily-brief.yml`: ingest → per-desk brief →
+  convergence-graph rebuild → health), **not a Fly worker.** The `hpi-worker` Fly app (which only ever
+  ran the IP-blocked GDELT pull) was **retired 2026-07-17**; see `DEPLOYMENT_CONFIG.md`.
 - Next.js calls `hpi-api` for all data. It calls Supabase Auth JS client only for session management (token refresh, sign-in, sign-out).
 - Both services read/write Supabase Postgres **directly via `DATABASE_URL`** (asyncpg pool) as a trusted backend Postgres role — not through Supabase's PostgREST/Auth REST API. User-token verification uses `SUPABASE_JWT_SECRET` (HS256; JWKS path also supported). `SUPABASE_SERVICE_ROLE_KEY` is **not currently used by any service** (declared in settings, reserved for future Supabase Admin API calls, e.g. comp-grants); it is *not* on the request path. Row-level security remains on as defense-in-depth.

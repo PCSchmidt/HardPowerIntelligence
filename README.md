@@ -144,6 +144,14 @@ fixtures onto live data and became genuinely multi-desk:
   on a live brief (every link correct, zero false positives). Chips click through to **Entity 360**
   pages (`/entity/[id]` — identifiers, the desks an entity spans, recent appearances), and an entity
   seen on ≥2 desks is flagged as a **cross-desk convergence** signal — the moat, live end-to-end.
+- **Interactive Convergence Graph (live, D146–D153)** — the entity graph made visible at **`/graph`**:
+  an interactive, on-brand force-directed map where companies recurring together across desks cluster,
+  with gold **convergence nodes** (spanning ≥2 desks) and gradient edges that blend the two sectors they
+  bridge. Built as: cross-desk co-appearance edges (`CONVERGES_WITH`), a name-gazetteer that lifts
+  linking past the identifier-only ceiling, a filtered graph API, the interactive viz, edge-hover that
+  surfaces the **cited stories behind each connection**, and a toggleable **federal-funding overlay**
+  (`AWARDED` agency→company edges from USAspending — the first structured semantic layer). Behavior is
+  instrumented so demo reactions are never mistaken for demand.
 
 Remaining before public launch: Lemon Squeezy go-live (the checkout/webhook code is built;
 needs account creds + variant IDs in Vercel/Fly — config, not engineering), a live-validation

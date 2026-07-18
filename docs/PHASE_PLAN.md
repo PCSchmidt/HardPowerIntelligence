@@ -16,6 +16,15 @@ isn't defined, the entity graph doesn't surface in the UI, and no real target us
 rely on it unattended, does anyone want it, and does it look like a product worth paying for?"
 So this plan moves from *build* mode to *harden + validate* mode.
 
+> **Update 2026-07-17 (D146–D153):** the two clauses above about the entity graph are now out of
+> date — the **Convergence Graph (Archetype A / Phase-C C1) was built and deployed ahead of the
+> B-gate** and surfaces in the UI at `/graph`: cross-desk co-appearance edges, name-gazetteer coverage
+> lift, a graph API, the interactive hero viz, edge-evidence hover, and the AWARDED federal-funding
+> overlay. This was a deliberate "build the sizzle ahead of the gate" call (abundant build capacity;
+> the graph is instrumented so demo *reactions* are never mistaken for demand). The **validation
+> sequencing below is unchanged** — the B-gate still governs the *commercial* read, and the graph's
+> value is judged on behavior (`convergence_node_clicked`) + the cold cohort, not the build being done.
+
 ## Governing principles
 
 - **Gated.** Each phase has an entry gate, a measurable exit gate, and a kill/continue
@@ -137,9 +146,11 @@ list with evidence; baseline warm-cohort return rate + an initial cold-cohort fu
   → auto-revoke to free at day 30 without conversion → permanent "Founding Reader" comp for the
   warm cohort. Define Pro's boundary: **free = daily briefs + wire (as today); Pro = the
   differentiated surface + retention features.**
-- [ ] **C1 — Build ONE hero differentiator** (top-ranked surface from B — likely the convergence
+- [~] **C1 — Build ONE hero differentiator** (top-ranked surface from B — likely the convergence
   view). Minimum that's genuinely *wow + substance*, provenance-preserving, mobile-degrading.
-  The trial carrot. Resist building the whole viz suite.
+  The trial carrot. Resist building the whole viz suite. **Built ahead of the gate (D146–D153):** the
+  interactive Convergence Graph is live at `/graph` (see the 2026-07-17 update above). Whether it's the
+  *right* hero — vs. Capital & Catalyst or the Narrative Homepage — is still the B-validation question.
 - [ ] **C2 — Conversion instrumentation.** Trial→paid %, which surface converters used, where
   non-converters dropped.
 

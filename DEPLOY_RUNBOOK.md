@@ -178,9 +178,14 @@ Record the API base URL: **`https://hpi-api.fly.dev/v1`** (note the `/v1`; `/hea
 
 ### 2.5 Fly.io — deploy `hpi-worker` (GDELT)
 
-The always-on worker (D116) owns **GDELT** ingestion: a persistent IAD IP clears the HTTP 429 that
-the shared GitHub Actions IP hits. It ingests into the same DB on a 3h loop; CI runs every other
-source (`run_ingest.py --exclude gdelt`). New always-on machine — ~$2–4/mo.
+> **RETIRED 2026-07-17 — `hpi-worker` is gone; skip this section.** GDELT's DOC API IP-blocks Fly (not
+> just CI), so the worker never worked and GDELT is parked (see the `gdelt-ingestion-saga`). The app was
+> destroyed; **all ingestion now runs in GitHub Actions** (`daily-brief.yml`, `run_ingest.py` — no
+> `--exclude gdelt` needed since GDELT isn't fetched). The steps below are kept for history only.
+
+The always-on worker (D116) owned **GDELT** ingestion: a persistent IAD IP was meant to clear the HTTP
+429 that the shared GitHub Actions IP hits. It ingested into the same DB on a 3h loop; CI ran every
+other source (`run_ingest.py --exclude gdelt`). New always-on machine — ~$2–4/mo.
 
 ```bash
 fly apps create hpi-worker                        # if taken, update `app` in fly.worker.toml

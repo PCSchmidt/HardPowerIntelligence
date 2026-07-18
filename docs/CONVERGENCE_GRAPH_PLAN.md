@@ -1,10 +1,13 @@
 # Convergence Graph — build plan
 
-**Status:** **§1 + §4 + §2 + §3 ALL DONE (D146–D149)** — the full arc shipped: edge layer +
-name-gazetteer coverage lift + graph API + the interactive `/graph` hero surface, all built, tested
-(`tsc` + build clean), wired, migration applied live. Graph is **10 edges (9 cross-desk)** today and
-compounds as briefs accrue. **Remaining/optional:** §5 semantic edges (node-detail depth), entity
-dedup (the Northrop Corp-vs-Systems self-edge), and tuning the gazetteer stopword list. The Phase-C
+**Status:** **§1–§5 SHIPPED + DEPLOYED (D146–D153).** The full arc is live at `/graph`: §1 edge layer,
+§4 name-gazetteer coverage lift, §2 graph API, §3 interactive hero viz, plus the brand redesign (D151),
+edge-evidence hover — the cited stories behind a connection (D152), and **§5 the AWARDED federal-funding
+overlay** (D153: agencies as `gov_agency` nodes, 121 agency→company edges from USAspending, toggleable).
+The same-company self-edge artifact is suppressed (D150). Graph is **9 CONVERGES_WITH edges (8
+cross-desk)** + the funding overlay today, and compounds as briefs accrue. **Remaining/optional:**
+LLM-extracted company↔company semantic edges (SUPPLIES/TRANSACTED — a separately-eval'd pass), full
+entity-dedup, gazetteer stopword tuning, desk-anchored layout. The Phase-C
 Archetype-A hero surface
 (the interactive entity/theme graph) and its foundation. **Companion:** [PERSONAS.md](PERSONAS.md) (A
 serves P1/P3), `MOCKUPS.md` (B5), [PHASE_PLAN.md](PHASE_PLAN.md).

@@ -125,8 +125,8 @@ Appears on all pages. Client Component.
 
 **Desktop layout (lg+):**
 - Left: HPI logotype (wordmark + small shield/chevron mark)
-- Center: Desk tabs — `Defense` (active) | `Energy` (grayed, "Coming soon" tooltip) | `AI Infrastructure` (grayed, "Coming soon")
-- Right: `EntitySearch` icon button → command palette | `UserMenu` (avatar + dropdown)
+- Center: Desk tabs — `Defense` | `Energy` | `AI Infrastructure` (all three live) | `Convergence` → `/graph`
+- Right: `UserMenu` (avatar + dropdown)
 
 **UserMenu dropdown contents:**
 - User email (truncated)
@@ -273,6 +273,33 @@ Appears on all pages. Client Component.
 **Empty tab state:** "No [awards/filings/...] on record yet." with `EmptyState` component.
 
 **SEO:** `robots: noindex`. `title`: "[Canonical Name] — Entity 360 — Hard Power Intelligence"
+
+---
+
+### `GET /graph` — Convergence Graph (Convergence-graph §3/§5, D149–D153)
+
+**Auth:** Required (any tier)
+**Render:** Server Component (fetch) + `ConvergenceGraph` Client Component (interactive SVG)
+**FastAPI calls:** `GET /graph/convergence?funding=true` (page); edge evidence via the
+`app/api/graph/co-appearances` route handler → `GET /graph/co-appearances` (on edge hover).
+
+**Layout:** Full-width single column — header (title in `text-display` Playfair, one-line explainer),
+toolbar, canvas, legend.
+
+**The graph (`ConvergenceGraph`):**
+- Dependency-free force-directed SVG (physics in `lib/graph-layout.ts`); on-brand palette — desk-colored
+  company nodes (navy Defense / violet AI / green Energy), **antique-gold convergence nodes** (span ≥2
+  desks); edges arc and gradient-blend their endpoints' sector colors.
+- **Interactions:** drag to rearrange; hover a node → detail card (ticker chip, desk pills); hover a
+  convergence edge → the shared brief items behind it (fetched, cached); click a node → its Entity 360.
+- **Federal funding toggle** — overlays the AWARDED subgraph: federal agencies as slate hub-chips,
+  dashed dollar-scaled AWARDED edges; hover shows agency + total obligated + award count.
+- **Filters:** cross-desk only, min-confidence slider.
+- **Instrumentation:** `convergence_graph_viewed`, `convergence_node_clicked`.
+
+**Empty state:** "No convergence links yet…" when the graph has no edges.
+
+**SEO:** `robots: noindex`. `title`: "Convergence Graph — Hard Power Intelligence"
 
 ---
 
