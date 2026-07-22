@@ -1,0 +1,206 @@
+[
+  {
+    "id": "data-ingestion-usaspending-adapter",
+    "name": "Data Ingestion — USAspending Adapter",
+    "source_section": "Data Ingestion — USAspending Adapter",
+    "lifecycle": {
+      "happy_path": false,
+      "integration": false,
+      "edge_cases": false,
+      "error_handling": false,
+      "hardening": false
+    }
+  },
+  {
+    "id": "data-ingestion-samgov-adapter",
+    "name": "Data Ingestion — SAM.gov Adapter",
+    "source_section": "Data Ingestion — SAM.gov Adapter",
+    "lifecycle": {
+      "happy_path": false,
+      "integration": false,
+      "edge_cases": false,
+      "error_handling": false,
+      "hardening": false
+    }
+  },
+  {
+    "id": "data-ingestion-dod-daily-contracts-adapter",
+    "name": "Data Ingestion — DoD Daily Contracts Adapter",
+    "source_section": "Data Ingestion — DoD Daily Contracts Adapter",
+    "lifecycle": {
+      "happy_path": false,
+      "integration": false,
+      "edge_cases": false,
+      "error_handling": false,
+      "hardening": false
+    }
+  },
+  {
+    "id": "data-ingestion-edgar-adapter",
+    "name": "Data Ingestion — EDGAR Adapter",
+    "source_section": "Data Ingestion — EDGAR Adapter",
+    "lifecycle": {
+      "happy_path": false,
+      "integration": false,
+      "edge_cases": false,
+      "error_handling": false,
+      "hardening": false
+    }
+  },
+  {
+    "id": "data-ingestion-scheduler",
+    "name": "Data Ingestion — Scheduler",
+    "source_section": "Data Ingestion — Scheduler",
+    "lifecycle": {
+      "happy_path": false,
+      "integration": false,
+      "edge_cases": false,
+      "error_handling": false,
+      "hardening": false
+    }
+  },
+  {
+    "id": "entity-resolution-crosswalk-spine",
+    "name": "Entity Resolution — Crosswalk Spine",
+    "source_section": "Entity Resolution — Crosswalk Spine",
+    "lifecycle": {
+      "happy_path": false,
+      "integration": false,
+      "edge_cases": false,
+      "error_handling": false,
+      "hardening": false
+    }
+  },
+  {
+    "id": "entity-resolution-mention-disambiguation",
+    "name": "Entity Resolution — Mention Disambiguation",
+    "source_section": "Entity Resolution — Mention Disambiguation",
+    "lifecycle": {
+      "happy_path": false,
+      "integration": false,
+      "edge_cases": false,
+      "error_handling": false,
+      "hardening": false
+    }
+  },
+  {
+    "id": "brief-generation-change-detection",
+    "name": "Brief Generation — Change Detection",
+    "source_section": "Brief Generation — Change Detection",
+    "lifecycle": {
+      "happy_path": false,
+      "integration": false,
+      "edge_cases": false,
+      "error_handling": false,
+      "hardening": false
+    }
+  },
+  {
+    "id": "brief-generation-rag-synthesis",
+    "name": "Brief Generation — RAG Synthesis",
+    "source_section": "Brief Generation — RAG Synthesis",
+    "lifecycle": {
+      "happy_path": false,
+      "integration": false,
+      "edge_cases": false,
+      "error_handling": false,
+      "hardening": false
+    }
+  },
+  {
+    "id": "brief-generation-citation-eval-gate",
+    "name": "Brief Generation — Citation Eval Gate",
+    "source_section": "Brief Generation — Citation Eval Gate",
+    "lifecycle": {
+      "happy_path": false,
+      "integration": false,
+      "edge_cases": false,
+      "error_handling": false,
+      "hardening": false
+    }
+  },
+  {
+    "id": "brief-delivery-web-cards-and-pdf",
+    "name": "Brief Delivery — Web Cards and PDF",
+    "source_section": "Brief Delivery — Web Cards and PDF",
+    "lifecycle": {
+      "happy_path": false,
+      "integration": false,
+      "edge_cases": false,
+      "error_handling": false,
+      "hardening": false
+    }
+  },
+  {
+    "id": "web-defense-desk-reader",
+    "name": "Web — Defense Desk Reader",
+    "source_section": "Web — Defense Desk Reader",
+    "lifecycle": {
+      "happy_path": false,
+      "integration": false,
+      "edge_cases": false,
+      "error_handling": false,
+      "hardening": false
+    }
+  },
+  {
+    "id": "web-entity-360-page",
+    "name": "Web — Entity 360 Page",
+    "source_section": "Web — Entity 360 Page",
+    "lifecycle": {
+      "happy_path": false,
+      "integration": false,
+      "edge_cases": false,
+      "error_handling": false,
+      "hardening": false
+    }
+  },
+  {
+    "id": "web-convergence-graph-d146d153",
+    "name": "Web — Convergence Graph (D146–D153)",
+    "source_section": "Web — Convergence Graph (D146–D153)",
+    "lifecycle": {
+      "happy_path": false,
+      "integration": false,
+      "edge_cases": false,
+      "error_handling": false,
+      "hardening": false
+    }
+  },
+  {
+    "id": "web-auth-supabase",
+    "name": "Web — Auth (Supabase)",
+    "source_section": "Web — Auth (Supabase)",
+    "lifecycle": {
+      "happy_path": false,
+      "integration": false,
+      "edge_cases": false,
+      "error_handling": false,
+      "hardening": false
+    }
+  },
+  {
+    "id": "web-lemon-squeezy-subscriptions",
+    "name": "Web — Lemon Squeezy Subscriptions",
+    "source_section": "Web — Lemon Squeezy Subscriptions",
+    "lifecycle": {
+      "happy_path": false,
+      "integration": false,
+      "edge_cases": false,
+      "error_handling": false,
+      "hardening": false
+    }
+  },
+  {
+    "id": "web-marketing-and-seo",
+    "name": "Web — Marketing and SEO",
+    "source_section": "Web — Marketing and SEO",
+    "lifecycle": {
+      "happy_path": false,
+      "integration": false,
+      "edge_cases": false,
+      "error_handling": false,
+      "hardening": false
+    }
+  }
+]

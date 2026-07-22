@@ -113,3 +113,29 @@ gate; a brief publishes when it has at least one honest, non-fabricated item; th
 line is **no fabrication** (an item with no source-supported content is excluded). This is
 a Cycle-2 scope/quality-bar change and is recorded here rather than rewriting the Cycle-1
 acceptance criteria, which stand as the historical record of what Cycle 1 was held to.
+
+---
+
+## Addendum B — scope expanded beyond Cycle 1 plan (2026-07-21)
+
+Three decisions made during the build changed the delivered scope materially. They are recorded
+in DECISIONS.md and summarized here as an addendum rather than rewriting the Cycle-1 scope
+sections above, which stand as the historical record.
+
+**1. All three desks launched in Cycle 1 (D060)**
+The original plan said "Defense desk, Cycle 1; Energy and AI-Infrastructure, Cycle 2." During
+the build, the convergence thesis (D060) reordered priorities: the moat requires >=2 desks of
+live data, so breadth beat Defense depth. Defense, AI, and Energy desks all launched together,
+served by the same reader components at `/desk/defense`, `/desk/ai`, and `/desk/energy`.
+The "Energy and AI-Infrastructure desks - Cycle 2" out-of-scope line above is superseded.
+
+**2. Convergence graph added as a first-class product surface (D146-D153)**
+An interactive force-directed graph at `/graph` visualizes cross-desk entity co-appearances
+(CONVERGES_WITH edges) and federal-funding relationships (AWARDED edges from USAspending).
+Gold nodes span >=2 desks -- the convergence signal made visible. Served by
+`GET /v1/graph/convergence`; auth-gated; instrumented for engagement.
+
+**3. Worker retired; ingestion moved to GitHub Actions (post-deploy)**
+The `hpi-worker` Fly.io service was retired after GDELT's DOC-API proved IP-blocked from Fly.
+All ingestion now runs in `.github/workflows/daily-brief.yml` (ingest -> per-desk brief ->
+convergence-graph rebuild -> health check). `worker/` code remains in-repo but is not deployed.
