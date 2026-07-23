@@ -2,6 +2,34 @@
 
 **Markets intelligence on the AI, defense, and energy build-out.**
 
+> **🌐 Live now at [hardpowerintel.com](https://hardpowerintel.com/)**
+>
+> The site is up and running, and today's briefings are **free to read right now** — no account required to see them. Paid subscriptions are on the way, but the checkout isn't wired to a payment processor yet, so for the moment everything on the site is open. If you're an investor, analyst, or just curious, go read a live brief and come back.
+
+---
+
+## The short version (start here)
+
+Imagine hiring a sharp research analyst whose entire job is to read the boring-but-important stuff — thousands of pages of government contracts, corporate filings, regulatory notices, and industry news — every single day, across three industries: **artificial intelligence, defense, and energy.** Instead of handing you a pile of raw documents, this analyst hands you a single short briefing that leads with the point, tells you which companies each development actually affects, and shows you exactly where every fact came from so you can check the work yourself.
+
+That analyst is what Hard Power Intelligence automates.
+
+Most people who follow these markets don't have too little information — they have far too much of it, scattered across dozens of government websites and news feeds, written in dense bureaucratic language, and disconnected from what it means for the companies and stocks involved. A defense contract award, an energy regulator's licensing decision, a chipmaker's filing — each is public, but reading them all, connecting them, and figuring out what changed and why it matters is a full-time job. HPI does that work on a schedule and delivers the result as a clean briefing.
+
+Three ideas make it trustworthy rather than just another news summarizer:
+
+- **It leads with the bottom line.** Each briefing is written "BLUF" — *Bottom Line Up Front*, a style borrowed from military and intelligence reporting. You get the conclusion first, then the supporting detail, so you're not hunting for the point.
+- **It shows its sources.** Every item links back to the original document — the actual contract, filing, or regulatory notice — so nothing has to be taken on faith. You can always click through and verify it yourself.
+- **It labels how sure it is.** Every item is graded by confidence: a *confirmed* fact from a primary record looks different from *reported* news, which looks different from *HPI's own analysis* or *speculation*. You always know whether you're reading a hard fact or an interpretation.
+
+The name is a play on three kinds of *power*: **hard power** (defense), **electrical power** (energy), and **compute power** (AI) — the three forces this product tracks, and increasingly the three forces that overlap. A single company can sit at the intersection of all three, and spotting those overlaps is where HPI aims to be most valuable.
+
+HPI is a research and reporting tool, **not investment advice and not a stock-picker.** It tells you what happened and why it might matter; what you do with that is up to you.
+
+---
+
+## The detailed version
+
 Hard Power Intelligence (HPI) turns scattered public data — SEC filings, federal
 contract awards, energy and macro releases, regulatory actions, and news — into
 **source-attributed, confidence-graded BLUF intelligence briefings** for investors tracking the
