@@ -14,6 +14,20 @@ live ingestion runner, with Supabase auth and Lemon Squeezy subscriptions. Built
 
 ### Added
 
+- **Billing-aware health alerting + credit-runway check** (2026-07-25, D156): the D155 companion —
+  the failure was *findable*, but the 7/24 dark surfaced only as a generic `no_brief_published`
+  CRITICAL and was noticed via stale reader briefs two days later. `run_health` now probes the
+  OpenRouter remaining balance (`ops/provider_balance.py`, GET /api/v1/credits) and reads it
+  **together with the publish outcome**: dry + nothing published → `billing_exhausted` (critical,
+  names the cause); dry + briefs published → `running_on_backstop` (warn — the Fireworks backstop
+  served; refill the primary); low-but-not-dry → `credit_runway_low` (warn, early). Fireworks needs
+  no separate probe — its health is observable through those outcomes. On any act-now billing
+  condition (or a critical verdict), a **Resend push** (`ops/notify.py`) pages immediately instead of
+  relying on the daily manual glance; best-effort — an empty `RESEND_API_KEY`/`ALERT_EMAIL_TO` skips
+  the push, GitHub's failure email still fires. Live-verified: the balance probe reads the real
+  OpenRouter balance ($16.99, verdict OK). +23 unit tests (`test_provider_balance.py`, `test_notify.py`,
+  `test_health_credit_runway.py`); thresholds env-tunable (`credit_low_usd`/`credit_exhausted_usd`).
+  Closes both follow-ups flagged in D155.
 - **Cross-provider LLM last-resort — no single billing account can dark the site** (2026-07-25, D155):
   On 2026-07-24 the daily brief went dark for two days. Root cause was **not** a code regression:
   the OpenRouter account ran out of credits, so every model in the waterfall — synthesis, eval,

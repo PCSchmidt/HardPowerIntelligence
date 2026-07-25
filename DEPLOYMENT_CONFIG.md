@@ -102,6 +102,7 @@ Legend: 🔒 secret (never commit) · 🌐 public (safe in client bundle).
 | `DATABASE_URL` | 🔒 | Same Supabase connection |
 | `OPENROUTER_API_KEY` / `OPENAI_API_KEY` | 🔒 | LLM waterfall + embeddings during ingestion/synthesis |
 | `FIREWORKS_API_KEY` | 🔒 | Cross-provider LLM last-resort (separate billing from OpenRouter, D155) |
+| `RESEND_API_KEY` / `ALERT_EMAIL_TO` | 🔒 | Optional — billing/critical health push (D156); unset = no push, GitHub email still fires |
 | `SAM_GOV_API_KEY` | 🔒 | SAM.gov opportunities adapter |
 
 ---

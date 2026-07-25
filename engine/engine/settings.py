@@ -64,6 +64,19 @@ class Settings(BaseSettings):
     llm_daily_budget_usd: float = 5.0
     llm_monthly_budget_usd: float = 50.0
 
+    # Credit-runway + billing alerting (D156). The 2026-07-24 dark was OpenRouter running out of
+    # credits with no warning; run_health probes the remaining balance to warn BEFORE the primary
+    # lane runs dry and to diagnose a 0-brief day as billing exhaustion. Thresholds are absolute
+    # USD (robust — no noisy burn-rate estimate): below `low` warns, below `exhausted` is dry.
+    credit_low_usd: float = 5.0
+    credit_exhausted_usd: float = 0.50
+    # Resend push alert for act-now health conditions (billing exhaustion / running-on-backstop),
+    # so degradation is caught in minutes, not via stale reader briefs days later. Best-effort:
+    # an empty key/recipient simply skips the push (GitHub's failure email still fires).
+    resend_api_key: str = ""
+    alert_email_to: str = ""
+    alert_email_from: str = "HPI Health <health@hardpowerintel.com>"
+
     # OpenAI (embeddings)
     openai_api_key: str = ""
     embedding_model: str = "text-embedding-3-small"

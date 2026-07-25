@@ -24,6 +24,8 @@ sys.path.insert(0, "engine")
 
 from engine.db import create_pool
 from engine.ops.health import HealthReport, HealthThresholds, evaluate_health
+from engine.ops.notify import alert_payload, send_resend_alert
+from engine.ops.provider_balance import fetch_openrouter_balance
 from engine.settings import settings
 
 _ICON = {"critical": "[CRITICAL]", "warn": "[WARN]", "notice": "[notice]", "info": "[info]"}
@@ -115,11 +117,27 @@ async def main(day: date) -> int:
         briefs, runs, sources = await _gather(pool, day)
     finally:
         await pool.close()
+    # Credit-runway probe (D156) — best-effort; a probe failure surfaces as a finding, never a crash.
+    balance = await fetch_openrouter_balance(settings.openrouter_api_key)
     report = evaluate_health(
         briefs=briefs, ingest_runs=runs, sources=sources, now=datetime.now(timezone.utc),
-        thresholds=HealthThresholds(run_token_budget=settings.llm_run_token_budget),
+        thresholds=HealthThresholds(
+            run_token_budget=settings.llm_run_token_budget,
+            credit_low_usd=settings.credit_low_usd,
+            credit_exhausted_usd=settings.credit_exhausted_usd,
+        ),
+        provider_balances=[balance.as_dict()],
     )
     _emit(report, day)
+    # Push an out-of-band alert for act-now conditions (billing / critical) so degradation is caught
+    # in minutes, not via stale reader briefs days later (D156). Best-effort — never blocks the exit.
+    payload = alert_payload(report, day)
+    if payload:
+        sent = await send_resend_alert(
+            *payload, api_key=settings.resend_api_key,
+            to=settings.alert_email_to, sender=settings.alert_email_from,
+        )
+        print(f"[alert] push {'sent' if sent else 'skipped/failed'} (resend)")
     return report.exit_code
 
 

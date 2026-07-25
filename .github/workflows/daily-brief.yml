@@ -221,4 +221,10 @@ jobs:
       - name: Evaluate run health
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          # Credit-runway probe + billing alert (D156). OPENROUTER_API_KEY reads the remaining
+          # balance; RESEND_API_KEY + ALERT_EMAIL_TO push an act-now alert (both optional — the
+          # push degrades to a no-op when unset, GitHub's failure email still fires).
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          ALERT_EMAIL_TO: ${{ secrets.ALERT_EMAIL_TO }}
         run: uv run python scripts/run_health.py

@@ -296,6 +296,8 @@ gh secret set DATABASE_URL --body '<cloud DATABASE_URL>'
 gh secret set OPENROUTER_API_KEY --body '<...>'
 gh secret set OPENAI_API_KEY --body '<...>'
 gh secret set FIREWORKS_API_KEY --body '<fw_...>'   # cross-provider last-resort (D155)
+gh secret set RESEND_API_KEY --body '<re_...>'      # optional — billing/critical health push (D156)
+gh secret set ALERT_EMAIL_TO --body '<you@…>'       # optional — recipient for the health push
 ```
 **Verify (manual run):**
 ```bash

@@ -52,6 +52,8 @@ class HealthThresholds:
     min_faithfulness: float = 0.98   # a published brief below the eval bar is a data smell
     source_stale_hours: int = 30     # an active source that once fetched but hasn't within this window
     run_token_budget: int = 0        # total completion tokens across desks above which cost warns (0=off)
+    credit_low_usd: float = 5.0      # provider balance below which runway warns (refill soon)
+    credit_exhausted_usd: float = 0.50  # balance below which the lane is effectively dry (D156)
 
 
 @dataclass(frozen=True)
@@ -87,6 +89,7 @@ def evaluate_health(
     now: datetime,
     expected_desks: tuple[str, ...] = _EXPECTED_DESKS,
     thresholds: HealthThresholds | None = None,
+    provider_balances: list[dict] | None = None,
 ) -> HealthReport:
     """Evaluate one day's run telemetry into a verdict. Pure — no I/O.
 
@@ -173,6 +176,43 @@ def evaluate_health(
                 f"{desk}: brief stuck 'pending' (generation didn't complete).",
             ))
 
+    # ── Credit runway (D156) — probed by run_health, evaluated here (pure) ───────────
+    # The 2026-07-24 dark was OpenRouter running dry with no warning. A balance below the floor is
+    # read together with the publish outcome: dry + nothing published = both providers failed
+    # (billing_exhausted, critical); dry + published = the cross-provider backstop served, so the
+    # site is up but on the pricier lane (running_on_backstop, warn — refill the primary). Low but
+    # not dry warns early. Each `pb`: {provider, reachable, remaining_usd, detail}.
+    for pb in provider_balances or []:
+        prov = pb.get("provider", "?")
+        if not pb.get("reachable", True):
+            findings.append(Finding(
+                "warn", "balance_check_failed",
+                f"{prov}: credit-balance check failed ({pb.get('detail', '')}) — runway unknown.",
+            ))
+            continue
+        remaining = pb.get("remaining_usd")
+        if remaining is None:
+            continue
+        if remaining < t.credit_exhausted_usd:
+            if not published:
+                findings.append(Finding(
+                    "critical", "billing_exhausted",
+                    f"{prov} credits exhausted (${remaining:.2f}) and no desk published — the LLM "
+                    f"waterfall is dark; the cross-provider backstop also failed. Refill {prov} now.",
+                ))
+            else:
+                findings.append(Finding(
+                    "warn", "running_on_backstop",
+                    f"{prov} credits exhausted (${remaining:.2f}) but briefs still published — running "
+                    f"on the cross-provider last-resort. Refill {prov} to restore the cheap primary lane.",
+                ))
+        elif remaining < t.credit_low_usd:
+            findings.append(Finding(
+                "warn", "credit_runway_low",
+                f"{prov} credits low: ${remaining:.2f} remaining (< ${t.credit_low_usd:.2f}) — "
+                f"refill soon to avoid a dark day.",
+            ))
+
     # ── Ingest-source health (the workflow never surfaces this) ──────────────────────
     # These are "notice" not "warn" (D132): a single source 500ing / timing out / going stale is
     # routine upstream flakiness that shouldn't fail an otherwise-healthy run. If it actually
@@ -235,6 +275,12 @@ def evaluate_health(
     digest.append("ingest: " + (", ".join(vol_items) if vol_items else "no new records"))
     if total_tokens:
         digest.append(f"LLM: {total_calls} calls, {total_tokens:,} tokens (~${total_cost:.2f} approx)")
+    for pb in provider_balances or []:
+        remaining = pb.get("remaining_usd")
+        if remaining is not None:
+            digest.append(f"{pb.get('provider')} credits: ${remaining:.2f} remaining")
+        elif not pb.get("reachable", True):
+            digest.append(f"{pb.get('provider')} credits: check failed ({pb.get('detail', '')})")
 
     verdict = (
         "critical" if any(f.level == "critical" for f in findings)
