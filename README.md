@@ -109,7 +109,7 @@ See [docs/PHILOSOPHY.md](docs/PHILOSOPHY.md) for the full thesis.
 | Backend | FastAPI |
 | Data / auth | Supabase (Postgres + pgvector) |
 | Intelligence engine | source adapters → scheduler → entity-resolution graph → RAG synthesis → eval gate |
-| LLM | OpenRouter (DeepSeek V4 Flash/Pro, Qwen3.7 Max) + Anthropic SDK (last-resort fallback) — ~$0.09/brief |
+| LLM | OpenRouter (DeepSeek V4 Flash/Pro, Qwen3.7 Max) + Fireworks cross-provider last-resort — ~$0.09/brief |
 | Payments | Lemon Squeezy — Merchant of Record (web-first reader model) |
 
 **Pipeline shape:** a per-source scheduler fetches each source at its own cadence →

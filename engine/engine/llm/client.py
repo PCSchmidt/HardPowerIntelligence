@@ -37,8 +37,44 @@ if settings.openrouter_api_key:
     os.environ.setdefault("OPENROUTER_API_KEY", settings.openrouter_api_key)
 if settings.anthropic_api_key:
     os.environ.setdefault("ANTHROPIC_API_KEY", settings.anthropic_api_key)
+if settings.fireworks_api_key:
+    # litellm's fireworks_ai provider reads FIREWORKS_AI_API_KEY; set the vendor's own
+    # FIREWORKS_API_KEY too so either lookup path resolves the cross-provider fallback lane.
+    os.environ.setdefault("FIREWORKS_AI_API_KEY", settings.fireworks_api_key)
+    os.environ.setdefault("FIREWORKS_API_KEY", settings.fireworks_api_key)
 
 _FENCE_RE = re.compile(r"```(?:json)?\s*([\s\S]*?)\s*```")
+
+# Auth/credit failures — 401 (unauthorized), 402 (payment-required), 403 (key-limit/forbidden)
+# — are PERMANENT for this provider within a run, not a transient blip. Retrying with backoff
+# can't clear them: it only burns wall-clock (a credit-exhausted run retried the billing wall
+# for 6+ minutes on 2026-07-24) and, if any credit remains, spends more of it. Treat them as
+# terminal so control returns immediately to the next fallback / provider instead of looping.
+_TERMINAL_STATUS = {401, 402, 403}
+
+
+def _is_terminal_provider_error(exc: Exception) -> bool:
+    code = getattr(exc, "status_code", None)
+    try:
+        return int(code) in _TERMINAL_STATUS
+    except (TypeError, ValueError):
+        return False
+
+
+def resolve_fallbacks(primary: list[str] | None) -> list[str] | None:
+    """Append the cross-provider last-resort to a call's fallback chain (deduped, None-safe).
+
+    The primary tiers are all OpenRouter, which share one billing balance — so an OpenRouter
+    credit/auth outage 403s every tier at once (the 2026-07-24 dark). The last-resort is a
+    separate billing account (``settings.llm_model_fallback_last_resort`` → Fireworks) that
+    fires only once the OpenRouter tiers are exhausted, converting a site-dark into a
+    slightly-pricier brief. Kept out of the primary tiers on purpose: it should be the escape
+    hatch, not a routine hop."""
+    chain = [m for m in (primary or []) if m]
+    last_resort = settings.llm_model_fallback_last_resort
+    if last_resort and last_resort not in chain:
+        chain.append(last_resort)
+    return chain or None
 
 
 class LLMError(Exception):
@@ -112,7 +148,9 @@ class LLMClient:
                 return await litellm.acompletion(**kwargs)
             except _RETRYABLE_ERRORS as exc:
                 last_exc = exc
-                if attempt >= settings.llm_max_retries:
+                # A billing/auth failure is terminal for this provider — don't spend the
+                # backoff budget re-hitting a wall only a fallback provider can clear.
+                if _is_terminal_provider_error(exc) or attempt >= settings.llm_max_retries:
                     break
                 delay = min(
                     settings.llm_backoff_base_seconds * (2 ** attempt),

@@ -908,8 +908,9 @@ All secrets in environment variables; never hardcoded.
 | `LEMONSQUEEZY_API_KEY` | Lemon Squeezy API key (checkout + portal URL generation) |
 | `LEMONSQUEEZY_STORE_ID` | Lemon Squeezy store ID |
 | `LEMONSQUEEZY_WEBHOOK_SECRET` | Lemon Squeezy webhook HMAC signing secret |
-| `OPENROUTER_API_KEY` | OpenRouter API key (all non-Anthropic models) |
-| `ANTHROPIC_API_KEY` | Direct Anthropic SDK key (last-resort fallback) |
+| `OPENROUTER_API_KEY` | OpenRouter API key (primary waterfall tiers) |
+| `FIREWORKS_API_KEY` | Fireworks key — cross-provider last-resort (separate billing from OpenRouter, D155) |
+| `ANTHROPIC_API_KEY` | Anthropic SDK key — retained but no longer the last-resort (superseded by Fireworks, D155) |
 | `SENTRY_DSN` | Sentry error reporting |
 | `LLM_MODEL_EXTRACTION` | `openrouter/deepseek/deepseek-v4-flash` |
 | `LLM_MODEL_DISAMBIGUATION` | `openrouter/deepseek/deepseek-v4-flash` |

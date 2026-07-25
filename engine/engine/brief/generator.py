@@ -22,7 +22,7 @@ from engine.db import transient_retry
 from engine.entity.gazetteer import load_alias_index
 from engine.entity.linker import resolve_item_entities
 from engine.eval.citation_eval import extract_citation_indices, strip_uncited_sentences
-from engine.llm.client import llm_client, parse_json
+from engine.llm.client import llm_client, parse_json, resolve_fallbacks
 from engine.settings import settings
 
 log = structlog.get_logger()
@@ -579,7 +579,7 @@ async def generate_brief(desk: str, pool: asyncpg.Pool) -> GeneratedBrief:
         model=synthesis_model,
         messages=messages,
         json_mode=True,
-        fallbacks=[settings.llm_model_synthesis_fallback],
+        fallbacks=resolve_fallbacks([settings.llm_model_synthesis_fallback]),
         temperature=settings.llm_temperature,
     )
 

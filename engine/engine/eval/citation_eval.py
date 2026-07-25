@@ -4,7 +4,7 @@ from dataclasses import dataclass
 import structlog
 
 from engine.brief.rag import PassageContext
-from engine.llm.client import llm_client, parse_json
+from engine.llm.client import llm_client, parse_json, resolve_fallbacks
 from engine.settings import settings
 
 log = structlog.get_logger()
@@ -139,7 +139,7 @@ class CitationEvaluator:
     def __init__(self, eval_model: str | None = None):
         self.eval_model = eval_model or settings.llm_model_eval
         # Fallback so an eval-model provider error degrades instead of failing the desk (D130).
-        self._fallbacks = [settings.llm_model_eval_fallback] if settings.llm_model_eval_fallback else None
+        self._fallbacks = resolve_fallbacks([settings.llm_model_eval_fallback])
 
     async def eval_item(
         self,

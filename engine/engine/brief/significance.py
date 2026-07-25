@@ -17,7 +17,7 @@ from __future__ import annotations
 
 import structlog
 
-from engine.llm.client import llm_client, parse_json
+from engine.llm.client import llm_client, parse_json, resolve_fallbacks
 from engine.settings import settings
 
 log = structlog.get_logger()
@@ -89,7 +89,7 @@ async def _score_facts(facts: list[Fact], desk: str) -> dict[int, tuple[float, s
     ]
     content = await llm_client.complete(
         model=model, messages=messages, json_mode=True,
-        fallbacks=[settings.llm_model_eval_fallback] if settings.llm_model_eval_fallback else None,
+        fallbacks=resolve_fallbacks([settings.llm_model_eval_fallback]),
         temperature=settings.llm_temperature,
     )
     parsed = parse_json(content) or {}

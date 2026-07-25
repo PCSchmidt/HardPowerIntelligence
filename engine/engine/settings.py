@@ -28,7 +28,14 @@ class Settings(BaseSettings):
     # calls had NO fallback, so the whole desk failed (Defense, D130). Fall back to a different
     # provider path (the synthesis model) so an eval hiccup degrades instead of darkening the desk.
     llm_model_eval_fallback: str = "openrouter/deepseek/deepseek-v4-pro"
-    llm_model_fallback_last_resort: str = "claude-sonnet-4-6"
+    # Cross-provider last-resort — a DIFFERENT billing account from OpenRouter (Fireworks).
+    # Every OpenRouter tier above shares one balance, so credit exhaustion (402/403) darks
+    # them all at once and the site goes stale (2026-07-24: 2 days dark, whole waterfall 403).
+    # This lane bills separately, so a dead OpenRouter account degrades to a slightly pricier
+    # brief instead of no brief. Same model as the synthesis primary (deepseek-v4-pro) — only
+    # the account differs, so brief shape/quality is already validated. Wired into every
+    # fallback chain via resolve_fallbacks(); fires only when the OpenRouter tiers can't answer.
+    llm_model_fallback_last_resort: str = "fireworks_ai/accounts/fireworks/models/deepseek-v4-pro"
 
     # LLM transient-failure resilience (D076). The daily run fires several calls per
     # desk across three desks back-to-back; the OpenRouter free tier rate-limits (429)
@@ -48,6 +55,10 @@ class Settings(BaseSettings):
 
     # Anthropic
     anthropic_api_key: str = ""
+
+    # Fireworks AI — cross-provider fallback lane (separate billing account from OpenRouter,
+    # so an OpenRouter credit outage can't dark it too). Serves llm_model_fallback_last_resort.
+    fireworks_api_key: str = ""
 
     # Budget guards
     llm_daily_budget_usd: float = 5.0

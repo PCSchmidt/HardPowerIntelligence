@@ -38,7 +38,7 @@ freshest graph state on its own cadence and diffs against the last brief.
 | Mobile *(later)* | React Native + Expo | Log-in-only "reader" app |
 | API | FastAPI | Brief API, auth, Lemon Squeezy webhooks |
 | Data / auth / cache | Supabase (Postgres + pgvector) | Graph, records, briefs, users, vectors |
-| LLM | OpenRouter (DeepSeek V4 Flash/Pro, Qwen3.7 Max) + Anthropic SDK last-resort (D006) | Cost-controlled waterfall |
+| LLM | OpenRouter (DeepSeek V4 Flash/Pro, Qwen3.7 Max) + Fireworks cross-provider last-resort (D006/D155) | Cost-controlled waterfall |
 | Payments | Lemon Squeezy (MoR) | Web-first subscriptions (reader model); global tax handled (D050) |
 | Infra | Cloudflare, Sentry, PostHog, Resend | DNS/WAF, errors, analytics, email |
 
@@ -198,7 +198,8 @@ re-summary. Rendered drill-down: see COMPONENT_REGISTRY §2 (P3).
 - **Data cost at MVP ≈ $0** (free public Tier-0 sources) + ~$19/mo for one market-data
   vendor (FMP).
 - **LLM cost is low by design.** The waterfall routes through OpenRouter to
-  cost-optimized models; Claude Sonnet is only the last-resort fallback.
+  cost-optimized models; a Fireworks-hosted DeepSeek V4 Pro (a *separate billing account*)
+  is the cross-provider last-resort, firing only when OpenRouter is unavailable (D155).
 
 | Role | Model | Est. tokens/brief | Est. cost/brief |
 |------|-------|-------------------|-----------------|

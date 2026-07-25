@@ -105,6 +105,14 @@ copy and query rewrite, not a redesign.
 
 ## D006 — LLM waterfall: OpenRouter + DeepSeek V4 + Qwen3.7, configuration-driven *(updated 2026-06-05)*
 
+> **Superseded in part by D155 (2026-07-25, see CHANGELOG):** the last-resort fallback is no longer
+> Claude Sonnet 4.6 via the Anthropic SDK — it is now **DeepSeek V4 Pro hosted on Fireworks**
+> (`fireworks_ai/…`), a *separate billing account* from OpenRouter. The 2026-07-24 outage proved the
+> real failure mode is the whole OpenRouter balance going dry (402/403), which darks every OpenRouter
+> tier at once; the last-resort's job is cross-*provider* billing independence, not just a different
+> model. The rest of this decision (five configurable roles, env-pinned model IDs) stands. Original
+> text below preserved as written.
+
 **Decision:** Use a model waterfall with five independently configurable roles, all
 accessed via **LiteLLM + OpenRouter** except the last-resort fallback which calls the
 Anthropic SDK directly. Model IDs are pinned in environment variables, never hardcoded.

@@ -14,6 +14,25 @@ live ingestion runner, with Supabase auth and Lemon Squeezy subscriptions. Built
 
 ### Added
 
+- **Cross-provider LLM last-resort — no single billing account can dark the site** (2026-07-25, D155):
+  On 2026-07-24 the daily brief went dark for two days. Root cause was **not** a code regression:
+  the OpenRouter account ran out of credits, so every model in the waterfall — synthesis, eval,
+  and their fallbacks, all `openrouter/…` sharing one balance — was rejected with `402`/`403` at
+  once, and no brief could be synthesized. Worse, the failure surfaced only as a generic health
+  `CRITICAL` and was noticed via stale reader-facing briefs, not an alert. Two structural fixes:
+  (1) a **cross-provider last-resort** (`llm_model_fallback_last_resort`, now
+  `fireworks_ai/accounts/fireworks/models/deepseek-v4-pro` — DeepSeek V4 Pro on **Fireworks**, a
+  *separate billing account* from OpenRouter) is appended to **every** fallback chain via a new
+  `resolve_fallbacks()` helper (synthesis, significance, eval/citation-eval, analysis), so a dead
+  OpenRouter balance degrades to a slightly-pricier brief on the same model instead of a dark site;
+  (2) billing/auth errors (`401`/`402`/`403`) are now classified **terminal** in the client — the
+  retry loop no longer burns its backoff budget re-hitting a wall it can't clear (that wasted 6+
+  minutes on 7/24), failing over to the next provider immediately. This supersedes the D006
+  last-resort (Claude Sonnet 4.6 via the Anthropic SDK — dead config, never wired into any chain).
+  Live-verified end-to-end against the real Fireworks key (JSON-mode returns valid JSON on the exact
+  synthesis path). New repo secret `FIREWORKS_API_KEY` wired into `daily-brief.yml`. +8 unit tests
+  (`test_llm_fallback_resolution.py`); full unit suite green. Follow-ups still open: a billing-aware
+  health alert (Resend ping) and a credit-runway check across both OpenRouter and Fireworks balances.
 - **Convergence graph §5 — federal-funding (AWARDED) semantic layer** (2026-07-17, D153): the first
   *semantic* relationship beyond co-appearance, chosen honestly from what the structured data actually
   carries. A data audit found the classic KG relations (SUPPLIES/COMPETES_WITH/FILES_AS) aren't in the

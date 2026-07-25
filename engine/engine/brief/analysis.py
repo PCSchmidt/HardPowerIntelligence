@@ -19,7 +19,7 @@ import structlog
 
 from engine.brief.generator import GeneratedBrief, _unwrap_analysis_field
 from engine.eval.citation_eval import CitationEvaluator
-from engine.llm.client import llm_client
+from engine.llm.client import llm_client, resolve_fallbacks
 from engine.settings import settings
 
 log = structlog.get_logger()
@@ -65,6 +65,7 @@ async def _regenerate(
     ]
     content = await llm_client.complete(
         model=model, messages=messages, temperature=settings.llm_temperature,
+        fallbacks=resolve_fallbacks(None),
     )
     # Unwrap a stray JSON wrapper the rewrite model sometimes returns ({"rewritten": "..."}) —
     # otherwise it renders verbatim on the desk page (the D118 leak, regen branch).

@@ -14,7 +14,8 @@
 # publishes just the chosen desk (the matrix collapses to one entry).
 #
 # Required repo secrets (gh secret set ...): DATABASE_URL, OPENROUTER_API_KEY,
-# OPENAI_API_KEY, SAM_GOV_API_KEY, and optionally ANTHROPIC_API_KEY.
+# OPENAI_API_KEY, SAM_GOV_API_KEY, FIREWORKS_API_KEY (cross-provider LLM last-resort, D155),
+# and optionally ANTHROPIC_API_KEY (retained, no longer the fallback).
 
 name: Daily Brief
 
@@ -142,6 +143,9 @@ jobs:
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          # Cross-provider last-resort (separate billing from OpenRouter). Without this the
+          # Fireworks fallback is dark in CI and an OpenRouter credit outage darks the site.
+          FIREWORKS_API_KEY: ${{ secrets.FIREWORKS_API_KEY }}
         run: |
           # run_brief.py exit codes (D076): 0=published, 3=clean skip (below the provable-claim
           # floor on a thin day — not an error), other=hard crash. Per-desk job: a clean skip is

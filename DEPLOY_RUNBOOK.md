@@ -19,7 +19,7 @@ cadence via GitHub Actions. Architecture per [DEPLOYMENT_CONFIG.md](DEPLOYMENT_C
 > always-on `hpi-worker` (D116) is now built and owns **GDELT** ingestion off CI (persistent
 > IP — see [§2.5](#25-flyio--deploy-hpi-worker-gdelt)); every other source runs in CI.
 
-> **Cost note.** `run_brief.py` calls paid LLMs (OpenRouter + OpenAI embeddings, D006).
+> **Cost note.** `run_brief.py` calls paid LLMs (OpenRouter + OpenAI embeddings; Fireworks only as the cross-provider last-resort, D006/D155).
 > A daily run is a few cents; don't enable the schedule until you have data worth briefing.
 
 ---
@@ -32,7 +32,7 @@ cadence via GitHub Actions. Architecture per [DEPLOYMENT_CONFIG.md](DEPLOYMENT_C
 - [ ] Vercel account (`https://vercel.com`)
 - [ ] OpenRouter API key (`https://openrouter.ai`)
 - [ ] OpenAI API key (embeddings — `text-embedding-3-small`)
-- [ ] Anthropic API key (optional — last-resort LLM fallback, D006)
+- [ ] Fireworks API key (cross-provider last-resort LLM fallback — separate billing from OpenRouter, D155)
 - [ ] Lemon Squeezy store (test mode is fine for first deploy, D050)
 - [ ] GitHub repo already exists ✅ (`PCSchmidt/HardPowerIntelligence`)
 
@@ -146,7 +146,7 @@ fly secrets set --stage --app hpi-api \
   SUPABASE_JWT_SECRET='<jwt-secret-if-HS256-else-any-placeholder>' \
   OPENROUTER_API_KEY='<openrouter>' \
   OPENAI_API_KEY='<openai>' \
-  ANTHROPIC_API_KEY='<anthropic-or-empty>' \
+  FIREWORKS_API_KEY='<fw_...-or-empty>' \
   LEMONSQUEEZY_WEBHOOK_SECRET='<ls-webhook-secret>'
 # Note: the Lemon Squeezy CHECKOUT creds (API key, store id, variant ids) go in VERCEL,
 # not here — the checkout route runs on Vercel (web/app/api/checkout/route.ts). The API
@@ -295,7 +295,7 @@ ingestion exists (so you don't pay to regenerate the same brief nightly).
 gh secret set DATABASE_URL --body '<cloud DATABASE_URL>'
 gh secret set OPENROUTER_API_KEY --body '<...>'
 gh secret set OPENAI_API_KEY --body '<...>'
-gh secret set ANTHROPIC_API_KEY --body '<...>'   # optional
+gh secret set FIREWORKS_API_KEY --body '<fw_...>'   # cross-provider last-resort (D155)
 ```
 **Verify (manual run):**
 ```bash
