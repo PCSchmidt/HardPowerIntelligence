@@ -14,6 +14,23 @@ live ingestion runner, with Supabase auth and Lemon Squeezy subscriptions. Built
 
 ### Added
 
+- **Close two "silent dark" gaps exposed by the 2026-07-27 outage** (2026-07-27, D157): the day
+  after D156 shipped, the site went dark again from a **new, unrelated cause** — and the D156 pager
+  no-op'd on its first real critical event. Two fixes: **(1) The Supabase CLI install can no longer
+  dark the pipeline.** `supabase/setup-cli@v1` used `version: latest`, which resolves the release
+  through GitHub's *unauthenticated* API (60 req/hr on shared runner IPs) and hit
+  `rate limit exceeded` — killing `ingest` so all three desks skipped, even though the *only* thing
+  the CLI feeds (the migration reconcile) is already `continue-on-error`. Now the version is **pinned**
+  (`2.109.1`, no "resolve latest" call), the lookup is **authenticated** (`GITHUB_TOKEN`), the install
+  is **`continue-on-error`**, and the reconcile is gated on `steps.supabase_cli.outcome == 'success'`
+  — so a CLI hiccup skips a best-effort safeguard instead of darkening the site. **(2) The health
+  pager is now observable.** `send_resend_alert` returned a bare `False` for *all* of config-missing,
+  Resend-rejected (non-2xx), and transport-error — so the 7/27 log said only "skipped/failed" with no
+  way to tell an unset secret from a rejected sender. It now returns `(ok, detail)` and `run_health`
+  logs the reason (`no RESEND_API_KEY set` / `resend rejected: HTTP 422 …` / `transport error: …`).
+  The alert `from` default also moved from the unverified `health@hardpowerintel.com` to the
+  API's already-verified `noreply@hardpowerintel.com` (override via `ALERT_EMAIL_FROM`), removing the
+  most likely rejection cause. Tests updated to assert the reason strings.
 - **Billing-aware health alerting + credit-runway check** (2026-07-25, D156): the D155 companion —
   the failure was *findable*, but the 7/24 dark surfaced only as a generic `no_brief_published`
   CRITICAL and was noticed via stale reader briefs two days later. `run_health` now probes the

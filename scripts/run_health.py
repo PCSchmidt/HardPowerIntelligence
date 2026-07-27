@@ -133,11 +133,11 @@ async def main(day: date) -> int:
     # in minutes, not via stale reader briefs days later (D156). Best-effort — never blocks the exit.
     payload = alert_payload(report, day)
     if payload:
-        sent = await send_resend_alert(
+        _sent, detail = await send_resend_alert(
             *payload, api_key=settings.resend_api_key,
             to=settings.alert_email_to, sender=settings.alert_email_from,
         )
-        print(f"[alert] push {'sent' if sent else 'skipped/failed'} (resend)")
+        print(f"[alert] push (resend): {detail}")
     return report.exit_code
 
 

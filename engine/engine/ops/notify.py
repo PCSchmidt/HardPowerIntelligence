@@ -52,10 +52,21 @@ async def send_resend_alert(
     to: str,
     sender: str,
     client: httpx.AsyncClient | None = None,
-) -> bool:
-    """POST the alert to Resend. Returns True on 2xx. Missing config or any error → False (skip)."""
-    if not (api_key and to and sender):
-        return False
+) -> tuple[bool, str]:
+    """POST the alert to Resend. Returns ``(ok, detail)``.
+
+    ``detail`` is a human-readable reason so the run log distinguishes the three ways a push can
+    fail to land — *config missing* (secret unset), *Resend rejected* (non-2xx, e.g. an
+    unverified ``from`` domain), and *transport error* (exception). The original silent ``False``
+    hid exactly this: on 2026-07-27 the pager no-op'd on its first real critical event and the log
+    said only "skipped/failed", giving no way to tell an unset secret from a rejected sender.
+    Best-effort: never raises, never changes the health verdict."""
+    if not api_key:
+        return False, "skipped: no RESEND_API_KEY set"
+    if not to:
+        return False, "skipped: no ALERT_EMAIL_TO set"
+    if not sender:
+        return False, "skipped: no sender configured"
     owns_client = client is None
     client = client or httpx.AsyncClient(timeout=_TIMEOUT_SECONDS)
     try:
@@ -64,9 +75,12 @@ async def send_resend_alert(
             headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
             json={"from": sender, "to": [to], "subject": subject, "text": body},
         )
-        return resp.status_code in (200, 201)
-    except Exception:  # noqa: BLE001 — alerting must never crash the health run
-        return False
+        if resp.status_code in (200, 201):
+            return True, "sent"
+        # Resend puts the actionable reason (e.g. domain not verified) in the body — surface it.
+        return False, f"resend rejected: HTTP {resp.status_code} {resp.text[:200]}"
+    except Exception as exc:  # noqa: BLE001 — alerting must never crash the health run
+        return False, f"resend transport error: {type(exc).__name__}: {exc}"
     finally:
         if owns_client:
             await client.aclose()

@@ -75,7 +75,10 @@ class Settings(BaseSettings):
     # an empty key/recipient simply skips the push (GitHub's failure email still fires).
     resend_api_key: str = ""
     alert_email_to: str = ""
-    alert_email_from: str = "HPI Health <health@hardpowerintel.com>"
+    # Sender must be a Resend-verified address on this key's account. Default reuses the sender the
+    # API already sends from (noreply@hardpowerintel.com) rather than an unverified health@ subaddress —
+    # the latter risks a silent Resend rejection (the 2026-07-27 pager miss). Override via ALERT_EMAIL_FROM.
+    alert_email_from: str = "HPI Health <noreply@hardpowerintel.com>"
 
     # OpenAI (embeddings)
     openai_api_key: str = ""

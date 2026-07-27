@@ -61,9 +61,20 @@ jobs:
         run: uv sync --all-packages --all-extras
 
       - name: Install Supabase CLI
+        id: supabase_cli
+        # Best-effort install: the reconcile it enables is itself non-fatal (see below), so its
+        # setup must never dark the pipeline either. On 2026-07-27 `version: latest` resolved the
+        # release through GitHub's UNauthenticated API (60 req/hr, shared runner IP) and hit
+        # "rate limit exceeded" — killing ingest and skipping all three desks. Fix, defence in depth:
+        #   1. pin a concrete version → no "resolve latest" API call at all;
+        #   2. pass GITHUB_TOKEN → any release lookup is authenticated (5000 req/hr);
+        #   3. continue-on-error → even if the install still fails, ingest + briefs proceed.
         uses: supabase/setup-cli@v1
+        continue-on-error: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          version: latest
+          version: 2.109.1
 
       - name: Reconcile DB migrations (safeguard)
         # Apply any migrations on `main` the remote DB doesn't have yet, BEFORE we ingest or
@@ -74,6 +85,8 @@ jobs:
         # *direct* connection to take its advisory lock; if DATABASE_URL is the transaction-mode
         # pooler this step will warn rather than apply — then add a direct-connection secret for
         # migrations (DEPLOY_RUNBOOK §6).
+        # Skipped when the CLI install above didn't succeed — a missing safeguard must not fail the run.
+        if: steps.supabase_cli.outcome == 'success'
         continue-on-error: true
         timeout-minutes: 5
         env:

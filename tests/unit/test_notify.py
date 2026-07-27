@@ -46,9 +46,13 @@ def _client(handler):
 
 @pytest.mark.asyncio
 class TestSendResendAlert:
-    async def test_missing_config_skips(self):
-        assert await send_resend_alert("s", "b", api_key="", to="a@b.c", sender="f") is False
-        assert await send_resend_alert("s", "b", api_key="k", to="", sender="f") is False
+    async def test_missing_config_skips_with_reason(self):
+        ok, detail = await send_resend_alert("s", "b", api_key="", to="a@b.c", sender="f")
+        assert ok is False and "RESEND_API_KEY" in detail
+        ok, detail = await send_resend_alert("s", "b", api_key="k", to="", sender="f")
+        assert ok is False and "ALERT_EMAIL_TO" in detail
+        ok, detail = await send_resend_alert("s", "b", api_key="k", to="a@b.c", sender="")
+        assert ok is False and "sender" in detail
 
     async def test_2xx_returns_true_and_sends_bearer(self):
         def handler(req):
@@ -56,18 +60,18 @@ class TestSendResendAlert:
             return httpx.Response(200, json={"id": "e1"})
 
         async with _client(handler) as c:
-            ok = await send_resend_alert("s", "b", api_key="k", to="a@b.c", sender="f", client=c)
-        assert ok is True
+            ok, detail = await send_resend_alert("s", "b", api_key="k", to="a@b.c", sender="f", client=c)
+        assert ok is True and detail == "sent"
 
-    async def test_non_2xx_returns_false(self):
-        async with _client(lambda req: httpx.Response(422, json={})) as c:
-            ok = await send_resend_alert("s", "b", api_key="k", to="a@b.c", sender="f", client=c)
-        assert ok is False
+    async def test_non_2xx_returns_false_with_status(self):
+        async with _client(lambda req: httpx.Response(422, json={"message": "domain not verified"})) as c:
+            ok, detail = await send_resend_alert("s", "b", api_key="k", to="a@b.c", sender="f", client=c)
+        assert ok is False and "422" in detail and "domain not verified" in detail
 
-    async def test_exception_returns_false(self):
+    async def test_exception_returns_false_with_type(self):
         def handler(req):
             raise httpx.ConnectError("boom")
 
         async with _client(handler) as c:
-            ok = await send_resend_alert("s", "b", api_key="k", to="a@b.c", sender="f", client=c)
-        assert ok is False
+            ok, detail = await send_resend_alert("s", "b", api_key="k", to="a@b.c", sender="f", client=c)
+        assert ok is False and "ConnectError" in detail
