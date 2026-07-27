@@ -187,6 +187,8 @@ class TestRetry:
 
     @pytest.mark.asyncio
     async def test_raises_after_exhausting_retries(self):
+        # last-resort disabled to isolate the OpenRouter retry mechanics (D158 two-phase would
+        # otherwise fail this same 429 over to Fireworks).
         with (
             patch(
                 "engine.llm.client.litellm.acompletion",
@@ -194,6 +196,7 @@ class TestRetry:
             ) as mock_call,
             patch("engine.llm.client.asyncio.sleep", new=AsyncMock()),
             patch("engine.llm.client.settings.llm_max_retries", 4),
+            patch("engine.llm.client.settings.llm_model_fallback_last_resort", ""),
         ):
             client = LLMClient()
             with pytest.raises(litellm.RateLimitError):
@@ -205,12 +208,15 @@ class TestRetry:
 
     @pytest.mark.asyncio
     async def test_non_retryable_error_propagates_immediately(self):
+        # last-resort disabled to isolate the retry mechanics: a non-transient error is not retried.
+        # (That a ValueError also doesn't TRIGGER the last-resort is covered separately.)
         with (
             patch(
                 "engine.llm.client.litellm.acompletion",
                 new=AsyncMock(side_effect=ValueError("boom")),
             ) as mock_call,
             patch("engine.llm.client.asyncio.sleep", new=AsyncMock()) as mock_sleep,
+            patch("engine.llm.client.settings.llm_model_fallback_last_resort", ""),
         ):
             client = LLMClient()
             with pytest.raises(ValueError, match="boom"):
@@ -218,7 +224,7 @@ class TestRetry:
                     model="openrouter/deepseek/deepseek-v4-pro",
                     messages=[{"role": "user", "content": "test"}],
                 )
-        assert mock_call.call_count == 1      # no retry on a non-transient error
+        assert mock_call.call_count == 1      # no retry, no fail-over on a non-provider error
         mock_sleep.assert_not_awaited()
 
     @pytest.mark.asyncio
@@ -238,6 +244,7 @@ class TestRetry:
             patch("engine.llm.client.settings.llm_max_retries", 3),
             patch("engine.llm.client.settings.llm_backoff_base_seconds", 2.0),
             patch("engine.llm.client.settings.llm_backoff_max_seconds", 30.0),
+            patch("engine.llm.client.settings.llm_model_fallback_last_resort", ""),
         ):
             client = LLMClient()
             with pytest.raises(litellm.RateLimitError):

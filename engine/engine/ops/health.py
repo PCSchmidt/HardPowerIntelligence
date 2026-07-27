@@ -193,24 +193,31 @@ def evaluate_health(
         remaining = pb.get("remaining_usd")
         if remaining is None:
             continue
+        # `detail` names WHICH ceiling binds — account credits or the API key's own total limit
+        # (D158). The 2026-07-27 dark was the key cap at $0 while the account still had ~$17, so the
+        # binding figure and its label are what make the alert actionable.
+        bind = pb.get("detail", "")
+        bind_suffix = f" [{bind}]" if bind else ""
         if remaining < t.credit_exhausted_usd:
             if not published:
                 findings.append(Finding(
                     "critical", "billing_exhausted",
-                    f"{prov} credits exhausted (${remaining:.2f}) and no desk published — the LLM "
-                    f"waterfall is dark; the cross-provider backstop also failed. Refill {prov} now.",
+                    f"{prov} spend ceiling exhausted (${remaining:.2f}){bind_suffix} and no desk "
+                    f"published — the LLM waterfall is dark; the cross-provider backstop also failed. "
+                    f"Raise the {prov} key limit / refill now.",
                 ))
             else:
                 findings.append(Finding(
                     "warn", "running_on_backstop",
-                    f"{prov} credits exhausted (${remaining:.2f}) but briefs still published — running "
-                    f"on the cross-provider last-resort. Refill {prov} to restore the cheap primary lane.",
+                    f"{prov} spend ceiling exhausted (${remaining:.2f}){bind_suffix} but briefs still "
+                    f"published — the primary lane is effectively dry (backstop or last headroom). "
+                    f"Raise the {prov} key limit / refill to restore the cheap primary lane.",
                 ))
         elif remaining < t.credit_low_usd:
             findings.append(Finding(
                 "warn", "credit_runway_low",
-                f"{prov} credits low: ${remaining:.2f} remaining (< ${t.credit_low_usd:.2f}) — "
-                f"refill soon to avoid a dark day.",
+                f"{prov} runway low: ${remaining:.2f} remaining (< ${t.credit_low_usd:.2f})"
+                f"{bind_suffix} — raise the key limit / refill soon to avoid a dark day.",
             ))
 
     # ── Ingest-source health (the workflow never surfaces this) ──────────────────────

@@ -46,6 +46,14 @@ class Settings(BaseSettings):
     llm_max_retries: int = 4               # retries after the first try (5 attempts total)
     llm_backoff_base_seconds: float = 2.0  # first backoff; doubles each retry
     llm_backoff_max_seconds: float = 30.0  # cap per-retry sleep
+    # Account-credit refill wait (D158). An OpenRouter 402 ("requires more credits") means the
+    # ACCOUNT balance hit $0 — and this account auto-refills within a couple of minutes. Unlike a
+    # 401/403 (bad key / key-limit cap, which a wait never clears), a 402 DOES clear on a wait, so
+    # rather than fall straight to the pricier last-resort we sleep long enough for the refill and
+    # retry on (cheaper) OpenRouter first. This keeps routine credit blips on OpenRouter and
+    # preserves the separate-billing Fireworks reserve for a genuine outage. 401/403 stay terminal.
+    llm_credit_refill_wait_seconds: float = 150.0  # ~2.5 min — covers the auto-refill window
+    llm_credit_refill_retries: int = 2             # long-waits on a 402 before giving up on OpenRouter
     # Cost observability (Phase A / A4). The pipeline mixes models, so token COUNTS are the real
     # signal; this coarse blended $/1M-token rate is only for eyeballing anomalies, never billing.
     llm_cost_per_1m_tokens_usd: float = 0.60

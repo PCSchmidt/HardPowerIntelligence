@@ -41,17 +41,31 @@ class TestEmptyContentHandling:
         assert out == '{"ok": true}'
         assert c._acompletion_with_retry.call_count == 2
 
+    async def test_empty_content_falls_through_to_last_resort(self):
+        # D158: on null content the explicit chain now also tries the cross-provider last-resort,
+        # so an empty OpenRouter reply degrades to a Fireworks brief instead of raising.
+        from engine.settings import settings
+        c = LLMClient()
+        c._acompletion_with_retry = AsyncMock(side_effect=[_resp(None), _resp('{"ok": true}')])
+        out = await c.complete("primary", [{"role": "user", "content": "x"}])  # no OR fallbacks
+        assert out == '{"ok": true}'
+        assert c._acompletion_with_retry.call_count == 2
+        assert c._acompletion_with_retry.await_args.kwargs["model"] == settings.llm_model_fallback_last_resort
+
     async def test_raises_clean_error_when_all_empty(self):
         c = LLMClient()
-        c._acompletion_with_retry = AsyncMock(side_effect=[_resp(None), _resp(None)])
+        # primary + OR fallback + last-resort all empty (D158) → 3 attempts, then a clean raise.
+        c._acompletion_with_retry = AsyncMock(side_effect=[_resp(None), _resp(None), _resp(None)])
         with pytest.raises(LLMError):
             await c.complete("primary", [{"role": "user", "content": "x"}],
                              fallbacks=["fallback"])
+        assert c._acompletion_with_retry.call_count == 3
 
     async def test_raises_clean_error_with_no_fallbacks(self):
         c = LLMClient()
-        c._acompletion_with_retry = AsyncMock(side_effect=[_resp(None)])
-        with pytest.raises(LLMError):  # not AttributeError
+        # No OR fallbacks: primary + last-resort both empty → raise (not AttributeError).
+        c._acompletion_with_retry = AsyncMock(side_effect=[_resp(None), _resp(None)])
+        with pytest.raises(LLMError):
             await c.complete("primary", [{"role": "user", "content": "x"}], json_mode=True)
 
     async def test_normal_content_unaffected(self):

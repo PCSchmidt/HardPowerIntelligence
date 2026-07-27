@@ -31,6 +31,19 @@ _RETRYABLE_ERRORS = tuple(
     if isinstance(exc, type)
 )
 
+# Errors that mean "OpenRouter couldn't serve this call" and so justify failing over to the
+# cross-provider last-resort (D158): the retryable/availability set above, plus auth/permission
+# walls (401/403). Deliberately NOT generic Exception — a ValueError/BadRequest is a request-shape
+# bug the last resort can't fix, so those propagate immediately instead of wasting a Fireworks call.
+_PROVIDER_OUTAGE_ERRORS = _RETRYABLE_ERRORS + tuple(
+    exc
+    for exc in (
+        getattr(litellm, name, None)
+        for name in ("AuthenticationError", "PermissionDeniedError")
+    )
+    if isinstance(exc, type)
+)
+
 # LiteLLM reads credentials from os.environ, not from our Settings object.
 # Ensure they're present before any API call is made.
 if settings.openrouter_api_key:
@@ -61,19 +74,31 @@ def _is_terminal_provider_error(exc: Exception) -> bool:
         return False
 
 
-def resolve_fallbacks(primary: list[str] | None) -> list[str] | None:
-    """Append the cross-provider last-resort to a call's fallback chain (deduped, None-safe).
+def _is_credit_exhaustion_error(exc: Exception) -> bool:
+    """A 402 — the OpenRouter *account* balance hit $0 ("requires more credits", D158).
 
-    The primary tiers are all OpenRouter, which share one billing balance — so an OpenRouter
-    credit/auth outage 403s every tier at once (the 2026-07-24 dark). The last-resort is a
-    separate billing account (``settings.llm_model_fallback_last_resort`` → Fireworks) that
-    fires only once the OpenRouter tiers are exhausted, converting a site-dark into a
-    slightly-pricier brief. Kept out of the primary tiers on purpose: it should be the escape
-    hatch, not a routine hop."""
-    chain = [m for m in (primary or []) if m]
-    last_resort = settings.llm_model_fallback_last_resort
-    if last_resort and last_resort not in chain:
-        chain.append(last_resort)
+    Distinct from 401/403 (bad key / key-limit cap): the account auto-refills within a couple of
+    minutes, so a 402 DOES clear on a wait, whereas 401/403 never do. This is the one billing wall
+    worth sleeping through instead of failing over immediately."""
+    try:
+        return int(getattr(exc, "status_code", None)) == 402
+    except (TypeError, ValueError):
+        return False
+
+
+def resolve_fallbacks(primary: list[str] | None) -> list[str] | None:
+    """Clean a call's **OpenRouter** fallback chain (dedup, drop falsy, None-safe).
+
+    NOTE (D158): the cross-provider last-resort is **no longer appended here**. ``complete()`` now
+    applies it as an explicit *second phase*, reached only after the OpenRouter phase — including a
+    long refill-wait retry on a 402 (`llm_credit_refill_*`) — is exhausted. Keeping Fireworks out of
+    this chain is what stops a routine OpenRouter credit blip from immediately spending (and slowly
+    draining) the separate-billing emergency reserve: blips wait for the account auto-refill and stay
+    on OpenRouter; Fireworks fires only on a genuine outage."""
+    chain: list[str] = []
+    for m in (primary or []):
+        if m and m not in chain:
+            chain.append(m)
     return chain or None
 
 
@@ -137,19 +162,40 @@ class LLMClient:
         log.info("llm_call", model=model, prompt_tokens=pt, completion_tokens=ct)
 
     async def _acompletion_with_retry(self, **kwargs):
-        """Call litellm with exponential backoff + jitter on transient errors (D076).
+        """Call litellm with exponential backoff + jitter on transient errors (D076, D158).
 
         A rate-limit (429) is a time window, so an immediate re-try just hits the same
         wall; we sleep with doubling backoff (plus jitter to de-sync the three desks)
-        so the window passes. Non-retryable errors propagate immediately."""
+        so the window passes. A 402 (account credits at $0) is special: this account
+        auto-refills within minutes, so we sleep ~2.5 min and retry on OpenRouter up to
+        `llm_credit_refill_retries` times before giving up (D158) — staying on the cheaper
+        primary and preserving the Fireworks reserve. 401/403 stay terminal (a wait never
+        clears a bad key or a key-limit cap). Other non-retryable errors propagate immediately."""
         last_exc: Exception | None = None
-        for attempt in range(settings.llm_max_retries + 1):
+        refill_waits = 0
+        attempt = 0
+        while True:
             try:
                 return await litellm.acompletion(**kwargs)
             except _RETRYABLE_ERRORS as exc:
                 last_exc = exc
-                # A billing/auth failure is terminal for this provider — don't spend the
-                # backoff budget re-hitting a wall only a fallback provider can clear.
+                # 402: account balance hit $0. Auto-refill clears it in ~minutes, so wait it out
+                # and retry on OpenRouter rather than fail over to the pricier last-resort (D158).
+                if _is_credit_exhaustion_error(exc) and refill_waits < settings.llm_credit_refill_retries:
+                    refill_waits += 1
+                    delay = settings.llm_credit_refill_wait_seconds
+                    log.warning(
+                        "llm_credit_refill_wait",
+                        model=kwargs.get("model"),
+                        attempt=refill_waits,
+                        max_attempts=settings.llm_credit_refill_retries,
+                        wait=round(delay, 1),
+                        error=str(exc)[:200],
+                    )
+                    await asyncio.sleep(delay)
+                    continue
+                # A billing/auth wall (401/403, or a 402 whose refill-waits are spent) is terminal
+                # for this provider — hand control to the caller's last-resort phase, don't loop.
                 if _is_terminal_provider_error(exc) or attempt >= settings.llm_max_retries:
                     break
                 delay = min(
@@ -166,8 +212,39 @@ class LLMClient:
                     error=str(exc)[:200],
                 )
                 await asyncio.sleep(delay)
+                attempt += 1
         assert last_exc is not None  # only reached after a retryable failure
         raise last_exc
+
+    def _last_resort_model(self, already: list[str]) -> str | None:
+        """The cross-provider last-resort, unless it's already one of the models tried."""
+        lr = settings.llm_model_fallback_last_resort
+        return lr if (lr and lr not in already) else None
+
+    async def _complete_openrouter_then_last_resort(self, base: dict, or_fallbacks: list[str]):
+        """Two-phase completion (D158). Phase 1: OpenRouter — the primary plus its OpenRouter
+        fallbacks, run through the retry loop (which waits out a 402 for the account auto-refill).
+        Phase 2: the cross-provider last-resort (Fireworks, separate billing) — reached ONLY once
+        the whole OpenRouter phase is exhausted, so routine credit blips stay on OpenRouter and the
+        emergency reserve isn't drained. Returns (served_model, response)."""
+        kwargs = dict(base)
+        if or_fallbacks:
+            kwargs["fallbacks"] = or_fallbacks
+        try:
+            return base["model"], await self._acompletion_with_retry(**kwargs)
+        except _PROVIDER_OUTAGE_ERRORS as exc:  # OpenRouter couldn't serve → try the last resort
+            last_resort = self._last_resort_model([base["model"], *or_fallbacks])
+            if last_resort is None:
+                raise
+            log.warning(
+                "llm_last_resort_engaged",
+                primary=base["model"],
+                last_resort=last_resort,
+                error=str(exc)[:200],
+            )
+            lr_kwargs = dict(base)  # no fallbacks, no refill-wait — a separate provider/billing
+            lr_kwargs["model"] = last_resort
+            return last_resort, await self._acompletion_with_retry(**lr_kwargs)
 
     async def complete(
         self,
@@ -177,53 +254,59 @@ class LLMClient:
         fallbacks: list[str] | None = None,
         temperature: float | None = None,
     ) -> str:
-        kwargs: dict = {"model": model, "messages": messages}
+        base: dict = {"model": model, "messages": messages}
         if json_mode:
-            kwargs["response_format"] = {"type": "json_object"}
-        if fallbacks:
-            kwargs["fallbacks"] = fallbacks
+            base["response_format"] = {"type": "json_object"}
         if temperature is not None:
-            kwargs["temperature"] = temperature
+            base["temperature"] = temperature
 
-        response = await self._acompletion_with_retry(**kwargs)
+        or_fallbacks = fallbacks or []
+        served_model, response = await self._complete_openrouter_then_last_resort(base, or_fallbacks)
         content = response.choices[0].message.content
-        self._record_usage(model, response)
+        self._record_usage(served_model, response)
 
         # A provider-side error can return finish_reason='error' with NULL content and NO
         # exception — so litellm's own `fallbacks` never fire, and the None crashes downstream
         # (`'NoneType' has no attribute 'strip'` darkened the Defense desk 2026-07-06, D128). This
         # hits the largest desk first: a bigger synthesis prompt is likelier to trip the provider.
-        # Treat empty content as a failure: try the fallback model(s) explicitly, then raise a
-        # clean LLMError the caller's re-roll (D072) can handle instead of an opaque AttributeError.
+        # Treat empty content as a failure: walk the OpenRouter fallbacks and then the last-resort
+        # explicitly (D158), then raise a clean LLMError the caller's re-roll (D072) can handle.
         if not content:
-            log.warning("llm_empty_content", model=model, fallbacks=fallbacks or [])
-            for fb in fallbacks or []:
-                fb_kwargs = {k: v for k, v in kwargs.items() if k != "fallbacks"}
+            log.warning("llm_empty_content", model=served_model, fallbacks=or_fallbacks)
+            empty_chain = list(or_fallbacks)
+            lr = self._last_resort_model([model, *or_fallbacks])
+            if lr is not None:
+                empty_chain.append(lr)
+            for fb in empty_chain:
+                fb_kwargs = dict(base)
                 fb_kwargs["model"] = fb
                 response = await self._acompletion_with_retry(**fb_kwargs)
                 content = response.choices[0].message.content
                 self._record_usage(fb, response)
                 if content:
+                    served_model = fb
                     break
             if not content:
                 raise LLMError(
                     f"Empty content from model={model} and fallbacks "
-                    f"{fallbacks or []} (provider finish_reason=error?)"
+                    f"{empty_chain} (provider finish_reason=error?)"
                 )
 
         if json_mode:
             if parse_json(content) is None:
-                # One repair retry
+                # One repair retry, on whichever model actually served the content.
                 repair_messages = messages + [
                     {"role": "assistant", "content": content},
                     {"role": "user", "content": "Your response was not valid JSON. Return only valid JSON, no other text."},
                 ]
-                repair_kwargs = {**kwargs, "messages": repair_messages}
+                repair_kwargs = dict(base)
+                repair_kwargs["model"] = served_model
+                repair_kwargs["messages"] = repair_messages
                 response = await self._acompletion_with_retry(**repair_kwargs)
                 content = response.choices[0].message.content
-                self._record_usage(model, response)
+                self._record_usage(served_model, response)
                 if parse_json(content) is None:
-                    raise LLMError(f"JSON parse failed after repair retry for model={model}")
+                    raise LLMError(f"JSON parse failed after repair retry for model={served_model}")
 
         return content
 

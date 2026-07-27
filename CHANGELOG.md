@@ -14,6 +14,29 @@ live ingestion runner, with Supabase auth and Lemon Squeezy subscriptions. Built
 
 ### Added
 
+- **Credit-refill wait + two-phase last-resort + key-limit probe** (2026-07-27, D158): tightens the
+  D155/D156 resilience after the 7/27 investigation showed the Fireworks backstop never actually
+  engaged and the balance probe was blind to the real failure. Three parts. **(1) 402 refill-wait
+  (`client.py`).** OpenRouter's `402` ("requires more credits") means the *account* hit $0 — and this
+  account auto-refills within minutes — whereas `401/403` (bad key / key-limit cap) never clear on a
+  wait. Previously both were lumped as terminal and failed over instantly. Now a 402 sleeps
+  `llm_credit_refill_wait_seconds` (150s) and retries on OpenRouter up to `llm_credit_refill_retries`
+  (2) times, so a routine credit blip waits out the refill and stays on the cheaper primary; 401/403
+  stay terminal. **(2) Two-phase last-resort.** `resolve_fallbacks()` no longer appends Fireworks;
+  `complete()` runs OpenRouter (primary + its fallbacks, incl. the refill-wait) as phase 1, then the
+  cross-provider last-resort as an explicit phase 2 — reached only once OpenRouter is genuinely
+  exhausted (a provider-outage error, not a request-shape bug). This preserves availability *and*
+  stops routine blips from draining the separate-billing Fireworks reserve, and it's why Fireworks
+  stayed dormant on 7/27 (OpenRouter thrashed at its cap but served every call before the chain
+  reached the last resort). Empty-content (finish_reason=error) now also falls through to the last
+  resort. **(3) Key-limit probe (`provider_balance.py` + `health.py`).** The 7/27 dark was the API
+  *key's* $20 total limit (`limit_remaining: $0`, 403) while the *account* still showed ~$17 credits —
+  so the D156 credits-only probe reported "healthy" and never paged. The probe now reads both
+  `/api/v1/credits` **and** `/api/v1/key` and alerts on the **binding minimum**, naming which ceiling
+  binds (key cap vs account). +24 unit tests across `test_llm_fallback_resolution.py`,
+  `test_llm_client*.py`, `test_provider_balance.py`. Note: the refill-wait addresses the 402
+  account-exhaustion case; the 7/27 dark itself was a 403 key-cap, which still needs the key limit
+  raised — this only makes it *visible* (paged) instead of silent.
 - **Close two "silent dark" gaps exposed by the 2026-07-27 outage** (2026-07-27, D157): the day
   after D156 shipped, the site went dark again from a **new, unrelated cause** — and the D156 pager
   no-op'd on its first real critical event. Two fixes: **(1) The Supabase CLI install can no longer
