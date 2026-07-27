@@ -162,40 +162,19 @@ class LLMClient:
         log.info("llm_call", model=model, prompt_tokens=pt, completion_tokens=ct)
 
     async def _acompletion_with_retry(self, **kwargs):
-        """Call litellm with exponential backoff + jitter on transient errors (D076, D158).
+        """Call litellm for ONE model with exponential backoff + jitter on transient errors (D076).
 
-        A rate-limit (429) is a time window, so an immediate re-try just hits the same
-        wall; we sleep with doubling backoff (plus jitter to de-sync the three desks)
-        so the window passes. A 402 (account credits at $0) is special: this account
-        auto-refills within minutes, so we sleep ~2.5 min and retry on OpenRouter up to
-        `llm_credit_refill_retries` times before giving up (D158) — staying on the cheaper
-        primary and preserving the Fireworks reserve. 401/403 stay terminal (a wait never
-        clears a bad key or a key-limit cap). Other non-retryable errors propagate immediately."""
+        A rate-limit (429) is a time window, so an immediate re-try just hits the same wall; we
+        sleep with doubling backoff (plus jitter to de-sync the three desks) so the window passes.
+        A billing/auth wall (401/402/403) is terminal — retrying can't clear it — so it returns
+        control to the caller's chain, which owns the 402 refill-wait and the cross-provider
+        fail-over (`_complete_via_chain`, D158). Non-retryable errors propagate immediately."""
         last_exc: Exception | None = None
-        refill_waits = 0
-        attempt = 0
-        while True:
+        for attempt in range(settings.llm_max_retries + 1):
             try:
                 return await litellm.acompletion(**kwargs)
             except _RETRYABLE_ERRORS as exc:
                 last_exc = exc
-                # 402: account balance hit $0. Auto-refill clears it in ~minutes, so wait it out
-                # and retry on OpenRouter rather than fail over to the pricier last-resort (D158).
-                if _is_credit_exhaustion_error(exc) and refill_waits < settings.llm_credit_refill_retries:
-                    refill_waits += 1
-                    delay = settings.llm_credit_refill_wait_seconds
-                    log.warning(
-                        "llm_credit_refill_wait",
-                        model=kwargs.get("model"),
-                        attempt=refill_waits,
-                        max_attempts=settings.llm_credit_refill_retries,
-                        wait=round(delay, 1),
-                        error=str(exc)[:200],
-                    )
-                    await asyncio.sleep(delay)
-                    continue
-                # A billing/auth wall (401/403, or a 402 whose refill-waits are spent) is terminal
-                # for this provider — hand control to the caller's last-resort phase, don't loop.
                 if _is_terminal_provider_error(exc) or attempt >= settings.llm_max_retries:
                     break
                 delay = min(
@@ -212,7 +191,6 @@ class LLMClient:
                     error=str(exc)[:200],
                 )
                 await asyncio.sleep(delay)
-                attempt += 1
         assert last_exc is not None  # only reached after a retryable failure
         raise last_exc
 
@@ -221,30 +199,60 @@ class LLMClient:
         lr = settings.llm_model_fallback_last_resort
         return lr if (lr and lr not in already) else None
 
-    async def _complete_openrouter_then_last_resort(self, base: dict, or_fallbacks: list[str]):
-        """Two-phase completion (D158). Phase 1: OpenRouter — the primary plus its OpenRouter
-        fallbacks, run through the retry loop (which waits out a 402 for the account auto-refill).
-        Phase 2: the cross-provider last-resort (Fireworks, separate billing) — reached ONLY once
-        the whole OpenRouter phase is exhausted, so routine credit blips stay on OpenRouter and the
-        emergency reserve isn't drained. Returns (served_model, response)."""
-        kwargs = dict(base)
-        if or_fallbacks:
-            kwargs["fallbacks"] = or_fallbacks
-        try:
-            return base["model"], await self._acompletion_with_retry(**kwargs)
-        except _PROVIDER_OUTAGE_ERRORS as exc:  # OpenRouter couldn't serve → try the last resort
-            last_resort = self._last_resort_model([base["model"], *or_fallbacks])
-            if last_resort is None:
-                raise
+    async def _complete_via_chain(self, base: dict, or_fallbacks: list[str]):
+        """Walk the provider chain and return (served_model, response) from the first tier that
+        answers (D158).
+
+        Phase 1 — OpenRouter: [primary, *fallbacks], all sharing ONE account. A 402 means that
+        account hit $0; since it auto-refills within minutes and every tier shares it, we stop,
+        sleep ``llm_credit_refill_wait_seconds``, and retry the WHOLE chain up to
+        ``llm_credit_refill_retries`` times — staying on the cheaper primary. A 403/401/exhausted
+        tier just advances to the next tier. Phase 2 — the cross-provider last-resort (Fireworks,
+        separate billing): reached only once OpenRouter is exhausted, so routine credit blips don't
+        drain the reserve.
+
+        We walk the chain ourselves rather than handing litellm a ``fallbacks=`` list because
+        litellm collapses an all-fallbacks-failed run into an UNTYPED ``Exception`` ("All fallback
+        attempts failed") — which hid the 402-vs-403 distinction and skipped the last resort
+        entirely (caught by the deliberate backstop proof, 2026-07-27). One model per call keeps
+        every failure a typed provider error we can route on."""
+        or_chain = [base["model"]] + [m for m in or_fallbacks if m and m != base["model"]]
+        last_resort = self._last_resort_model(or_chain)
+        last_exc: Exception | None = None
+
+        for refill_round in range(settings.llm_credit_refill_retries + 1):
+            account_dry = False
+            for model in or_chain:
+                try:
+                    return model, await self._acompletion_with_retry(**{**base, "model": model})
+                except _PROVIDER_OUTAGE_ERRORS as exc:
+                    last_exc = exc
+                    if _is_credit_exhaustion_error(exc):
+                        account_dry = True  # shared account $0 — wait for refill, retry the chain
+                        break
+                    # this tier is down (401/403/persistent 429/5xx) — advance to the next tier
+                    log.warning("llm_tier_failed", model=model, error=str(exc)[:200])
+            if account_dry and refill_round < settings.llm_credit_refill_retries:
+                log.warning(
+                    "llm_credit_refill_wait",
+                    attempt=refill_round + 1,
+                    max_attempts=settings.llm_credit_refill_retries,
+                    wait=round(settings.llm_credit_refill_wait_seconds, 1),
+                )
+                await asyncio.sleep(settings.llm_credit_refill_wait_seconds)
+                continue
+            break
+
+        if last_resort is not None:
             log.warning(
                 "llm_last_resort_engaged",
                 primary=base["model"],
                 last_resort=last_resort,
-                error=str(exc)[:200],
+                error=str(last_exc)[:200] if last_exc else "",
             )
-            lr_kwargs = dict(base)  # no fallbacks, no refill-wait — a separate provider/billing
-            lr_kwargs["model"] = last_resort
-            return last_resort, await self._acompletion_with_retry(**lr_kwargs)
+            return last_resort, await self._acompletion_with_retry(**{**base, "model": last_resort})
+        assert last_exc is not None
+        raise last_exc
 
     async def complete(
         self,
@@ -261,7 +269,7 @@ class LLMClient:
             base["temperature"] = temperature
 
         or_fallbacks = fallbacks or []
-        served_model, response = await self._complete_openrouter_then_last_resort(base, or_fallbacks)
+        served_model, response = await self._complete_via_chain(base, or_fallbacks)
         content = response.choices[0].message.content
         self._record_usage(served_model, response)
 

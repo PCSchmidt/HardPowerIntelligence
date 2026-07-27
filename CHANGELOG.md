@@ -29,7 +29,14 @@ live ingestion runner, with Supabase auth and Lemon Squeezy subscriptions. Built
   stops routine blips from draining the separate-billing Fireworks reserve, and it's why Fireworks
   stayed dormant on 7/27 (OpenRouter thrashed at its cap but served every call before the chain
   reached the last resort). Empty-content (finish_reason=error) now also falls through to the last
-  resort. **(3) Key-limit probe (`provider_balance.py` + `health.py`).** The 7/27 dark was the API
+  resort. `complete()` walks the chain itself (one model per litellm call) rather than handing
+  litellm a `fallbacks=` list — a **deliberate backstop proof** revealed litellm collapses an
+  all-fallbacks-failed run into an *untyped* `Exception`, which had silently skipped the last-resort
+  phase; walking it ourselves keeps every failure a typed provider error we can route on. **The
+  Fireworks backstop is now proven end-to-end** (forced OpenRouter 401 → both tiers failed over →
+  Fireworks served `{"ok": true}`). Also caught in the proof: a stale local `.env`
+  `LLM_MODEL_FALLBACK_LAST_RESORT=claude-sonnet-4-6` (pre-D155) that overrode the Fireworks default
+  locally — production is unaffected (CI never sets that var, so it uses the settings default). **(3) Key-limit probe (`provider_balance.py` + `health.py`).** The 7/27 dark was the API
   *key's* $20 total limit (`limit_remaining: $0`, 403) while the *account* still showed ~$17 credits —
   so the D156 credits-only probe reported "healthy" and never paged. The probe now reads both
   `/api/v1/credits` **and** `/api/v1/key` and alerts on the **binding minimum**, naming which ceiling

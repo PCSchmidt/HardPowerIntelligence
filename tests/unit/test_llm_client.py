@@ -146,21 +146,33 @@ class TestComplete:
         assert "temperature" not in mock_call.call_args.kwargs
 
     @pytest.mark.asyncio
-    async def test_fallbacks_passed_to_litellm(self):
-        mock_response = MagicMock()
-        mock_response.choices[0].message.content = '{"ok": true}'
-        mock_response.usage.prompt_tokens = 50
-        mock_response.usage.completion_tokens = 10
+    async def test_fallback_tier_is_called_when_primary_fails(self):
+        # D158: the client walks the chain itself (one model per litellm call) rather than handing
+        # litellm a `fallbacks=` list — so we never pass `fallbacks` to litellm, and a failed
+        # primary results in the fallback MODEL being called directly.
+        import litellm
+        ok = MagicMock()
+        ok.choices[0].message.content = '{"ok": true}'
+        ok.usage.prompt_tokens = 50
+        ok.usage.completion_tokens = 10
+        down = litellm.APIError(status_code=403, message="key limit", llm_provider="openrouter", model="x")
 
-        with patch("engine.llm.client.litellm.acompletion", new=AsyncMock(return_value=mock_response)) as mock_call:
+        with (
+            patch("engine.llm.client.litellm.acompletion",
+                  new=AsyncMock(side_effect=[down, ok])) as mock_call,
+            patch("engine.llm.client.asyncio.sleep", new=AsyncMock()),
+        ):
             client = LLMClient()
-            await client.complete(
+            out = await client.complete(
                 model="openrouter/deepseek/deepseek-v4-pro",
                 messages=[{"role": "user", "content": "test"}],
                 fallbacks=["openrouter/qwen/qwen3.7-max"],
             )
-        call_kwargs = mock_call.call_args.kwargs
-        assert call_kwargs.get("fallbacks") == ["openrouter/qwen/qwen3.7-max"]
+        assert out == '{"ok": true}'
+        # never delegates fallbacks to litellm; calls the fallback model directly instead
+        assert all("fallbacks" not in c.kwargs for c in mock_call.call_args_list)
+        assert mock_call.call_args_list[0].kwargs["model"] == "openrouter/deepseek/deepseek-v4-pro"
+        assert mock_call.call_args_list[1].kwargs["model"] == "openrouter/qwen/qwen3.7-max"
 
 
 class TestRetry:
