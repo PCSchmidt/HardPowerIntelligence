@@ -14,6 +14,17 @@ live ingestion runner, with Supabase auth and Lemon Squeezy subscriptions. Built
 
 ### Added
 
+- **Enforced per-run cost circuit breaker** (2026-07-27, D159): the app's `llm_daily_budget_usd` /
+  `llm_monthly_budget_usd` were defined but **never enforced** — so the OpenRouter per-key spend cap
+  was the *only* guard against a runaway glitch, and that cap doubles as a routine dark-the-site
+  tripwire (D158). New `llm_run_budget_usd` ($3 default) is a real breaker: `LLMClient.complete()`
+  checks the run's estimated spend **before each call** and raises `LLMBudgetExceeded` (an `LLMError`
+  subclass, so the existing degrade path handles it) once the ceiling is crossed — bounding a
+  loop/glitch to ~$3 per desk-process (~$9/day worst case across three desks) instead of an unbounded
+  bill. Process-local, so it resets every run with zero shared state. This is what lets the OpenRouter
+  key cap be raised to a high **catastrophe-only** ceiling without spend exposure. The daily/monthly
+  targets are now documented as aspirational (a true cross-process cap needs shared state — future).
+  +4 unit tests (`test_llm_budget.py`).
 - **Credit-refill wait + two-phase last-resort + key-limit probe** (2026-07-27, D158): tightens the
   D155/D156 resilience after the 7/27 investigation showed the Fireworks backstop never actually
   engaged and the balance probe was blind to the real failure. Three parts. **(1) 402 refill-wait

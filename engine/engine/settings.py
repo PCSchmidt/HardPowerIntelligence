@@ -68,7 +68,17 @@ class Settings(BaseSettings):
     # so an OpenRouter credit outage can't dark it too). Serves llm_model_fallback_last_resort.
     fireworks_api_key: str = ""
 
-    # Budget guards
+    # Budget guards.
+    # llm_run_budget_usd is the ENFORCED runaway circuit breaker (D159): a single desk-run is
+    # refused further LLM calls once its estimated spend crosses this — so a loop/glitch is bounded
+    # per process (~$3 × 3 desks worst case) and degrades (LLMBudgetExceeded) instead of racking up
+    # an unbounded bill. Process-local, so it resets every run with zero shared state. This is what
+    # lets the OpenRouter key cap be raised to a catastrophe-only ceiling without exposure. Uses the
+    # coarse blended $/1M rate above — fine for a runaway magnitude check (normal desk-run ≈ $0.05,
+    # so ~60× headroom). 0 disables.
+    llm_run_budget_usd: float = 3.0
+    # Aspirational cost targets (NOT yet enforced across processes — a true daily/monthly cap needs
+    # shared state; the per-run breaker above is the real glitch guard). Surfaced by cost telemetry.
     llm_daily_budget_usd: float = 5.0
     llm_monthly_budget_usd: float = 50.0
 

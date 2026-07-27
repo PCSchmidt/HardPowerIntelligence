@@ -106,6 +106,14 @@ class LLMError(Exception):
     pass
 
 
+class LLMBudgetExceeded(LLMError):
+    """This desk-run crossed `llm_run_budget_usd` — a runaway circuit breaker (D159).
+
+    Raised BEFORE a further call is made, so a loop/glitch is bounded per process instead of
+    racking up an unbounded bill. A subclass of LLMError so the caller's existing degrade path
+    handles it (the desk skips/fails loudly rather than spending on)."""
+
+
 def parse_json(text: str | None) -> dict | list | None:
     """Return parsed JSON from text, stripping markdown fences if present.
 
@@ -262,6 +270,18 @@ class LLMClient:
         fallbacks: list[str] | None = None,
         temperature: float | None = None,
     ) -> str:
+        # Runaway circuit breaker (D159): refuse the call if this desk-run has already spent its
+        # budget. Checked pre-call so a loop is bounded — worst overshoot is the one in-flight call.
+        budget = settings.llm_run_budget_usd
+        if budget > 0:
+            spent = self.usage_snapshot()["est_cost_usd"]
+            if spent >= budget:
+                log.error("llm_budget_exceeded", spent_usd=spent, budget_usd=budget, calls=self._calls)
+                raise LLMBudgetExceeded(
+                    f"desk-run spend ~${spent:.2f} reached the ${budget:.2f} run budget "
+                    f"after {self._calls} calls — refusing further LLM calls (possible loop)."
+                )
+
         base: dict = {"model": model, "messages": messages}
         if json_mode:
             base["response_format"] = {"type": "json_object"}
